@@ -1,6 +1,6 @@
 ---
 name: vainreef-fast-publish
-description: Build small Windows desktop apps from natural-language requirements and move them through a fixed C#/.NET 10/WinUI 3 toolchain to a tested MSIX and Microsoft Store submission. Use when a user asks an AI coding agent to create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
+description: Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Project requests into Fast Mode when they fit the contract, identify infrastructure or compliance thresholds, and prepare an Advanced Mode handoff when a request needs a server, accounts, monetization, or restricted capabilities. Use when a user asks an AI coding agent to create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
 ---
 
 # Vainreef Fast Publish
@@ -39,15 +39,52 @@ description: Build small Windows desktop apps from natural-language requirements
 - 将 `winapp` 视为需要显式锁定的工具；官方当前将其标为 public preview，命令和特性可能变化。发布前记录 `winapp --version` 与 `winapp --help` 输出。
 - 版本锁定后，Agent 依据 lock file 工作；升级动作单独形成 Skill release。
 
+## Capability Boundary
+
+Fast Publish Mode 以基础设施、数据流、权限和 Store 前提定义边界，而不是按“聊天 App、图片 App、天气 App”这类产品名称做排除。完整规则见 [capability-boundary.md](references/capability-boundary.md)。
+
+### Fast Mode contract
+
+把每个需求投影到下面八个词：
+
+> **免费、本地、个人、通用；固定技术栈；Microsoft Store only。**
+
+- **免费**：应用价格为 Free；付费 Offer、订阅、IAP、广告、License 和 payout 进入 Advanced Mode。
+- **本地**：核心计算、JSON/SQLite 数据和用户内容默认留在 Windows 本机；自建服务器、云数据库、同步服务和 License Server 进入 Advanced Mode。
+- **个人**：按普通个人开发者账号设计；公司主体、DUNS、组织审批和企业身份链路作为额外前提单独评估。
+- **通用**：效率、创作、学习、生活、本地数据处理、API Client 和个人工具优先进入 Fast Mode；行业资质、特殊版权授权、金融/医疗/赌博运营链路进入 Advanced Mode。
+- **权限**：使用普通窗口、文件选择器和本地存储；管理员、驱动、内核、系统服务、全局拦截、特殊系统数据和 Restricted Capability 进入 Advanced Mode。
+- **隐私**：默认关闭遥测、广告追踪、账号体系和用户内容上传；具体 App 仍按当前 Store 规则检查隐私政策要求。
+- **秘密**：公开 API 或最终用户自行填写的 API key 可以进入 Fast Mode；开发者自己的 key、统一额度、统一计费和隐藏凭据需要服务器边界。
+- **网络**：没有自建服务器仍然可以联网；使用 `HttpClient` 访问稳定公开 API，或让用户提供自己的凭据。
+
+### Request triage
+
+每次收到需求时执行：
+
+1. 提取产品目标，不按产品类别做结论。
+2. 检查服务器、账号、云同步、开发者秘密、收费、特殊权限、行业资质和个人信息数据流。
+3. 为需求生成 Fast Mode projection：优先采用本地数据、用户输入、公开 API、文件选择器和免费 Store Offer。
+4. 需求落在契约内时直接实现。
+5. 需求需要改变基础设施时，说明触发项，给出保留核心价值的本地版本，并把完整版本标记为 Advanced Mode。
+6. 只有在用户确认后才把项目切换到 Advanced Mode；Fast Publish Skill 继续负责其中的 Fast Mode 版本。
+
+用户沟通模板：
+
+```text
+完整需求需要 [服务器 / 账号体系 / 云同步 / 开发者统一 API / 收费 / 特殊 Capability]，这属于 Advanced Mode。
+Fast Mode 可以先交付 [本地化投影]：核心价值保留，数据留在本机，应用保持免费并走 MSIX + Microsoft Store。
+```
+
 ### User prerequisites
 
 - 采用 CLI-first 路径；Visual Studio 作为可选工具，Fast Publish 流程以 `dotnet`、WinUI templates 和 `winapp` 为主。
 - Git 属于实现细节。Agent 可以读取本地仓库、下载 archive 或使用其他文件来源完成模板初始化。
 - Windows 实机或 VM 是 WinUI、Package Identity、开发证书、MSIX 安装和 Store readiness 的验证环境。
 
-### V1 范围
+### Stack boundary
 
-将下面的选项视为 Fast Publish V1 之外的技术栈：WPF、WinForms、.NET MAUI、Electron、Tauri、Python GUI、C++ UI、EXE/MSI/NSIS/Inno Setup/Squirrel 分发。遇到这类需求时，先记录为 Fast Mode exception，再由项目负责人决定是否创建新的 Skill mode。
+Fast Mode 只有一套底盘：C#/.NET 10/WinUI 3/Windows App SDK Stable/`dotnet`/`winapp`/MSIX/Store。WPF、WinForms、.NET MAUI、Electron、Tauri、Python GUI、C++ UI、EXE/MSI/NSIS/Inno Setup/Squirrel 属于技术栈切换信号；记录为 Advanced Mode candidate，并优先给出保留用户目标的 Fast Mode projection。
 
 ## Golden Template
 
@@ -80,6 +117,7 @@ store/
 - 每个新增 NuGet 包写入依赖清单：包名、精确版本、用途、许可证、体积/原生依赖、验证结果。
 - 让 App 首次打开即可说明价值，示例数据和空状态都可用。
 - 首个 App 优先本地化、离线化和小功能闭环，降低 Store 变量。
+- 默认关闭遥测、广告 SDK、远程用户画像和内容上传；涉及个人信息时读取当前 Store policy 并准备对应资料。
 
 ## Workflow
 
@@ -151,6 +189,7 @@ winapp pack ./publish --generate-cert --install-cert
 - Store listing 至少准备描述、图标和截图。
 - 完成年龄评级问卷。
 - 个人信息访问、收集或传输场景准备隐私政策 URL。
+- 检查 manifest 中的 Capability；普通文件选择优先，Restricted Capability 与 elevation 进入 Advanced Mode 评估。
 - 将 `APP_ID`、目标市场、价格和可见性留给用户确认。
 
 CLI 提交基线：
@@ -176,6 +215,8 @@ winapp store publish ./*.msix --appId APP_ID
 每次执行结束时，输出：
 
 - 需求摘要与采用的页面/数据模型。
+- Fast Mode classification：direct、projected 或 Advanced Mode candidate。
+- 若使用 projection，说明保留的核心价值与调整后的基础设施边界。
 - 使用的模板 commit 与版本锁内容。
 - 修改过的文件绝对路径。
 - 执行过的命令与结果。
@@ -189,4 +230,5 @@ winapp store publish ./*.msix --appId APP_ID
 按需读取：
 
 - [version-lock.md](references/version-lock.md)：V1 版本锁定记录。
+- [capability-boundary.md](references/capability-boundary.md)：按基础设施、数据、权限、隐私和商业化划分 Fast Mode。
 - [official-sources.md](references/official-sources.md)：微软官方工具链、WinUI、.NET、SQLite 和 Store 资料。
