@@ -1,0 +1,35 @@
+# macOS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# .NET / Windows build output
+**/bin/
+**/obj/
+**/TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Generated packaging scratch space
+artifacts/
+publish/
+packages/
+
+# Local secrets and signing material
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Local tool caches
+.nuget/
+
+# Keep the repository's test-build archive visible to Git.
+# Final MSIX/MSIXBUNDLE files belong under apps/test-builds/.
