@@ -134,7 +134,7 @@ apps/test-builds/<app-slug>/<version>/
 - [x] 建立 Skill、模板、测试 Build、研究目录
 - [x] 确定首个 Golden Path：本地决策器「别纠结了」
 - [ ] 在 Windows 实机固定 Windows App SDK 与 `winapp` 版本
-- [ ] 创建 `skills/vainreef-fast-publish`
+- [x] 创建 `skills/vainreef-fast-publish`
 - [ ] 建出第一个可安装 MSIX
 - [ ] 完成一次 Microsoft Store 提交并记录结果
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vainreef Fast Publish"
+  short_description: "Build and package small Windows Store apps"
+  default_prompt: "Use $vainreef-fast-publish to turn this app idea into a tested Windows Store package."
