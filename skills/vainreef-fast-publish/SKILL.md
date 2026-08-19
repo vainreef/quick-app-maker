@@ -1,35 +1,39 @@
 ---
 name: vainreef-fast-publish
-description: Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Begin with an open creative interview about what the user wants to make, create a living project README after the first substantive idea, update it after every answer with what the user wants and does not want, detect when the user says the idea is complete, confirm the whole product in plain non-technical language, and only then run feasibility analysis. Use when a user asks an AI coding agent to define, create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
+description: Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Begin with an open creative interview about what the user wants to make, create and update a living project README after every answer, continuously evaluate each new requirement against the fixed stack and Fast Mode boundaries, immediately explain meaningful limits in plain language and ask the user to confirm any risky direction or proposed adjustment, then confirm the complete product and begin implementation. Use when a user asks an AI coding agent to define, create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
 ---
 
 # Vainreef Fast Publish
 
 将用户的自然语言 App 想法落到固定的 Windows Golden Template，完成生成、运行、校验、MSIX 打包和 Microsoft Store 提交流程。把底层工具链冻结，把页面、业务和数据模型留给用户需求。
 
-## Mandatory First Phase: Creative Requirement Discovery
+## Mandatory First Phase: Creative Discovery With Continuous Feasibility
 
-每个新 App 项目先进入创意与需求明确阶段。第一问围绕“你想做什么”，让用户自由发挥想象；此时先理解产品体验，不把想法强行套进“解决麻烦”的叙事。详细流程见 [discovery-interview.md](references/discovery-interview.md)。
+每个新 App 项目先进入创意与需求明确阶段。第一问围绕“你想做什么”，让用户自由发挥想象；与此同时，Agent 在每轮内部检查固定技术栈与 Fast Mode 边界。创意理解和可行性思考属于同一条连续流程。详细流程见 [discovery-interview.md](references/discovery-interview.md)。
 
 遵循以下强制规则：
 
 1. 第一问使用：`你想做一个什么样的 App？可以先随意描述你脑中的画面、玩法或感觉。`
-2. 每轮优先提出一个关键问题，根据上一轮答案自然深入；问题围绕用户想看到什么、点什么、发生什么、保留什么感觉。
+2. 每轮优先提出一个关键问题，根据上一轮答案自然深入。
 3. 用户给出第一段实质想法后，立即在当前工作目录创建暂定项目文件夹和 `README.md`。
-4. 每次收到用户回答后，先更新 README，再提出下一问。README 持续记录：当前想法、用户需要什么、用户目前不需要什么、新增创意、已确定内容、仍待明确内容和每轮变更。
-5. 访谈期间把 README 当作活的创意记录，允许推翻、扩展、缩小和重新命名；新回答覆盖旧理解时，保留一条简短变更记录。
-6. 识别用户的结束信号，例如“就是这样”“差不多了”“就这些”“这个方向可以”“开始吧”“按这个来”。用户随时可以结束创意访谈。
-7. 收到结束信号后，停止继续发散问题，重新阅读完整 README，并用非常容易理解的语言复述整个项目。
-8. 需求确认复述只讲：要做什么、给谁用、打开后会发生什么、用户需要什么、用户目前不需要什么、希望是什么感觉、怎样算做好。此处保持产品语言，隐藏技术栈、框架、打包、数据库、权限名和发布工具。
-9. 复述结尾只问：`我理解的是这样，对吗？`
-10. 用户确认后，把 README 状态更新为“需求已确认”，进入独立的可行性分析阶段。
-11. 可行性分析发现需要调整时，用生活化语言说明原因、保留内容和调整内容，然后询问：`这样调整可以吗？`
-12. 用户确认可行方案后，再进入工程实现阶段。
+4. 每次收到用户回答后，先更新 README，再同时进行需求理解与边界判断。
+5. README 持续记录：当前想法、用户需要什么、用户目前不需要什么、新增创意、已确定内容、当前限制与提醒、用户对提醒的选择、仍待明确内容和每轮变更。
+6. 新需求与当前技术栈、性能目标、Fast Mode 基础设施或 Store 路径存在明显张力时，立即提醒；提醒发生在对应想法出现的当轮。
+7. 提醒使用用户易懂的语言，依次说明：用户想要的体验、当前路线擅长什么、按原方向继续可能出现什么结果、建议如何调整，并询问用户是否确认继续或接受调整。
+8. 提醒前至少审视五个方面：当前技术栈是否匹配、性能目标是否现实、素材与内容制作量、在线或系统依赖、Store 发布变量。基于完整体验慎重判断，而不是只看关键词。
+9. 例如用户提出完整 3D 射击游戏时，说明当前路线更适合普通 Windows 工具和轻量界面；完整 3D 射击涉及实时画面、角色动画、物理、地图、音效与持续性能优化，当前路线的成品质量和稳定发布风险很高。随后询问用户更希望进入游戏专用路线，还是把创意收敛为轻量 2D、俯视角或射击训练小应用。
+10. 用户确认继续某个高风险方向时，把“已知限制、用户选择和后续影响”写入 README；后续出现新的实质风险时再次提醒。
+11. 用户确认调整方案时，立即更新“用户需要什么、用户目前不需要什么、已确定内容与限制记录”，然后继续创意提问。
+12. 识别用户的结束信号，例如“就是这样”“差不多了”“就这些”“这个方向可以”“开始吧”“按这个来”。
+13. 收到结束信号后，停止发散，重新阅读完整 README，并用非常容易理解的语言复述整个项目以及用户已经确认过的取舍。
+14. 最终复述只讲产品体验：要做什么、给谁用、打开后会发生什么、需要什么、目前省略什么、希望是什么感觉、怎样算做好。工程术语保持隐藏。
+15. 复述结尾只问：`我理解的是这样，对吗？`
+16. 用户确认后，将 README 状态更新为“需求与可行方向已确认”，进入工程实现阶段。
 
-阶段顺序固定为：
+连续流程为：
 
 ```text
-自由创意 → 逐轮提问 → 每轮更新 README → 用户主动收口 → 通俗完整复述 → 用户确认 → 可行性分析 → 调整确认 → 工程实现
+自由创意 → 更新 README → 同轮可行性思考 → 必要时提醒并确认 → 继续提问 → 用户主动收口 → 通俗完整复述 → 用户确认 → 工程实现
 ```
 
 ## Skill Contract
@@ -173,7 +177,14 @@ store/
 每轮都执行同一个循环：
 
 ```text
-读取 README → 理解本轮回答 → 更新 README → 选择当前最关键的创意缺口 → 提出一个自然问题
+读取 README
+→ 理解本轮回答
+→ 更新用户需要与当前省略
+→ 检查技术栈和 Fast Mode 边界
+→ 有明显风险时立即提醒并等待选择
+→ 更新提醒与用户决定
+→ 选择下一个创意缺口
+→ 提出一个自然问题
 ```
 
 每次更新至少检查：
@@ -186,6 +197,8 @@ store/
 - `新增创意`：本轮出现、还在探索的点子。
 - `已确定内容`：用户已经明确认可的决定。
 - `待明确内容`：下一轮真正值得问的问题。
+- `当前限制与提醒`：本轮发现的技术栈、性能、联网、权限、商业化或发布风险。
+- `用户对提醒的选择`：继续原方向、采用调整、交给高级路线或暂缓决定。
 - `创意记录`：日期/轮次、本轮新增、修改、移除与用户原意摘要。
 
 提问从产品体验逐步递进：
@@ -199,7 +212,7 @@ store/
 7. 风格、语气、名称和完成后的理想感觉。
 8. 用户亲自体验时，怎样判断“这就是我想要的”。
 
-使用产品语言交流。对尚未影响用户体验的工程问题留到可行性分析阶段。
+使用产品语言交流，同时在内部持续检查工程适配度。风险会影响成品体验、成本、性能或发布稳定性时，当轮向用户说明；纯实现细节保持隐藏。
 
 ### 3. Detect the user stop signal and confirm the whole product
 
@@ -228,32 +241,17 @@ store/
 6. 此阶段隐藏技术栈、框架、存储方案、API 名称、Capability、MSIX 和构建工具。
 7. 结尾询问：`我理解的是这样，对吗？`
 
-用户补充或纠正时，回到 Stage 2，更新 README 并继续澄清。用户确认时，将 README 状态改为“需求已确认”，进入 Stage 4。
+用户补充或纠正时，回到 Stage 2，更新 README 并继续澄清。用户确认时，进入 Stage 4。
 
-### 4. Run feasibility analysis as a separate checkpoint
+### 4. Finalize the continuously checked product brief
 
-需求确认后，再读取 [capability-boundary.md](references/capability-boundary.md) 做内部判断：
+用户确认完整复述后：
 
-- `direct`：用户确认的完整想法可以原样进入 Fast Mode。
-- `projected`：核心体验保留，部分实现需要调整为更轻量的版本。
-- `advanced-candidate`：完整体验需要持续在线服务、跨设备账号、统一代付能力、收费体系或更深层系统访问。
-
-向用户解释时继续使用生活化语言，先给结论，再讲影响：
-
-```text
-你确认的核心体验是：[核心体验]。
-其中 [部分内容] 会带来 [用户能理解的影响]。
-我建议第一版这样处理：[调整后的体验]。
-这样会保留：[保留内容]；暂时调整：[调整内容]。
-这样调整可以吗？
-```
-
-用户确认后：
-
-1. 更新 README 的“可行性结论”和“用户确认的调整”。
-2. 把当前版本标记为“可进入实现”。
-3. 如项目名称在创意阶段发生变化，安全地重命名项目目录并更新 README 标题。
-4. 再进入技术工程阶段。
+1. 确认 README 已记录每一项重要限制、提醒和用户选择。
+2. 将 README 状态更新为“需求与可行方向已确认”。
+3. 把仍待工程验证的内容标为“制作中验证”，并保持用户易懂的描述。
+4. 如项目名称在创意阶段发生变化，安全地重命名项目目录并更新 README 标题。
+5. 进入技术工程阶段。
 
 ### 5. Bootstrap the technical project
 

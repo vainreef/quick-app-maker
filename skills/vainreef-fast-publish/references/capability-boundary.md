@@ -103,7 +103,7 @@ Fast Mode projection：把 AI App 降为“用户自行填写 key 的本地客�
 
 1. **Phrase the idea**：用一句话写出用户真正想做的产品和最重要的体验。
 2. **Inspect the boundary**：扫描 server、account、sync、secret、pricing、permission、regulated-data 和 personal-data signals。
-3. **Choose a path**：
+3. **Choose a path during discovery**：
    - `direct`：全部落在 Fast Mode，完成需求确认后实现。
    - `projected`：核心价值可用本地/公开 API/用户凭据版本交付，先说明投影再实现。
    - `advanced-candidate`：完整需求需要改变基础设施或合规前提，保留 Fast Mode projection，并把完整版本标记为 Advanced Mode。
@@ -112,7 +112,7 @@ Fast Mode projection：把 AI App 降为“用户自行填写 key 的本地客�
 
 ## User-facing boundary language
 
-这一阶段发生在产品确认之后。内部分析可以使用技术词，面向用户时改用体验和生活场景表达：
+每轮创意回答后都做内部分析。发现会影响产品方向的实质风险时，当轮提醒；内部可以使用技术词，面向用户时改用体验和生活场景表达：
 
 ```text
 你想要的重点是：[核心体验]。
