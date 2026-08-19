@@ -104,7 +104,7 @@ Fast Mode projection：把 AI App 降为“用户自行填写 key 的本地客�
 1. **Phrase the goal**：用一句话写出用户真正要解决的问题。
 2. **Inspect the boundary**：扫描 server、account、sync、secret、pricing、permission、regulated-data 和 personal-data signals。
 3. **Choose a path**：
-   - `direct`：全部落在 Fast Mode，直接实现。
+   - `direct`：全部落在 Fast Mode，完成需求确认后实现。
    - `projected`：核心价值可用本地/公开 API/用户凭据版本交付，先说明投影再实现。
    - `advanced-candidate`：完整需求需要改变基础设施或合规前提，保留 Fast Mode projection，并把完整版本标记为 Advanced Mode。
 4. **Keep the user goal visible**：说明保留的体验、替换的基础设施和新版本的限制。

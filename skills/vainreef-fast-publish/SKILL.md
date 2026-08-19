@@ -1,11 +1,29 @@
 ---
 name: vainreef-fast-publish
-description: Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Project requests into Fast Mode when they fit the contract, identify infrastructure or compliance thresholds, and prepare an Advanced Mode handoff when a request needs a server, accounts, monetization, or restricted capabilities. Use when a user asks an AI coding agent to create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
+description: Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Begin every new project with a progressive user interview, confirm the complete product brief, evaluate Fast Mode fit in plain language, obtain approval for any projected scope, then create the project folder and README before implementation. Use when a user asks an AI coding agent to define, create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
 ---
 
 # Vainreef Fast Publish
 
 将用户的自然语言 App 想法落到固定的 Windows Golden Template，完成生成、运行、校验、MSIX 打包和 Microsoft Store 提交流程。把底层工具链冻结，把页面、业务和数据模型留给用户需求。
+
+## Mandatory First Phase: Discover Before Building
+
+每个新 App 项目的第一步都是逐步访谈。先把用户脑中的产品弄清楚，再判断能力边界，最后创建项目目录和 README。详细问题树见 [discovery-interview.md](references/discovery-interview.md)。
+
+遵循以下交互规则：
+
+1. 每轮优先提出一个关键问题；两个问题只有在它们紧密相关时一起提出。
+2. 从“解决什么问题”开始，逐步进入用户、场景、操作流程、数据、网络、权限、隐私、商业化、外观和验收标准。
+3. 使用用户的语言，解释技术词时先讲它对产品意味着什么。
+4. 已经回答的信息直接复用，只追问影响产品或 Fast Mode 判断的缺口。
+5. 需求信息完整后，先输出一份通俗的需求复述，并询问：`我的理解对吗？确认后我会创建项目文件夹和 README。`
+6. 根据 Capability Boundary 做 `direct`、`projected` 或 `advanced-candidate` 判断。
+7. 出现 scope projection 时，解释保留的核心价值、需要调整的功能和原因，然后明确询问：`这样调整可以吗？`
+8. 得到用户确认后，在当前工作目录创建 `<app-slug>/`，先写 `<app-slug>/README.md`，再创建工程文件。
+9. README 作为项目合同，至少包含产品目标、目标用户、核心流程、V1 功能、数据与隐私、Fast Mode 判断、固定技术栈、验收标准和 Store 发布计划。
+
+在访谈、需求复述、能力判断和用户确认完成之前，将工程脚手架与业务代码保持在后续阶段。
 
 ## Skill Contract
 
@@ -65,7 +83,7 @@ Fast Publish Mode 以基础设施、数据流、权限和 Store 前提定义边�
 1. 提取产品目标，不按产品类别做结论。
 2. 检查服务器、账号、云同步、开发者秘密、收费、特殊权限、行业资质和个人信息数据流。
 3. 为需求生成 Fast Mode projection：优先采用本地数据、用户输入、公开 API、文件选择器和免费 Store Offer。
-4. 需求落在契约内时直接实现。
+4. 需求落在契约内时说明实现方式；完成用户确认后进入项目创建阶段。
 5. 需求需要改变基础设施时，说明触发项，给出保留核心价值的本地版本，并把完整版本标记为 Advanced Mode。
 6. 只有在用户确认后才把项目切换到 Advanced Mode；Fast Publish Skill 继续负责其中的 Fast Mode 版本。
 
@@ -121,22 +139,97 @@ store/
 
 ## Workflow
 
-### 1. Normalize the request
+### 1. Run the discovery interview
 
-提取以下信息，并把缺失项交给合理默认值：
+读取 [discovery-interview.md](references/discovery-interview.md)，从用户已经提供的信息继续提问。按下面顺序逐步收敛：
 
-- App 名称与一句话价值主张
-- 页面和核心交互
-- 本地数据模型
-- 是否需要文件选择、网络或通知
-- 目标架构：V1 固定 `win-x64`
+1. 想解决的问题与真实使用场景。
+2. 目标用户与使用频率。
+3. 从打开 App 到获得结果的完整操作流程。
+4. 必备功能、以后再做的功能与明确的成功标准。
+5. 输入、输出、保存的数据及数据量。
+6. 文件、网络、第三方 API、API key、账号、同步和通知需求。
+7. 系统权限、个人信息、行业内容、商业化与 Store 资料影响。
+8. App 名称、风格、语言和用户最在意的体验。
 
-将需求映射到 Golden Template，先列出计划文件，再开始改动。
+访谈期间维护一份内部 requirement snapshot。每轮只追问当前最影响方案的缺口，直到 [discovery-interview.md](references/discovery-interview.md) 的 exit criteria 全部满足。
 
-### 2. Bootstrap the project
+### 2. Confirm the product brief
+
+用普通用户能理解的方式复述：
+
+- 这个 App 给谁用。
+- 它解决什么具体问题。
+- 用户打开以后会依次做什么。
+- V1 会交付哪些功能。
+- 数据保存在什么地方。
+- 是否涉及网络、API key、账号、同步、权限或收费。
+- 什么结果算项目完成。
+
+结尾询问：
+
+```text
+这是我对你想法的完整理解。我的理解对吗？确认后我会判断 Fast Mode 实现方式，并创建项目文件夹和 README。
+```
+
+收到确认后再进入能力判断。
+
+### 3. Evaluate Fast Mode fit
+
+逐项检查 [capability-boundary.md](references/capability-boundary.md)：
+
+- Windows + MSIX + Microsoft Store。
+- 免费 Offer。
+- 核心功能本地运行。
+- 自建服务器边界为空。
+- 开发者秘密不进入客户端。
+- 本地数据、普通权限、General Utility。
+- 个人信息数据流与 Privacy Policy 影响。
+
+输出三种结果之一：
+
+- `direct`：完整需求落在 Fast Mode，说明“可以按原想法实现”，并用一段话解释实现方式。
+- `projected`：核心目标可保留，部分基础设施需要本地化；说明修改前后差异与用户体验影响。
+- `advanced-candidate`：完整版本需要服务器、账号、云同步、收费、项目方秘密、特殊权限或行业前提；同时给出可交付的 Fast Mode 版本。
+
+使用通俗解释，把技术原因翻译成用户影响：
+
+- `需要服务器` → 需要一套持续在线的系统替所有用户保存、转发或控制数据。
+- `需要隐藏密钥` → 密钥放进安装包会进入用户电脑，需要服务端代为调用。
+- `需要账号与云同步` → 数据要离开本机，并增加登录、远程存储和隐私流程。
+- `需要特殊权限` → App 会访问更深层的系统能力，并增加 Store 审核变量。
+- `需要商业结算` → 会增加价格、付款、税务与结算配置。
+
+当结果为 `projected` 或 `advanced-candidate` 时，使用下面格式并等待确认：
+
+```text
+你真正想要的是：[核心目标]。
+完整版本还需要：[触发项及其对用户的影响]。
+Fast Mode 我建议这样实现：[具体修改后的版本]。
+这样会保留：[保留的价值]；调整的是：[调整内容]。
+这样调整可以吗？
+```
+
+用户确认修改方案后，才把投影版本写入项目 README。
+
+### 4. Create the project folder and README
+
+在当前工作目录执行：
+
+1. 根据用户确认的名称生成小写连字符形式的 `<app-slug>`。
+2. 检查同名路径；同名目录已存在且内容属于其他项目时，请用户确认新的目录名。
+3. 创建 `<app-slug>/`。
+4. 读取并填充 [project-readme-template.md](assets/project-readme-template.md)。
+5. 替换全部 `{{PLACEHOLDER}}`，清理空白示例项，写入 `<app-slug>/README.md`。
+6. 向用户展示目录绝对路径与 README 摘要，请用户确认项目合同。
+7. 确认后再放入 Golden Template 和工程文件。
+
+README 必须记录用户批准的真实需求；每次范围变化时同步更新 Decisions 与 Acceptance Criteria。
+
+### 5. Bootstrap the technical project
 
 - 在 Windows 环境确认 `.NET SDK 10.x`、WinUI 模板、`winapp` CLI 和目标 Windows SDK。
-- 使用模板或等价的官方 WinUI 项目创建基础工程。
+- 使用 Golden Template 或等价的官方 WinUI 项目创建基础工程。
 - 记录 `dotnet --info`、`winapp --version`、Windows App SDK 和 WinUI template 版本。
 - 保持项目名称、程序集名、包身份、显示名和 Store 名称一致。
 
@@ -148,7 +241,7 @@ cd APP_NAME
 dotnet run
 ```
 
-### 3. Implement the feature
+### 6. Implement the confirmed V1
 
 按下面的顺序实现：
 
@@ -157,19 +250,20 @@ dotnet run
 3. 业务 Service。
 4. 本地 JSON 或 SQLite 存储。
 5. 浅色/深色主题、空状态、错误状态和首次运行示例数据。
-6. 仅在需求明确时加入网络请求、文件能力或系统集成。
+6. 用户确认过的网络请求、文件能力或系统集成。
 
-每个阶段都执行一次 `dotnet run`，让 Agent 先修复当前编译与运行问题，再继续增加功能。
+每个阶段都执行一次 `dotnet run`，先处理当前编译与运行问题，再继续增加功能。新想法若改变已确认范围，先更新 README 并请用户确认。
 
-### 4. Validate locally
+### 7. Validate locally
 
-- 先验证 Debug：`dotnet run`。
-- 再验证 Release：`dotnet build -c Release` 或项目规定的 Release 命令。
+- 验证 Debug：`dotnet run`。
+- 验证 Release：`dotnet build -c Release` 或项目规定的 Release 命令。
+- 按 README 的 Acceptance Criteria 逐条验收。
 - 测试首次启动、主要流程、空状态、重复启动、本地数据重载和窗口关闭/重开。
 - 检查依赖清单、包身份、显示名称、图标和版本号。
 - 记录测试机器、Windows 版本、架构和工具链版本。
 
-### 5. Package as MSIX
+### 8. Package as MSIX
 
 开发运行和最终发布分开处理：
 
@@ -180,7 +274,7 @@ winapp pack ./publish --generate-cert --install-cert
 
 本地开发证书用于测试安装；Store 提交使用 Store 认证后的签名链。管理员权限只用于本地测试证书与安装准备，向用户解释动作目的后再请求确认。
 
-### 6. Prepare and publish to Store
+### 9. Prepare and publish to Store
 
 发布前检查：
 
@@ -214,9 +308,10 @@ winapp store publish ./*.msix --appId APP_ID
 
 每次执行结束时，输出：
 
-- 需求摘要与采用的页面/数据模型。
+- 用户确认的需求摘要、核心流程与验收标准。
 - Fast Mode classification：direct、projected 或 Advanced Mode candidate。
 - 若使用 projection，说明保留的核心价值与调整后的基础设施边界。
+- 新项目目录与 README 的绝对路径。
 - 使用的模板 commit 与版本锁内容。
 - 修改过的文件绝对路径。
 - 执行过的命令与结果。
@@ -229,6 +324,8 @@ winapp store publish ./*.msix --appId APP_ID
 
 按需读取：
 
+- [discovery-interview.md](references/discovery-interview.md)：逐步访谈问题树、requirement snapshot 与结束条件。
 - [version-lock.md](references/version-lock.md)：V1 版本锁定记录。
 - [capability-boundary.md](references/capability-boundary.md)：按基础设施、数据、权限、隐私和商业化划分 Fast Mode。
 - [official-sources.md](references/official-sources.md)：微软官方工具链、WinUI、.NET、SQLite 和 Store 资料。
+- [project-readme-template.md](assets/project-readme-template.md)：用户确认后写入新项目目录的 README 模板。
