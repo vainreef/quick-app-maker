@@ -1,151 +1,103 @@
-# {{APP_NAME}}
+# {{APP_NAME}}（暂定）
 
-> {{ONE_SENTENCE_VALUE}}
+> 这是一份会随着每轮交流持续更新的项目创意记录。
 
-## 项目状态
+## 当前状态
 
-- 模式：Vainreef Fast Publish Mode
-- 需求状态：已与用户确认
-- Fast Mode 分类：{{FAST_MODE_CLASSIFICATION}}
-- 目标平台：Windows 11 优先，Windows 10 1809+
-- 分发：MSIX + Microsoft Store
-- 价格：Free
+- 阶段：创意与需求明确中
+- 最近更新：{{UPDATED_AT}}
+- 当前轮次：{{ROUND_NUMBER}}
+- 产品确认：等待用户确认
+- 可行性分析：尚未开始
 
-## 这个项目要做什么
+## 当前想法
 
-{{PROJECT_OVERVIEW}}
+{{CURRENT_IDEA}}
 
-## 为什么要做
+## 用户需要什么
 
-### 用户
+- {{WANT_1}}
 
-{{TARGET_USER}}
+## 用户目前不需要什么
 
-### 真实使用场景
+- {{DOES_NOT_WANT_1_OR_UNDECIDED}}
 
-{{REAL_SCENARIO}}
+## 谁会使用
 
-### 要解决的问题
+{{WHO_USES_IT_OR_UNDECIDED}}
 
-{{PROBLEM}}
+## 什么时候会打开
 
-## 用户完整流程
+{{WHEN_USED_OR_UNDECIDED}}
 
-1. {{JOURNEY_STEP_1}}
-2. {{JOURNEY_STEP_2}}
-3. {{JOURNEY_STEP_3}}
-4. {{JOURNEY_RESULT}}
+## 使用画面
 
-## V1 功能
+### 打开后第一眼
 
-### Must have
+{{FIRST_SCREEN_OR_UNDECIDED}}
 
-- [ ] {{MUST_HAVE_1}}
-- [ ] {{MUST_HAVE_2}}
-- [ ] {{MUST_HAVE_3}}
+### 用户会怎么操作
 
-### Later
+1. {{FLOW_STEP_1_OR_UNDECIDED}}
 
-- {{LATER_1}}
-- {{LATER_2}}
+### 最后会得到什么
 
-## 输入、输出与数据
+{{FINAL_RESULT_OR_UNDECIDED}}
 
-| 项目 | 设计 |
-| --- | --- |
-| 输入 | {{INPUTS}} |
-| 输出 | {{OUTPUTS}} |
-| 本地存储 | {{LOCAL_STORAGE}} |
-| 数据规模 | {{DATA_SCALE}} |
-| 导入/导出 | {{IMPORT_EXPORT}} |
-| 删除/重置 | {{DELETE_RESET}} |
+## 感觉与风格
 
-## 网络、账号与密钥
+{{LOOK_AND_FEEL_OR_UNDECIDED}}
 
-| 项目 | 设计 |
-| --- | --- |
-| 离线能力 | {{OFFLINE_BEHAVIOR}} |
-| 网络服务 | {{NETWORK_SERVICES}} |
-| API key 所有者 | {{API_KEY_OWNER}} |
-| 账号与同步 | {{ACCOUNT_SYNC}} |
+## 正在探索的创意
 
-## 权限与隐私
+- {{EXPLORING_IDEA_OR_NONE}}
 
-- 文件/设备权限：{{PERMISSIONS}}
-- 个人信息数据流：{{PERSONAL_DATA_FLOW}}
-- 遥测：默认关闭
-- 广告追踪：默认关闭
-- 用户内容上传：{{CONTENT_UPLOAD}}
-- Privacy Policy 判断：{{PRIVACY_POLICY_DECISION}}
+## 已经确定
 
-## Fast Mode 判断
+- {{CONFIRMED_ITEM_OR_NONE}}
 
-### 保留的核心价值
+## 以后可以再加入
 
-{{PRESERVED_VALUE}}
+- {{LATER_IDEA_OR_NONE}}
 
-### 能力边界结论
+## 交给 Agent 发挥
 
-{{BOUNDARY_EXPLANATION}}
+- {{DELEGATED_ITEM_OR_NONE}}
 
-### 用户确认过的调整
+## 第一版怎样算做好
 
-{{APPROVED_PROJECTION}}
+- {{DONE_MEANS_1_OR_UNDECIDED}}
 
-## 固定技术栈
+## 待明确
 
-- C#
-- .NET 10 LTS
-- WinUI 3 + XAML
-- Windows App SDK Stable / pinned
-- `dotnet` CLI
-- `winapp` CLI
-- MSIX
-- Microsoft Store
-- `System.Text.Json`；复杂本地数据按需使用 `Microsoft.Data.Sqlite`
-- XAML + code-behind + 简单 Service 层
+- {{OPEN_QUESTION_1_OR_NONE}}
 
-## 目录计划
+## 产品确认
 
-```text
-{{APP_SLUG}}/
-├── README.md
-├── App.xaml
-├── MainWindow.xaml
-├── Pages/
-├── Models/
-├── Services/
-├── Storage/
-├── Assets/
-├── Package.appxmanifest
-├── build/
-└── store/
-```
+> 用户发出收口信号后，在这里写入完整的通俗产品复述；用户确认前保持“等待确认”。
 
-## 验收标准
+状态：等待确认
 
-- [ ] {{ACCEPTANCE_1}}
-- [ ] {{ACCEPTANCE_2}}
-- [ ] {{ACCEPTANCE_3}}
-- [ ] Debug 运行通过
-- [ ] Release 构建通过
-- [ ] MSIX 安装、启动、关闭、重开与卸载通过
+## 可行性结论
 
-## Microsoft Store 发布计划
+> 产品确认后再填写。使用普通用户能理解的语言记录结论、建议调整、保留内容和用户确认结果。
 
-1. 确认应用名称与 Package Identity。
-2. 准备图标、截图、描述和年龄评级。
-3. 检查 Capability 与隐私资料。
-4. 生成并安装测试 MSIX。
-5. 生成 Store submission package。
-6. 用户确认 Partner Center 信息后提交。
+状态：尚未开始
 
-## Decisions
+### 建议调整
 
-| 日期 | 决策 | 原因 | 用户确认 |
-| --- | --- | --- | --- |
-| {{DATE}} | {{DECISION}} | {{DECISION_REASON}} | Yes |
+- 暂无
 
-## Open questions
+### 保留内容
 
-- {{OPEN_QUESTION_OR_NONE}}
+- 暂无
+
+### 用户确认的调整
+
+- 暂无
+
+## 创意记录
+
+| 日期/轮次 | 本轮新增 | 本轮调整 | 本轮省略 | 用户原意摘要 |
+| --- | --- | --- | --- | --- |
+| {{UPDATED_AT}} / {{ROUND_NUMBER}} | {{ROUND_ADDED}} | {{ROUND_CHANGED}} | {{ROUND_REMOVED}} | {{USER_INTENT_SUMMARY}} |

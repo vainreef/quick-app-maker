@@ -101,7 +101,7 @@ Fast Mode projection：把 AI App 降为“用户自行填写 key 的本地客�
 
 ## Request triage protocol
 
-1. **Phrase the goal**：用一句话写出用户真正要解决的问题。
+1. **Phrase the idea**：用一句话写出用户真正想做的产品和最重要的体验。
 2. **Inspect the boundary**：扫描 server、account、sync、secret、pricing、permission、regulated-data 和 personal-data signals。
 3. **Choose a path**：
    - `direct`：全部落在 Fast Mode，完成需求确认后实现。
@@ -112,18 +112,21 @@ Fast Mode projection：把 AI App 降为“用户自行填写 key 的本地客�
 
 ## User-facing boundary language
 
-使用建设性的、技术条件式表达：
+这一阶段发生在产品确认之后。内部分析可以使用技术词，面向用户时改用体验和生活场景表达：
 
 ```text
-这部分完整体验需要 [服务器 / 账号 / 云同步 / 项目方 API key / 收费 / Restricted Capability]，因此归入 Advanced Mode。
-Fast Mode 可以先交付 [projection]：保留 [核心价值]，采用 [本地存储 / 公开 API / 用户自有凭据 / 免费 Offer]，继续走 MSIX + Microsoft Store。
+你想要的重点是：[核心体验]。
+其中 [某项体验] 会让应用长期依赖另一套在线服务、统一身份、收费流程或更深层的电脑访问。
+第一版我建议这样处理：[用户能直接理解的修改版本]。
+这样会保留：[保留内容]；暂时调整：[调整内容]。
+这样调整可以吗？
 ```
 
 直接落在契约内时，使用：
 
 ```text
-这个需求符合 Fast Mode：Windows 本地运行、数据留在本机、免费 Store Offer、普通权限。
-我会从 Golden Template 开始实现，并先完成本地运行与 MSIX 验证。
+你确认的第一版可以按现在的想法继续。
+它会保持简单、免费，主要内容留在用户自己的电脑里。接下来我会进入制作阶段。
 ```
 
 ## Store and compliance checkpoints

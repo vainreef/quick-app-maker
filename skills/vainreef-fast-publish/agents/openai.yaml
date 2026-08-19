@@ -1,4 +1,4 @@
 interface:
   display_name: "Vainreef Fast Publish"
   short_description: "Interview, define, build, and package Windows apps"
-  default_prompt: "Use $vainreef-fast-publish to interview me about my app idea, confirm its Fast Mode scope, then create the project README and Windows app."
+  default_prompt: "Use $vainreef-fast-publish to help me creatively explore what I want to make, update a living project README after every answer, confirm the whole product in plain language, then analyze feasibility."

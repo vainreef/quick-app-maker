@@ -1,29 +1,36 @@
 ---
 name: vainreef-fast-publish
-description: Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Begin every new project with a progressive user interview, confirm the complete product brief, evaluate Fast Mode fit in plain language, obtain approval for any projected scope, then create the project folder and README before implementation. Use when a user asks an AI coding agent to define, create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
+description: Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Begin with an open creative interview about what the user wants to make, create a living project README after the first substantive idea, update it after every answer with what the user wants and does not want, detect when the user says the idea is complete, confirm the whole product in plain non-technical language, and only then run feasibility analysis. Use when a user asks an AI coding agent to define, create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
 ---
 
 # Vainreef Fast Publish
 
 将用户的自然语言 App 想法落到固定的 Windows Golden Template，完成生成、运行、校验、MSIX 打包和 Microsoft Store 提交流程。把底层工具链冻结，把页面、业务和数据模型留给用户需求。
 
-## Mandatory First Phase: Discover Before Building
+## Mandatory First Phase: Creative Requirement Discovery
 
-每个新 App 项目的第一步都是逐步访谈。先把用户脑中的产品弄清楚，再判断能力边界，最后创建项目目录和 README。详细问题树见 [discovery-interview.md](references/discovery-interview.md)。
+每个新 App 项目先进入创意与需求明确阶段。第一问围绕“你想做什么”，让用户自由发挥想象；此时先理解产品体验，不把想法强行套进“解决麻烦”的叙事。详细流程见 [discovery-interview.md](references/discovery-interview.md)。
 
-遵循以下交互规则：
+遵循以下强制规则：
 
-1. 每轮优先提出一个关键问题；两个问题只有在它们紧密相关时一起提出。
-2. 从“解决什么问题”开始，逐步进入用户、场景、操作流程、数据、网络、权限、隐私、商业化、外观和验收标准。
-3. 使用用户的语言，解释技术词时先讲它对产品意味着什么。
-4. 已经回答的信息直接复用，只追问影响产品或 Fast Mode 判断的缺口。
-5. 需求信息完整后，先输出一份通俗的需求复述，并询问：`我的理解对吗？确认后我会创建项目文件夹和 README。`
-6. 根据 Capability Boundary 做 `direct`、`projected` 或 `advanced-candidate` 判断。
-7. 出现 scope projection 时，解释保留的核心价值、需要调整的功能和原因，然后明确询问：`这样调整可以吗？`
-8. 得到用户确认后，在当前工作目录创建 `<app-slug>/`，先写 `<app-slug>/README.md`，再创建工程文件。
-9. README 作为项目合同，至少包含产品目标、目标用户、核心流程、V1 功能、数据与隐私、Fast Mode 判断、固定技术栈、验收标准和 Store 发布计划。
+1. 第一问使用：`你想做一个什么样的 App？可以先随意描述你脑中的画面、玩法或感觉。`
+2. 每轮优先提出一个关键问题，根据上一轮答案自然深入；问题围绕用户想看到什么、点什么、发生什么、保留什么感觉。
+3. 用户给出第一段实质想法后，立即在当前工作目录创建暂定项目文件夹和 `README.md`。
+4. 每次收到用户回答后，先更新 README，再提出下一问。README 持续记录：当前想法、用户需要什么、用户目前不需要什么、新增创意、已确定内容、仍待明确内容和每轮变更。
+5. 访谈期间把 README 当作活的创意记录，允许推翻、扩展、缩小和重新命名；新回答覆盖旧理解时，保留一条简短变更记录。
+6. 识别用户的结束信号，例如“就是这样”“差不多了”“就这些”“这个方向可以”“开始吧”“按这个来”。用户随时可以结束创意访谈。
+7. 收到结束信号后，停止继续发散问题，重新阅读完整 README，并用非常容易理解的语言复述整个项目。
+8. 需求确认复述只讲：要做什么、给谁用、打开后会发生什么、用户需要什么、用户目前不需要什么、希望是什么感觉、怎样算做好。此处保持产品语言，隐藏技术栈、框架、打包、数据库、权限名和发布工具。
+9. 复述结尾只问：`我理解的是这样，对吗？`
+10. 用户确认后，把 README 状态更新为“需求已确认”，进入独立的可行性分析阶段。
+11. 可行性分析发现需要调整时，用生活化语言说明原因、保留内容和调整内容，然后询问：`这样调整可以吗？`
+12. 用户确认可行方案后，再进入工程实现阶段。
 
-在访谈、需求复述、能力判断和用户确认完成之前，将工程脚手架与业务代码保持在后续阶段。
+阶段顺序固定为：
+
+```text
+自由创意 → 逐轮提问 → 每轮更新 README → 用户主动收口 → 通俗完整复述 → 用户确认 → 可行性分析 → 调整确认 → 工程实现
+```
 
 ## Skill Contract
 
@@ -83,15 +90,18 @@ Fast Publish Mode 以基础设施、数据流、权限和 Store 前提定义边�
 1. 提取产品目标，不按产品类别做结论。
 2. 检查服务器、账号、云同步、开发者秘密、收费、特殊权限、行业资质和个人信息数据流。
 3. 为需求生成 Fast Mode projection：优先采用本地数据、用户输入、公开 API、文件选择器和免费 Store Offer。
-4. 需求落在契约内时说明实现方式；完成用户确认后进入项目创建阶段。
-5. 需求需要改变基础设施时，说明触发项，给出保留核心价值的本地版本，并把完整版本标记为 Advanced Mode。
-6. 只有在用户确认后才把项目切换到 Advanced Mode；Fast Publish Skill 继续负责其中的 Fast Mode 版本。
+4. 需求落在契约内时，把可行性结论写入已经存在的 living README。
+5. 需求需要改变基础设施时，给出保留核心价值的第一版方案，并把完整版本标记为 Advanced Mode。
+6. 用户确认可行方案后，更新 README 并进入工程实现阶段。
 
 用户沟通模板：
 
 ```text
-完整需求需要 [服务器 / 账号体系 / 云同步 / 开发者统一 API / 收费 / 特殊 Capability]，这属于 Advanced Mode。
-Fast Mode 可以先交付 [本地化投影]：核心价值保留，数据留在本机，应用保持免费并走 MSIX + Microsoft Store。
+你想要的重点是：[核心体验]。
+其中 [某项体验] 会让应用长期依赖另一套在线服务、统一账号、收费流程或更深层系统访问。
+第一版我建议这样处理：[更轻量的具体体验]。
+这样会保留：[保留内容]；暂时调整：[调整内容]。
+这样调整可以吗？
 ```
 
 ### User prerequisites
@@ -139,92 +149,111 @@ store/
 
 ## Workflow
 
-### 1. Run the discovery interview
+### 1. Start with open creativity and create the living README
 
-读取 [discovery-interview.md](references/discovery-interview.md)，从用户已经提供的信息继续提问。按下面顺序逐步收敛：
-
-1. 想解决的问题与真实使用场景。
-2. 目标用户与使用频率。
-3. 从打开 App 到获得结果的完整操作流程。
-4. 必备功能、以后再做的功能与明确的成功标准。
-5. 输入、输出、保存的数据及数据量。
-6. 文件、网络、第三方 API、API key、账号、同步和通知需求。
-7. 系统权限、个人信息、行业内容、商业化与 Store 资料影响。
-8. App 名称、风格、语言和用户最在意的体验。
-
-访谈期间维护一份内部 requirement snapshot。每轮只追问当前最影响方案的缺口，直到 [discovery-interview.md](references/discovery-interview.md) 的 exit criteria 全部满足。
-
-### 2. Confirm the product brief
-
-用普通用户能理解的方式复述：
-
-- 这个 App 给谁用。
-- 它解决什么具体问题。
-- 用户打开以后会依次做什么。
-- V1 会交付哪些功能。
-- 数据保存在什么地方。
-- 是否涉及网络、API key、账号、同步、权限或收费。
-- 什么结果算项目完成。
-
-结尾询问：
+读取 [discovery-interview.md](references/discovery-interview.md)，从用户已经表达的想法继续。首次提问聚焦“想做什么”，例如：
 
 ```text
-这是我对你想法的完整理解。我的理解对吗？确认后我会判断 Fast Mode 实现方式，并创建项目文件夹和 README。
+你想做一个什么样的 App？可以先随意描述你脑中的画面、玩法或感觉。
 ```
 
-收到确认后再进入能力判断。
+用户给出第一段实质描述后：
 
-### 3. Evaluate Fast Mode fit
+1. 从描述中生成暂定项目名和小写连字符 `<app-slug>`；名称还在变化时标记为“暂定”。
+2. 在当前工作目录检查同名路径，选择清晰且安全的项目目录名。
+3. 创建 `<app-slug>/`。
+4. 读取 [project-readme-template.md](assets/project-readme-template.md)，创建 `<app-slug>/README.md`。
+5. 把用户原话中的核心想法写进“当前想法”和“本轮记录”。
+6. 记录 README 绝对路径，然后提出下一轮创意问题。
 
-逐项检查 [capability-boundary.md](references/capability-boundary.md)：
+用户最初的请求已经包含实质想法时，直接创建 living README，再追问最值得深入的创意点。
 
-- Windows + MSIX + Microsoft Store。
-- 免费 Offer。
-- 核心功能本地运行。
-- 自建服务器边界为空。
-- 开发者秘密不进入客户端。
-- 本地数据、普通权限、General Utility。
-- 个人信息数据流与 Privacy Policy 影响。
+### 2. Iterate creatively and update README every round
 
-输出三种结果之一：
-
-- `direct`：完整需求落在 Fast Mode，说明“可以按原想法实现”，并用一段话解释实现方式。
-- `projected`：核心目标可保留，部分基础设施需要本地化；说明修改前后差异与用户体验影响。
-- `advanced-candidate`：完整版本需要服务器、账号、云同步、收费、项目方秘密、特殊权限或行业前提；同时给出可交付的 Fast Mode 版本。
-
-使用通俗解释，把技术原因翻译成用户影响：
-
-- `需要服务器` → 需要一套持续在线的系统替所有用户保存、转发或控制数据。
-- `需要隐藏密钥` → 密钥放进安装包会进入用户电脑，需要服务端代为调用。
-- `需要账号与云同步` → 数据要离开本机，并增加登录、远程存储和隐私流程。
-- `需要特殊权限` → App 会访问更深层的系统能力，并增加 Store 审核变量。
-- `需要商业结算` → 会增加价格、付款、税务与结算配置。
-
-当结果为 `projected` 或 `advanced-candidate` 时，使用下面格式并等待确认：
+每轮都执行同一个循环：
 
 ```text
-你真正想要的是：[核心目标]。
-完整版本还需要：[触发项及其对用户的影响]。
-Fast Mode 我建议这样实现：[具体修改后的版本]。
-这样会保留：[保留的价值]；调整的是：[调整内容]。
+读取 README → 理解本轮回答 → 更新 README → 选择当前最关键的创意缺口 → 提出一个自然问题
+```
+
+每次更新至少检查：
+
+- `当前想法`：现在整体要做什么。
+- `用户需要什么`：明确提出、认可或反复强调的内容。
+- `用户目前不需要什么`：用户排除、推迟或表达兴趣较低的内容。
+- `使用画面`：打开以后看到什么、做什么、得到什么。
+- `感觉与风格`：希望带给用户的感受。
+- `新增创意`：本轮出现、还在探索的点子。
+- `已确定内容`：用户已经明确认可的决定。
+- `待明确内容`：下一轮真正值得问的问题。
+- `创意记录`：日期/轮次、本轮新增、修改、移除与用户原意摘要。
+
+提问从产品体验逐步递进：
+
+1. 想做什么、脑中画面和最吸引人的部分。
+2. 谁会使用、什么时候打开。
+3. 打开后第一眼看到什么。
+4. 用户会点什么、输入什么、接下来发生什么。
+5. 最希望保留的三件事。
+6. 当前阶段希望省略或以后再加入的内容。
+7. 风格、语气、名称和完成后的理想感觉。
+8. 用户亲自体验时，怎样判断“这就是我想要的”。
+
+使用产品语言交流。对尚未影响用户体验的工程问题留到可行性分析阶段。
+
+### 3. Detect the user stop signal and confirm the whole product
+
+每轮先判断用户是否表达收口意图。典型语义包括：
+
+- 就是这样、就这些、差不多了。
+- 这个方向可以、按这个来、开始吧。
+- 先做到这里、第一版这样就行。
+- 其他你决定、我暂时没有补充。
+
+识别到收口意图后：
+
+1. 把本轮内容写入 README。
+2. 将 README 状态改为“等待需求确认”。
+3. 阅读 README 全文，处理重复项和前后变化，以最新用户表达为准。
+4. 向用户完整复述项目，保持短句、具体场景和日常语言。
+5. 复述内容只包括：
+   - 这是一个什么 App。
+   - 谁会用、什么时候用。
+   - 打开以后会看到什么。
+   - 用户会依次做什么、最后得到什么。
+   - 用户明确需要什么。
+   - 用户明确暂时省略什么。
+   - 希望呈现什么感觉。
+   - 怎样算第一版做好。
+6. 此阶段隐藏技术栈、框架、存储方案、API 名称、Capability、MSIX 和构建工具。
+7. 结尾询问：`我理解的是这样，对吗？`
+
+用户补充或纠正时，回到 Stage 2，更新 README 并继续澄清。用户确认时，将 README 状态改为“需求已确认”，进入 Stage 4。
+
+### 4. Run feasibility analysis as a separate checkpoint
+
+需求确认后，再读取 [capability-boundary.md](references/capability-boundary.md) 做内部判断：
+
+- `direct`：用户确认的完整想法可以原样进入 Fast Mode。
+- `projected`：核心体验保留，部分实现需要调整为更轻量的版本。
+- `advanced-candidate`：完整体验需要持续在线服务、跨设备账号、统一代付能力、收费体系或更深层系统访问。
+
+向用户解释时继续使用生活化语言，先给结论，再讲影响：
+
+```text
+你确认的核心体验是：[核心体验]。
+其中 [部分内容] 会带来 [用户能理解的影响]。
+我建议第一版这样处理：[调整后的体验]。
+这样会保留：[保留内容]；暂时调整：[调整内容]。
 这样调整可以吗？
 ```
 
-用户确认修改方案后，才把投影版本写入项目 README。
+用户确认后：
 
-### 4. Create the project folder and README
-
-在当前工作目录执行：
-
-1. 根据用户确认的名称生成小写连字符形式的 `<app-slug>`。
-2. 检查同名路径；同名目录已存在且内容属于其他项目时，请用户确认新的目录名。
-3. 创建 `<app-slug>/`。
-4. 读取并填充 [project-readme-template.md](assets/project-readme-template.md)。
-5. 替换全部 `{{PLACEHOLDER}}`，清理空白示例项，写入 `<app-slug>/README.md`。
-6. 向用户展示目录绝对路径与 README 摘要，请用户确认项目合同。
-7. 确认后再放入 Golden Template 和工程文件。
-
-README 必须记录用户批准的真实需求；每次范围变化时同步更新 Decisions 与 Acceptance Criteria。
+1. 更新 README 的“可行性结论”和“用户确认的调整”。
+2. 把当前版本标记为“可进入实现”。
+3. 如项目名称在创意阶段发生变化，安全地重命名项目目录并更新 README 标题。
+4. 再进入技术工程阶段。
 
 ### 5. Bootstrap the technical project
 
@@ -324,8 +353,8 @@ winapp store publish ./*.msix --appId APP_ID
 
 按需读取：
 
-- [discovery-interview.md](references/discovery-interview.md)：逐步访谈问题树、requirement snapshot 与结束条件。
+- [discovery-interview.md](references/discovery-interview.md)：创意问题树、逐轮 README 更新、收口信号与通俗确认格式。
 - [version-lock.md](references/version-lock.md)：V1 版本锁定记录。
 - [capability-boundary.md](references/capability-boundary.md)：按基础设施、数据、权限、隐私和商业化划分 Fast Mode。
 - [official-sources.md](references/official-sources.md)：微软官方工具链、WinUI、.NET、SQLite 和 Store 资料。
-- [project-readme-template.md](assets/project-readme-template.md)：用户确认后写入新项目目录的 README 模板。
+- [project-readme-template.md](assets/project-readme-template.md)：第一段实质想法出现后创建，并在每轮持续更新的 living README 模板。

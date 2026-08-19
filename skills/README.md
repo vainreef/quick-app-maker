@@ -4,4 +4,4 @@
 
 当前 Skill：`vainreef-fast-publish`。
 
-它先通过逐步访谈把用户需求收敛成可确认的产品合同，再判断 Fast Mode 能力边界；用户确认后，在当前工作目录创建项目文件夹和 README，随后推进生成、运行、校验、打包与 Store 提交。访谈流程位于 `skills/vainreef-fast-publish/references/discovery-interview.md`，能力边界位于 `skills/vainreef-fast-publish/references/capability-boundary.md`，具体版本锁定记录位于 `skills/vainreef-fast-publish/references/version-lock.md`。
+它从“用户想做什么”开始进行创意访谈，用户给出第一段实质想法后立即创建项目文件夹和 living README，并在每轮对话后更新用户需要、目前省略、正在探索和已经确定的内容。用户主动收口后，Agent 先用通俗产品语言确认完整项目，再进入 Fast Mode 可行性分析，随后推进生成、运行、校验、打包与 Store 提交。访谈流程位于 `skills/vainreef-fast-publish/references/discovery-interview.md`，能力边界位于 `skills/vainreef-fast-publish/references/capability-boundary.md`，具体版本锁定记录位于 `skills/vainreef-fast-publish/references/version-lock.md`。
