@@ -17,6 +17,8 @@
 
 Skill 收到新想法后先问“你想做什么”，让用户自由发挥创意。用户给出第一段实质想法后，Agent 立即在当前工作目录创建暂定项目文件夹和 living README；此后每轮先更新用户需要、目前省略、正在探索和已经确定的内容，同时检查新想法与固定路线的适配度。遇到完整 3D 游戏、实时多人、云账号、收费或深层系统访问等明显风险时，当轮就用通俗语言提醒并请用户确认方向。用户主动收口后，Agent 完整复述已经讨论和确认过的项目，得到确认后直接进入工程实现。
 
+依赖能力通过 `skills/vainreef-fast-publish/capabilities/` Registry 管理，按内置能力、托管包、native wrapper、bundled CLI 和随 App 分发的 Python runtime 分级；外部运行时安装要求、服务器、隐藏项目方密钥、收费结算和深层系统访问会进入 Advanced Mode。用户看到简单的产品结论，详细版本、命令、日志与 hash 写入项目的 `build/run-report.md`。
+
 ### 首个演示 App：别纠结了
 
 首个 Golden Path 采用一个小而完整的本地决策器：

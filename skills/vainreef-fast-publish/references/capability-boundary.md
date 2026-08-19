@@ -8,6 +8,22 @@ Fast Publish Mode 的边界由基础设施、数据流、权限、商业化和 S
 
 目标是保留用户的核心价值，把实现投影到这个盒子里；需要改变盒子时，记录 Advanced Mode candidate，并给出一条可交付的 Fast Mode projection。
 
+## Boundary severity
+
+### Soft Limit
+
+技术底盘仍然适配，主要代价是工作量、性能、依赖、测试范围或 Store 资料增加。处理方式：当轮提醒、给出轻量方案、取得用户选择、记录风险后继续。
+
+例子：复杂动画界面、大型本地数据处理、复杂 PDF 操作、较重的图片处理、经过验证的 native-backed 库或 bundled CLI。
+
+### Hard Boundary
+
+完整需求改变 Fast Mode 的宿主、基础设施或发布前提。处理方式：当轮说明影响，标记 Advanced Mode candidate，Fast Mode 在触发项停止，并保留一份核心体验 projection。
+
+例子：自建服务器、项目方密钥隐藏、账号云同步、统一收费、驱动/内核/管理员级功能、外部运行时安装、特殊行业资质，以及完整 3D 游戏引擎需求。
+
+用户选择继续 Hard Boundary 方向时，保留需求记录与风险说明，项目转入 Advanced Mode；Fast Publish 的固定底盘继续服务于 projection 版本。
+
 ## Capability matrix
 
 | 维度 | Fast Mode invariant | Fast Mode 形式 | Advanced Mode trigger |
@@ -106,13 +122,13 @@ Fast Mode projection：把 AI App 降为“用户自行填写 key 的本地客�
 3. **Choose a path during discovery**：
    - `direct`：全部落在 Fast Mode，完成需求确认后实现。
    - `projected`：核心价值可用本地/公开 API/用户凭据版本交付，先说明投影再实现。
-   - `advanced-candidate`：完整需求需要改变基础设施或合规前提，保留 Fast Mode projection，并把完整版本标记为 Advanced Mode。
+   - `advanced-candidate`：完整需求触发 Hard Boundary，保留 Fast Mode projection，并把完整版本标记为 Advanced Mode。
 4. **Keep the user goal visible**：说明保留的体验、替换的基础设施和新版本的限制。
 5. **Ask at the correct checkpoint**：当投影会改变核心交互或数据所有权时，请用户确认；纯工具链、编译、检查和归档动作由 Agent 继续完成。
 
 ## User-facing boundary language
 
-每轮创意回答后都做内部分析。发现会影响产品方向的实质风险时，当轮提醒；内部可以使用技术词，面向用户时改用体验和生活场景表达：
+每轮创意回答后都做内部分析。发现会影响产品方向的实质风险时，当轮提醒；Soft Limit 记录选择后继续，Hard Boundary 切换 Advanced Mode；内部可以使用技术词，面向用户时改用体验和生活场景表达：
 
 ```text
 你想要的重点是：[核心体验]。

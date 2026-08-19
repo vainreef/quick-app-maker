@@ -1,0 +1,25 @@
+name: "archive"
+status: "planned"
+preferred_implementation: ""
+fallback: ""
+dependency_level: ""
+package_name: ""
+package_version: ""
+license: ""
+notice_required: false
+host_model: "CSharpHost"
+architectures:
+  - "win-x64"
+x64_tested: false
+msix_tested: false
+install_tested: false
+store_readiness_tested: false
+supports: []
+known_gaps: []
+permissions: []
+runtime_files: []
+subprocess: false
+python_embedded: false
+notes: "Await Windows validation"
+last_verified: ""
+verified_commit: ""

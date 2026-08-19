@@ -5,6 +5,8 @@
 | Component | Required value | Current status |
 | --- | --- | --- |
 | Target OS | Windows 11 priority; Windows 10 1809+ compatibility | Validate on Windows |
+| Golden Template | Exact template release and checksum | `GOLDEN_TEMPLATE_VERSION` / `GOLDEN_TEMPLATE_SHA256` |
+| Command Reference | Versioned command file | `references/toolchain/v1/commands.md` |
 | Runtime | .NET 10.x LTS | Contract fixed; patch follows test record |
 | Windows App SDK | Stable channel, exact `2.x.y` | `WINDOWS_APP_SDK_VERSION` |
 | WinUI templates | Exact installed template version | `WINUI_TEMPLATE_VERSION` |
@@ -14,9 +16,10 @@
 
 ## Lock procedure
 
-1. On the test Windows machine, record `dotnet --info`, `dotnet list package`, `winapp --version`, `winapp --help`, OS build and architecture.
-2. Build and run the Golden Template with `dotnet run`.
-3. Build Release output, package with `winapp pack`, install the MSIX, and test launch/uninstall/reinstall.
-4. Record the source commit, package hash and test result.
-5. Replace placeholders in this file and commit the lock as part of the Skill release.
-6. Treat upgrades as a separate release with a fresh package and Store readiness test.
+1. Select the Command Reference listed above and record its commit.
+2. On the test Windows machine, record tool versions, OS build, architecture, template checksum and dependency list.
+3. Build and run the Golden Template using the selected command file.
+4. Build Release output, package with the selected packaging command, install the MSIX, and test launch/uninstall/reinstall.
+5. Record the source commit, package hash and test result.
+6. Replace placeholders in this file and commit the lock as part of the Skill release.
+7. Treat upgrades as a separate release with a fresh package and Store readiness test.

@@ -1,34 +1,35 @@
 ---
 name: vainreef-fast-publish
-description: Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Begin with an open creative interview about what the user wants to make, create and update a living project README after every answer, continuously evaluate each new requirement against the fixed stack and Fast Mode boundaries, immediately explain meaningful limits in plain language and ask the user to confirm any risky direction or proposed adjustment, then confirm the complete product and begin implementation. Use when a user asks an AI coding agent to define, create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow.
+description: "Build general-utility Windows apps from natural-language requirements under a fixed local-first, free, individual-developer, MSIX and Microsoft Store contract. Use progressive discovery with safe defaults: create and update a living project README after every answer, ask only questions that materially affect product experience or feasibility, evaluate each requirement continuously, classify soft limits versus hard Advanced Mode boundaries, consult the capability registry before adding dependencies, and split simple user updates from technical run reports. Use when a user asks an AI coding agent to define, create, run, package, validate, or publish a Windows app through the Vainreef Fast Publish workflow."
 ---
 
 # Vainreef Fast Publish
 
 将用户的自然语言 App 想法落到固定的 Windows Golden Template，完成生成、运行、校验、MSIX 打包和 Microsoft Store 提交流程。把底层工具链冻结，把页面、业务和数据模型留给用户需求。
 
-## Mandatory First Phase: Creative Discovery With Continuous Feasibility
+## First Phase: Progressive Discovery With Continuous Feasibility
 
 每个新 App 项目先进入创意与需求明确阶段。第一问围绕“你想做什么”，让用户自由发挥想象；与此同时，Agent 在每轮内部检查固定技术栈与 Fast Mode 边界。创意理解和可行性思考属于同一条连续流程。详细流程见 [discovery-interview.md](references/discovery-interview.md)。
 
-遵循以下强制规则：
+遵循以下规则：
 
 1. 第一问使用：`你想做一个什么样的 App？可以先随意描述你脑中的画面、玩法或感觉。`
-2. 每轮优先提出一个关键问题，根据上一轮答案自然深入。
+2. 每轮优先提出一个关键问题，根据上一轮答案自然深入；能安全推断的内容采用合理默认值，不把访谈变成固定问卷。
 3. 用户给出第一段实质想法后，立即在当前工作目录创建暂定项目文件夹和 `README.md`。
 4. 每次收到用户回答后，先更新 README，再同时进行需求理解与边界判断。
 5. README 持续记录：当前想法、用户需要什么、用户目前不需要什么、新增创意、已确定内容、当前限制与提醒、用户对提醒的选择、仍待明确内容和每轮变更。
 6. 新需求与当前技术栈、性能目标、Fast Mode 基础设施或 Store 路径存在明显张力时，立即提醒；提醒发生在对应想法出现的当轮。
 7. 提醒使用用户易懂的语言，依次说明：用户想要的体验、当前路线擅长什么、按原方向继续可能出现什么结果、建议如何调整，并询问用户是否确认继续或接受调整。
 8. 提醒前至少审视五个方面：当前技术栈是否匹配、性能目标是否现实、素材与内容制作量、在线或系统依赖、Store 发布变量。基于完整体验慎重判断，而不是只看关键词。
-9. 例如用户提出完整 3D 射击游戏时，说明当前路线更适合普通 Windows 工具和轻量界面；完整 3D 射击涉及实时画面、角色动画、物理、地图、音效与持续性能优化，当前路线的成品质量和稳定发布风险很高。随后询问用户更希望进入游戏专用路线，还是把创意收敛为轻量 2D、俯视角或射击训练小应用。
-10. 用户确认继续某个高风险方向时，把“已知限制、用户选择和后续影响”写入 README；后续出现新的实质风险时再次提醒。
-11. 用户确认调整方案时，立即更新“用户需要什么、用户目前不需要什么、已确定内容与限制记录”，然后继续创意提问。
-12. 识别用户的结束信号，例如“就是这样”“差不多了”“就这些”“这个方向可以”“开始吧”“按这个来”。
-13. 收到结束信号后，停止发散，重新阅读完整 README，并用非常容易理解的语言复述整个项目以及用户已经确认过的取舍。
-14. 最终复述只讲产品体验：要做什么、给谁用、打开后会发生什么、需要什么、目前省略什么、希望是什么感觉、怎样算做好。工程术语保持隐藏。
-15. 复述结尾只问：`我理解的是这样，对吗？`
-16. 用户确认后，将 README 状态更新为“需求与可行方向已确认”，进入工程实现阶段。
+9. 将提醒分为 Soft Limit 与 Hard Boundary：Soft Limit 记录风险并取得用户选择后继续；Hard Boundary 切换到 Advanced Mode，Fast Mode 在该项停止。
+10. 例如完整 3D 射击游戏触发技术栈与规模 Hard Boundary：说明当前路线更适合普通 Windows 工具和轻量界面，完整 3D 射击涉及实时画面、角色动画、物理、地图、音效与持续性能优化；给出游戏专用路线或轻量 2D/俯视角/射击训练投影。
+11. 用户选择 Soft Limit 方向时，把已知限制、用户选择和后续影响写入 README；用户选择 Hard Boundary 方向时，把项目标记为 Advanced Mode candidate，并暂停 Fast Mode 工程动作。
+12. 用户确认调整方案时，立即更新“用户需要什么、用户目前不需要什么、已确定内容与限制记录”，然后继续创意提问。
+13. 识别用户的结束信号，例如“就是这样”“差不多了”“就这些”“这个方向可以”“开始吧”“按这个来”。
+14. 收到结束信号后，停止发散，重新阅读完整 README，并用非常容易理解的语言复述整个项目以及用户已经确认过的取舍。
+15. 最终复述只讲产品体验：要做什么、给谁用、打开后会发生什么、需要什么、目前省略什么、希望是什么感觉、怎样算做好。工程术语保持隐藏。
+16. 复述结尾只问：`我理解的是这样，对吗？`
+17. 用户确认后，将 README 状态更新为“需求与可行方向已确认”，进入工程实现阶段；Hard Boundary 项目保留需求记录，转入 Advanced Mode 处理。
 
 连续流程为：
 
@@ -74,7 +75,7 @@ Fast Publish Mode 以基础设施、数据流、权限和 Store 前提定义边�
 
 ### Fast Mode contract
 
-把每个需求投影到下面八个词：
+把每个需求投影到下面的 Fast Mode Contract：
 
 > **免费、本地、个人、通用；固定技术栈；Microsoft Store only。**
 
@@ -86,6 +87,30 @@ Fast Publish Mode 以基础设施、数据流、权限和 Store 前提定义边�
 - **隐私**：默认关闭遥测、广告追踪、账号体系和用户内容上传；具体 App 仍按当前 Store 规则检查隐私政策要求。
 - **秘密**：公开 API 或最终用户自行填写的 API key 可以进入 Fast Mode；开发者自己的 key、统一额度、统一计费和隐藏凭据需要服务器边界。
 - **网络**：没有自建服务器仍然可以联网；使用 `HttpClient` 访问稳定公开 API，或让用户提供自己的凭据。
+
+### Boundary severity
+
+#### Soft Limit
+
+技术上仍然落在 Fast Mode，只是工作量、性能、依赖或测试范围明显增加。处理方式：
+
+1. 当轮提醒用户影响。
+2. 给出轻量化的实现建议。
+3. 用户确认后继续探索与实现。
+4. 将风险、默认值和用户选择写入 living README。
+
+典型例子：复杂动画界面、大型本地数据处理、复杂 PDF 操作、较重的图片处理、经过验证的 native-backed 库或 bundled CLI。
+
+#### Hard Boundary
+
+完整需求改变 Fast Mode 的基础设施或发布前提。处理方式：
+
+1. 当轮提醒用户，并用日常语言说明影响。
+2. 将项目标记为 Advanced Mode candidate。
+3. Fast Mode 在触发项停止工程推进。
+4. 给出保留核心创意的 Fast Mode projection，或切换到 Advanced Mode 的明确入口。
+
+典型例子：自建服务器、项目方密钥隐藏、账号云同步、统一收费、驱动/内核/管理员级功能、跨平台宿主、外部运行时安装要求、特殊行业资质和完整 3D 游戏引擎需求。
 
 ### Request triage
 
@@ -116,11 +141,17 @@ Fast Publish Mode 以基础设施、数据流、权限和 Store 前提定义边�
 
 ### Stack boundary
 
-Fast Mode 只有一套底盘：C#/.NET 10/WinUI 3/Windows App SDK Stable/`dotnet`/`winapp`/MSIX/Store。WPF、WinForms、.NET MAUI、Electron、Tauri、Python GUI、C++ UI、EXE/MSI/NSIS/Inno Setup/Squirrel 属于技术栈切换信号；记录为 Advanced Mode candidate，并优先给出保留用户目标的 Fast Mode projection。
+Fast Mode 只有一套宿主底盘：C#/.NET 10/WinUI 3/Windows App SDK Stable/`dotnet`/`winapp`/MSIX/Store。WPF、WinForms、.NET MAUI、Electron、Tauri、Python GUI 宿主、C++ UI、EXE/MSI/NSIS/Inno Setup/Squirrel 属于技术栈切换信号；记录为 Advanced Mode candidate，并优先给出保留用户目标的 Fast Mode projection。经 Registry 验证的 CLI、native wrapper 或 embedded Python 只作为 C# Host 的受控 capability layer。
 
 ## Golden Template
 
-优先使用 `/templates/windows-golden-template/` 中经过验证的模板；模板准备完成前，使用官方 WinUI 模板建立等价结构，并把差异记录在版本锁文件中。
+Production Fast Mode 只使用 `/templates/windows-golden-template/` 中经过验证并由版本锁记录的 Golden Template。创建工程前检查模板版本、manifest 和 checksum：
+
+- 模板目录缺失：暂停项目脚手架，记录 Skill installation repair。
+- 版本或 checksum 不匹配：暂停项目脚手架，先修复模板安装。
+- 模板状态仍为 draft：保持项目在需求/可行性阶段，等待模板 release。
+
+开发实验可以单独建立草稿工程；Fast Publish 项目保持单一 Golden Template 来源。
 
 模板保持以下目录稳定：
 
@@ -150,6 +181,25 @@ store/
 - 让 App 首次打开即可说明价值，示例数据和空状态都可用。
 - 首个 App 优先本地化、离线化和小功能闭环，降低 Store 变量。
 - 默认关闭遥测、广告 SDK、远程用户画像和内容上传；涉及个人信息时读取当前 Store policy 并准备对应资料。
+
+## Capability Registry and Dependency Ladder
+
+使用 `capabilities/` 里的 Capability Registry 选择 PDF、图片、CSV、Office、压缩包、媒体、OCR、二维码和本地 AI 等能力。先找已验证条目，再决定实现方式；能力条目缺失或状态未验证时，记录为 registry gap，保持依赖决策待审。
+
+保持 **C# Host First**：WinUI/C# 是宿主底盘；“Host First”允许经过验证的 CLI、native wrapper 或随 App 分发的 Python sidecar 作为受控能力层，形成 C# Host + Capability，而非自由换宿主技术栈。
+
+按下面的阶梯逐级选择：
+
+| Level | 能力来源 | 使用条件 |
+| --- | --- | --- |
+| 0 | .NET / Windows 内置能力 | 优先采用，默认路径 |
+| 1 | Approved Managed NuGet | 纯托管 .NET，精确版本与许可证已登记，可自动采用 |
+| 2 | Approved Native-backed NuGet | 包含 native DLL；必须完成 x64、MSIX、安装、启动与卸载验证 |
+| 3 | Approved bundled CLI | 以子进程调用；必须验证打包、路径、退出码、日志、许可证与 Store 资料 |
+| 4 | Embedded Python Runtime | .NET/native 生态明显缺少关键能力时采用；Python 与依赖随 App 分发，用户端保持一键安装体验 |
+| 5 | External Runtime Requirement | 需要用户自行安装 Python、Node、Java、Rust 等；触发 Hard Boundary，进入 Advanced Mode |
+
+Level 2–4 仍要求 C# Host、x64/MSIX 验证、依赖登记和可审计的运行报告。Level 5 作为 Advanced Mode 条件记录。
 
 ## Workflow
 
@@ -255,18 +305,11 @@ store/
 
 ### 5. Bootstrap the technical project
 
-- 在 Windows 环境确认 `.NET SDK 10.x`、WinUI 模板、`winapp` CLI 和目标 Windows SDK。
-- 使用 Golden Template 或等价的官方 WinUI 项目创建基础工程。
-- 记录 `dotnet --info`、`winapp --version`、Windows App SDK 和 WinUI template 版本。
+- 读取 [version-lock.md](references/version-lock.md) 指向的 Toolchain Command Reference。
+- 在 Windows 环境确认 lock file 中的 `.NET SDK`、WinUI 模板、`winapp` CLI 和目标 Windows SDK。
+- 只从 Golden Template 创建基础工程，记录模板版本与 checksum。
+- 按 Command Reference 记录工具版本、Windows 版本、架构和构建入口。
 - 保持项目名称、程序集名、包身份、显示名和 Store 名称一致。
-
-CLI-first 基线命令：
-
-```powershell
-dotnet new winui-navview -n APP_NAME
-cd APP_NAME
-dotnet run
-```
 
 ### 6. Implement the confirmed V1
 
@@ -279,12 +322,11 @@ dotnet run
 5. 浅色/深色主题、空状态、错误状态和首次运行示例数据。
 6. 用户确认过的网络请求、文件能力或系统集成。
 
-每个阶段都执行一次 `dotnet run`，先处理当前编译与运行问题，再继续增加功能。新想法若改变已确认范围，先更新 README 并请用户确认。
+每个阶段都执行一次 Command Reference 中的开发运行入口，先处理当前编译与运行问题，再继续增加功能。新想法若改变已确认范围，先更新 README 并请用户确认。
 
 ### 7. Validate locally
 
-- 验证 Debug：`dotnet run`。
-- 验证 Release：`dotnet build -c Release` 或项目规定的 Release 命令。
+- 按 Command Reference 验证 Debug 与 Release。
 - 按 README 的 Acceptance Criteria 逐条验收。
 - 测试首次启动、主要流程、空状态、重复启动、本地数据重载和窗口关闭/重开。
 - 检查依赖清单、包身份、显示名称、图标和版本号。
@@ -292,12 +334,7 @@ dotnet run
 
 ### 8. Package as MSIX
 
-开发运行和最终发布分开处理：
-
-```powershell
-dotnet publish -o ./publish
-winapp pack ./publish --generate-cert --install-cert
-```
+开发运行和最终发布分开处理，使用版本锁指向的 packaging commands。
 
 本地开发证书用于测试安装；Store 提交使用 Store 认证后的签名链。管理员权限只用于本地测试证书与安装准备，向用户解释动作目的后再请求确认。
 
@@ -313,11 +350,7 @@ winapp pack ./publish --generate-cert --install-cert
 - 检查 manifest 中的 Capability；普通文件选择优先，Restricted Capability 与 elevation 进入 Advanced Mode 评估。
 - 将 `APP_ID`、目标市场、价格和可见性留给用户确认。
 
-CLI 提交基线：
-
-```powershell
-winapp store publish ./*.msix --appId APP_ID
-```
+按 Command Reference 执行 Store submission command，并把 `APP_ID`、目标市场、价格和可见性留给用户确认。
 
 涉及 Microsoft 登录、身份验证、Partner Center 资料、管理员权限、年龄评级、政策问卷和最终提交时，暂停自动操作并等待用户完成当前确认点。其余生成、编译、检查、打包和日志整理由 Agent 继续执行。
 
@@ -325,27 +358,42 @@ winapp store publish ./*.msix --appId APP_ID
 
 执行下列判断：
 
-1. .NET 自带能力优先：JSON 用 `System.Text.Json`，HTTP 用 `HttpClient`，文件用 BCL/Windows API。
-2. SQLite 只在本地结构化数据确有需求时启用，并使用 `Microsoft.Data.Sqlite`。
-3. 每个新增包都要进入 Allowlist，记录精确版本和构建结果。
-4. Native dependency、需要额外运行时、会改变 MSIX 清单或增加权限的包，先进入人工评审。
-5. 依赖升级与业务功能分开提交，方便定位 Store/打包回归。
+1. 先读取 `capabilities/` 中对应能力条目，确认 preferred implementation、Level、版本、许可证和测试状态。
+2. .NET 自带能力优先：JSON 用 `System.Text.Json`，HTTP 用 `HttpClient`，文件用 BCL/Windows API。
+3. SQLite 只在本地结构化数据确有需求时启用，并使用 `Microsoft.Data.Sqlite`。
+4. Managed NuGet、native-backed NuGet、bundled CLI 和 embedded Python 只能按 Dependency Ladder 进入；每项记录精确版本和构建结果。
+5. Native dependency、额外运行时、子进程、许可证变化、MSIX 清单变化或权限变化，都要在对应 capability 条目中完成 x64/MSIX 验证。
+6. External Runtime Requirement 触发 Hard Boundary，Fast Mode 停止在该项。
+7. 依赖升级与业务功能分开提交，方便定位 Store/打包回归。
 
 ## Output Contract
 
-每次执行结束时，输出：
+### User Output
+
+向用户保持短、清楚、可行动：
+
+- 当前 App 已完成的主要体验。
+- 用户可直接验证的结果。
+- MSIX 或测试安装包是否生成。
+- 用户下一步只需要做什么。
+- 尚待用户确认的登录、身份、Store 表单或政策步骤。
+
+用户输出保持产品语言；版本号、命令、文件清单、日志和 hash 进入 Technical Run Report。
+
+### Technical Run Report
+
+将技术记录写入项目目录的 `build/run-report.md`：
 
 - 用户确认的需求摘要、核心流程与验收标准。
 - Fast Mode classification：direct、projected 或 Advanced Mode candidate。
-- 若使用 projection，说明保留的核心价值与调整后的基础设施边界。
-- 新项目目录与 README 的绝对路径。
-- 使用的模板 commit 与版本锁内容。
+- projection 或 Hard Boundary 的用户决定。
+- 项目目录、README、模板版本与 checksum。
 - 修改过的文件绝对路径。
-- 执行过的命令与结果。
+- Command Reference 标识与执行结果。
 - Debug/Release/安装测试结果。
 - MSIX 绝对路径、架构、版本和 SHA-256。
-- 待用户确认的 Store 步骤。
-- 后续可选功能，以及它们对依赖和发布变量的影响。
+- 依赖清单、Capability Registry 条目和许可证记录。
+- Store 步骤、人工确认点和后续可选功能。
 
 ## References
 
@@ -354,5 +402,7 @@ winapp store publish ./*.msix --appId APP_ID
 - [discovery-interview.md](references/discovery-interview.md)：创意问题树、逐轮 README 更新、收口信号与通俗确认格式。
 - [version-lock.md](references/version-lock.md)：V1 版本锁定记录。
 - [capability-boundary.md](references/capability-boundary.md)：按基础设施、数据、权限、隐私和商业化划分 Fast Mode。
+- [capabilities/registry.md](capabilities/registry.md)：Capability Registry 与实现阶梯。
+- [toolchain/README.md](references/toolchain/README.md)：版本锁定的命令入口与版本目录规则。
 - [official-sources.md](references/official-sources.md)：微软官方工具链、WinUI、.NET、SQLite 和 Store 资料。
 - [project-readme-template.md](assets/project-readme-template.md)：第一段实质想法出现后创建，并在每轮持续更新的 living README 模板。
