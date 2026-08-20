@@ -4,7 +4,6 @@ This directory contains the x64 MSIX asset used by the Vainreef bootstrap flow.
 
 - Source: fixed copy committed in the Gitee `quick-app-maker` repository
 - Asset: `winappcli_x64.msix`
-- SHA-256: see `SHA256SUMS.txt`
 - Acquisition date: 2026-08-20
 - Use: install the pinned WinAppCLI version after the Gitee repository clone completes
 
