@@ -40,24 +40,155 @@
 <workspace>/build/bootstrap-cache/<toolchain-release>/
 ```
 
+PowerShell 示例：
+
+```powershell
+$cache = Join-Path (Get-Location) 'build/bootstrap-cache/TOOLCHAIN_RELEASE'
+New-Item -ItemType Directory -Force -Path $cache | Out-Null
+```
+
 下载批次至少包含以下资源：
 
 | 资源 | 用途 | 当前状态 |
 | --- | --- | --- |
-| Git for Windows x64 | 克隆、更新和提交仓库 | 已有国内直链 |
-| .NET 10 SDK x64 | 创建和编译 WinUI 项目 | 等待国内直链 |
-| WinUI C# template `.nupkg` | `dotnet new winui-navview` 和 Golden Template 维护 | 等待 NuGet 源或本地包 |
-| WinAppCLI x64 | 运行、打包、证书和 MSIX | 等待国内直链 |
+| Git for Windows x64 | 克隆、更新和提交仓库 | 真实 Windows 会话下载和安装成功 |
+| .NET 10 SDK x64 | 创建和编译 WinUI 项目 | 真实 Windows 会话下载和安装成功 |
+| WinUI C# template `.nupkg` | `dotnet new winui-navview` 和 Golden Template 维护 | 真实 Windows 会话安装成功 |
+| WinAppCLI x64 | 运行、打包、证书和 MSIX | 真实 Windows 会话已确认官方包，安装批次待完成 |
 | Golden Template 依赖包 | Windows App SDK、BuildTools 和项目还原 | 等待 NuGet 源或本地 feed |
 | WinApp/Windows App SDK 缓存 | 首次运行和打包所需的额外资源 | 按实机验证结果纳入 |
 
-当前已知的 Git 下载入口：
+### 真实 Windows 会话中已经验证的下载方式
+
+以下地址和命令来自一次 Windows 11 24H2 x64 实机流程记录。它们进入下载批次；安装阶段使用下载缓存中的文件。
+
+#### 1. Git for Windows：国内直链下载成功
 
 ```text
-https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/Git-2.47.1-64-bit.exe
+版本：2.47.1.windows.1
+文件：Git-2.47.1-64-bit.exe
+地址：https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/Git-2.47.1-64-bit.exe
 ```
 
-其余资源的地址、版本、文件名、大小和 SHA-256 进入工具链锁定清单；地址尚未填入前，保持为待配置项，不由 Agent 临时猜测包名或自行切换版本。
+下载与验证：
+
+```powershell
+$url = 'https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/Git-2.47.1-64-bit.exe'
+$out = Join-Path $cache 'Git-2.47.1-64-bit.exe'
+Invoke-WebRequest -Uri $url -OutFile $out
+Get-Item $out | Select-Object FullName, Length
+Get-FileHash $out -Algorithm SHA256
+```
+
+会话结果：文件约 69.1 MB；静默安装退出码为 0；`git --version` 显示 `2.47.1.windows.1`。
+
+#### 2. .NET 10 SDK：微软 CDN 下载成功
+
+```text
+版本：10.0.400
+架构：win-x64
+文件：dotnet-sdk-10.0.400-win-x64.exe
+地址：https://download.microsoft.com/download/0130d68c-c9c7-4114-a96c-ccdd476c6493/bd77bbcc-651a-4809-bd90-ca757cf4d5e8/dotnet-sdk-10.0.400-win-x64.exe
+```
+
+下载与验证：
+
+```powershell
+$url = 'https://download.microsoft.com/download/0130d68c-c9c7-4114-a96c-ccdd476c6493/bd77bbcc-651a-4809-bd90-ca757cf4d5e8/dotnet-sdk-10.0.400-win-x64.exe'
+$out = Join-Path $cache 'dotnet-sdk-10.0.400-win-x64.exe'
+Invoke-WebRequest -Uri $url -OutFile $out
+Get-Item $out | Select-Object FullName, Length
+Get-FileHash $out -Algorithm SHA256
+```
+
+也可以使用已经验证过的 winget 源下载方式：
+
+```powershell
+winget install --id Microsoft.DotNet.SDK.10 --exact --source winget `
+  --accept-source-agreements --accept-package-agreements --silent
+```
+
+会话结果：官方安装文件约 205 MB；直接运行安装器退出码为 0；`dotnet --list-sdks` 显示 `10.0.400`。README 后续优先采用直链批量下载，winget 作为备用方式，并固定 `--source winget`。
+
+#### 3. WinUI C# 模板：NuGet 安装成功
+
+```text
+包名：Microsoft.WindowsAppSDK.WinUI.CSharp.Templates
+版本：0.0.6-alpha
+```
+
+会话中成功执行的安装命令：
+
+```powershell
+dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates@0.0.6-alpha
+```
+
+下载批次采用本地包安装时，使用对应的 NuGet flat-container 文件：
+
+```text
+https://api.nuget.org/v3-flatcontainer/microsoft.windowsappsdk.winui.csharp.templates/0.0.6-alpha/microsoft.windowsappsdk.winui.csharp.templates.0.0.6-alpha.nupkg
+```
+
+下载完成后从本地安装：
+
+```powershell
+dotnet new install .\microsoft.windowsappsdk.winui.csharp.templates.0.0.6-alpha.nupkg
+dotnet new list winui
+```
+
+会话结果：模板安装成功，`winui-navview` 已注册；包体积约 373 KB。该版本属于 alpha，必须锁定版本并记录 SHA-256。
+
+#### 4. WinAppCLI：官方 x64 包已确认
+
+```text
+版本：0.6.1
+架构：x64
+文件：winappcli_x64.msix
+地址：https://github.com/microsoft/winappcli/releases/download/v0.6.1/winappcli_x64.msix
+```
+
+下载命令：
+
+```powershell
+$url = 'https://github.com/microsoft/winappcli/releases/download/v0.6.1/winappcli_x64.msix'
+$out = Join-Path $cache 'winappcli_x64.msix'
+Invoke-WebRequest -Uri $url -OutFile $out
+Get-Item $out | Select-Object FullName, Length
+Get-FileHash $out -Algorithm SHA256
+```
+
+也可以使用会话中查到的 winget 包标识：
+
+```powershell
+winget install --id Microsoft.WinAppCli --exact --source winget `
+  --accept-source-agreements --accept-package-agreements --silent --disable-interactivity
+```
+
+会话结果：官方 x64 MSIX 约 17.63 MB；下载资产大小已核对；安装过程在下载阶段被中断，因此安装结果仍需在完整安装批次重新验证。批量初始化优先下载 MSIX 或 standalone ZIP，再统一安装。
+
+#### 5. 现阶段仍待补齐的下载项
+
+真实会话已经覆盖 Git、.NET SDK、WinUI 模板和 WinAppCLI。第一次编译 Golden Template 时，还要根据实际生成的 `.csproj` 收集并锁定：
+
+```text
+Microsoft.WindowsAppSDK
+Microsoft.Windows.SDK.BuildTools
+Microsoft.Windows.SDK.BuildTools.WinApp
+以及它们的传递依赖
+```
+
+这些包放入同一下载批次，优先从本地 NuGet feed 或国内 NuGet 源获取，restore 阶段只使用已下载的缓存。
+
+### 下载批次的来源优先级
+
+```text
+本地缓存
+→ README/工具链锁文件中的国内直链
+→ 已配置的国内 NuGet 源
+→ 固定版本的官方备用地址
+```
+
+所有资源的版本、文件名、大小和 SHA-256 进入工具链锁定清单；地址尚未填入前，保持为待配置项，不由 Agent 临时猜测包名或自行切换版本。
 
 下载规则：
 
@@ -74,11 +205,18 @@ https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/Git-2.
 安装顺序固定为：
 
 1. Git for Windows；安装后刷新当前 PowerShell 进程的 PATH，并用 `git --version` 验证。
-2. .NET 10 SDK；使用 `dotnet --list-sdks` 和 SDK 目录双重验证，避免只相信 winget 的注册状态。
-3. WinUI C# template；从已校验的本地 `.nupkg` 安装，并用 `dotnet new list winui` 验证。
-4. NuGet 源和 Golden Template 依赖；优先使用本地 feed，再使用锁定的国内 NuGet 源。
-5. WinAppCLI；使用固定的 x64 包安装或解压，并用 `winapp --version` 验证。
-6. 执行 Hello World 的 restore、build 和 run smoke test。
+2. Git 安装验证通过后，使用 Git 获取正式仓库：
+
+   ```powershell
+   git clone https://gitee.com/freevian/quick-app-maker.git
+   ```
+
+   已存在工作区时，使用该工作区的远程地址和当前分支继续执行。
+3. .NET 10 SDK；使用 `dotnet --list-sdks` 和 SDK 目录双重验证，避免只相信 winget 的注册状态。
+4. WinUI C# template；从已校验的本地 `.nupkg` 安装，并用 `dotnet new list winui` 验证。
+5. NuGet 源和 Golden Template 依赖；优先使用本地 feed，再使用锁定的国内 NuGet 源。
+6. WinAppCLI；使用固定的 x64 包安装或解压，并用 `winapp --version` 验证。
+7. 执行 Hello World 的 restore、build 和 run smoke test。
 
 Developer Mode、管理员权限、测试证书信任、Microsoft 登录和 Store 提交属于人工确认点；这些内容不放入下载批次，也不把账号、Token、私钥或 PFX 放入仓库。
 
