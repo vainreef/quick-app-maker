@@ -1,0 +1,1 @@
+f5793c19197f939313cea062fb47eb55c9d1b1ff6c075752b6c4657463511372  toolchain/winapp-cli/0.6.1/winappcli_x64.msix

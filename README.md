@@ -6,6 +6,7 @@
 
 - `skills/`：存放可安装、可复用的 Codex/AI Agent Skill。
 - `templates/`：存放 Golden Template 候选、经过验证的模板与相关资源。
+- `toolchain/`：存放已锁定版本的安装资源、SHA-256 和来源记录。
 - `apps/test-builds/`：预留每个测试 App 的 MSIX、校验信息与构建记录归档位置。
 - `docs/research/`：存放平台、工具链与发布流程的研究记录。
 
@@ -13,9 +14,9 @@
 
 本节是仓库级前置流程，优先级高于产品创意访谈和 App 生成功能。用户把仓库地址交给 Agent 后，Agent 先读取本节，准备开发工具；工具链完成验证后，再进入 App 需求发现。
 
-初始化目标是：**先并行下载所有必需资源，等待下载批次全部完成并校验通过，再统一进入安装批次，最后一次性完成环境验证。**
+初始化目标是：**并行下载所有资源；任何资源下载完成并校验通过后，立即进入它自己的安装队列，不等待其他慢资源；最后再完成整体环境验证。**
 
-当前初始化模式：`download-all-then-install`
+当前初始化模式：`parallel-download-install-on-complete`
 
 ### 初始化顺序
 
@@ -24,9 +25,9 @@
 → 读取工具链下载清单
 → 检查 Windows、架构、磁盘空间和已有版本
 → 并行下载所有必需资源
-→ 等待所有下载结束
-→ 校验文件存在、大小、SHA-256 和签名信息
-→ 按依赖顺序连续安装，不在安装过程中重新下载
+→ 单项下载完成后立即校验
+→ 校验通过后立即触发对应安装任务
+→ 其他下载继续并行进行
 → 验证 Git、.NET、WinUI 模板、NuGet 和 winapp
 → 写入 bootstrap 报告
 → 进入 App 需求发现
@@ -54,13 +55,13 @@ New-Item -ItemType Directory -Force -Path $cache | Out-Null
 | Git for Windows x64 | 克隆、更新和提交仓库 | 真实 Windows 会话下载和安装成功 |
 | .NET 10 SDK x64 | 创建和编译 WinUI 项目 | 真实 Windows 会话下载和安装成功 |
 | WinUI C# template `.nupkg` | `dotnet new winui-navview` 和 Golden Template 维护 | 真实 Windows 会话安装成功 |
-| WinAppCLI x64 | 运行、打包、证书和 MSIX | 真实 Windows 会话已确认官方包，安装批次待完成 |
+| WinAppCLI x64 | 运行、打包、证书和 MSIX | 0.6.1 x64 MSIX 已放入仓库，安装队列待完成 |
 | Golden Template 依赖包 | Windows App SDK、BuildTools 和项目还原 | 等待 NuGet 源或本地 feed |
 | WinApp/Windows App SDK 缓存 | 首次运行和打包所需的额外资源 | 按实机验证结果纳入 |
 
 ### 真实 Windows 会话中已经验证的下载方式
 
-以下地址和命令来自一次 Windows 11 24H2 x64 实机流程记录。它们进入下载批次；安装阶段使用下载缓存中的文件。
+以下地址和命令来自一次 Windows 11 24H2 x64 实机流程记录。它们进入并行下载队列；单项下载完成后使用缓存文件立即进入对应安装队列。
 
 #### 1. Git for Windows：国内直链下载成功
 
@@ -147,6 +148,16 @@ dotnet new list winui
 地址：https://github.com/microsoft/winappcli/releases/download/v0.6.1/winappcli_x64.msix
 ```
 
+仓库内固定副本：
+
+```text
+toolchain/winapp-cli/0.6.1/winappcli_x64.msix
+SHA-256：f5793c19197f939313cea062fb47eb55c9d1b1ff6c075752b6c4657463511372
+校验文件：toolchain/winapp-cli/0.6.1/SHA256SUMS.txt
+```
+
+初始化时优先读取仓库内固定副本，复制到当前 bootstrap cache，校验通过后立即进入 WinAppCLI 安装任务。GitHub、国内镜像和 winget 作为后续备用来源。
+
 下载命令：
 
 ```powershell
@@ -164,7 +175,21 @@ winget install --id Microsoft.WinAppCli --exact --source winget `
   --accept-source-agreements --accept-package-agreements --silent --disable-interactivity
 ```
 
-会话结果：官方 x64 MSIX 约 17.63 MB；下载资产大小已核对；安装过程在下载阶段被中断，因此安装结果仍需在完整安装批次重新验证。批量初始化优先下载 MSIX 或 standalone ZIP，再统一安装。
+会话结果：官方 x64 MSIX 约 17.63 MB；下载资产大小已核对；安装过程在下载阶段被中断，因此安装结果仍需在下一次安装队列中验证。批量初始化优先下载 MSIX 或 standalone ZIP，下载完成后立即安装。
+
+GitHub 直连的当前实测结果：`0 bytes/s`，未建立有效传输。该结果说明国内网络路径上的 GitHub 直连存在连接瓶颈，暂时把 GitHub 作为备用来源；WinAppCLI 的主来源应使用本地缓存、国内镜像或 Gitee/对象存储镜像。
+
+`curl.exe -s` 会隐藏 DNS、代理、TLS 和连接超时等具体错误。排查时必须保留详细错误输出：
+
+```powershell
+Resolve-DnsName github.com
+Test-NetConnection github.com -Port 443
+curl.exe -v -L --connect-timeout 10 --max-time 30 `
+  -o NUL `
+  'https://github.com/microsoft/winappcli/releases/download/v0.6.1/winappcli_x64.msix'
+```
+
+报告至少记录 `dns_result`、`tcp_443_result`、`tls_result`、`http_status` 和 `curl_stderr`，仅显示 `0 bytes/s` 仍不足以定位具体瓶颈。
 
 #### 5. 现阶段仍待补齐的下载项
 
@@ -182,7 +207,8 @@ Microsoft.Windows.SDK.BuildTools.WinApp
 ### 下载批次的来源优先级
 
 ```text
-本地缓存
+仓库内固定副本
+→ 本地缓存
 → README/工具链锁文件中的国内直链
 → 已配置的国内 NuGet 源
 → 固定版本的官方备用地址
@@ -195,28 +221,31 @@ Microsoft.Windows.SDK.BuildTools.WinApp
 1. 所有资源先写入 `.part` 临时文件，下载完成后再改为正式文件名。
 2. 所有资源并行下载；每项单独记录开始时间、进度、速度、结果和错误信息。
 3. 主下载源、备用下载源和官方源只针对同一个固定版本，不跨版本替换。
-4. 下载批次全部完成后，统一检查文件大小、SHA-256 和可用的 Authenticode 签名信息。
-5. 某一项下载或校验失败时，保留缓存和报告，安装批次保持等待状态。
+4. 单项下载完成后立即检查文件大小、SHA-256 和可用的 Authenticode 签名信息。
+5. 单项校验通过后立即提交安装队列；其他资源继续下载。
+6. 单项下载或校验失败时，只重试该资源或切换同版本备用源，其他安装任务继续运行。
 
-### 第二阶段：安装批次
+### 第二阶段：下载完成即安装
 
-下载批次全部完成后，才进入安装。安装阶段使用本地缓存文件，安装过程不再发起新的网络下载。
+安装采用事件驱动队列：某项资源完成下载和校验后，立即进入安装。安装队列默认一次运行一个机器级安装器，避免多个 UAC、MSIX 或 PATH 变更同时发生；安装一个资源时，其他下载继续运行。
 
-安装顺序固定为：
+安装依赖关系如下：
 
-1. Git for Windows；安装后刷新当前 PowerShell 进程的 PATH，并用 `git --version` 验证。
-2. Git 安装验证通过后，使用 Git 获取正式仓库：
+1. Git for Windows 下载完成并校验通过后立即安装；安装后刷新当前 PowerShell 进程的 PATH，并用 `git --version` 验证。
+2. Git 安装验证通过后立即使用 Git 获取正式仓库：
 
    ```powershell
    git clone https://gitee.com/freevian/quick-app-maker.git
    ```
 
    已存在工作区时，使用该工作区的远程地址和当前分支继续执行。
-3. .NET 10 SDK；使用 `dotnet --list-sdks` 和 SDK 目录双重验证，避免只相信 winget 的注册状态。
-4. WinUI C# template；从已校验的本地 `.nupkg` 安装，并用 `dotnet new list winui` 验证。
-5. NuGet 源和 Golden Template 依赖；优先使用本地 feed，再使用锁定的国内 NuGet 源。
-6. WinAppCLI；使用固定的 x64 包安装或解压，并用 `winapp --version` 验证。
-7. 执行 Hello World 的 restore、build 和 run smoke test。
+3. .NET 10 SDK 下载完成并校验通过后立即安装；使用 `dotnet --list-sdks` 和 SDK 目录双重验证。
+4. WinAppCLI 下载完成并校验通过后立即安装或解压；用 `winapp --version` 验证。
+5. WinUI C# template 下载完成后，在 .NET SDK 可用时立即从本地 `.nupkg` 安装；用 `dotnet new list winui` 验证。
+6. Golden Template 依赖包下载完成后立即放入本地 NuGet feed；待 .NET 和模板可用后立即执行 restore。
+7. Git、.NET、WinAppCLI 和模板各自完成后，尽快启动 Hello World 的 restore、build 和 run smoke test。
+
+依赖等待只针对具体任务：例如 WinUI 模板已经下载，但 .NET SDK 仍在安装，则模板任务进入 `waiting-for-dotnet`，Git 和 WinAppCLI 继续各自安装；.NET 完成后立即唤醒模板任务。
 
 Developer Mode、管理员权限、测试证书信任、Microsoft 登录和 Store 提交属于人工确认点；这些内容不放入下载批次，也不把账号、Token、私钥或 PFX 放入仓库。
 
@@ -224,10 +253,26 @@ Developer Mode、管理员权限、测试证书信任、Microsoft 登录和 Stor
 
 - 初始化阶段只处理工作站工具链，工具链验证完成后再开始产品访谈。
 - 版本和下载地址以工具链锁定清单为唯一来源；README 只描述流程和用户可见状态。
-- Agent 先完成下载批次，再开始安装批次；下载和安装不交错进行。
+- Agent 启动并行下载；每个资源完成校验后立即触发自己的安装任务。
+- Agent 不设置“等待所有下载结束”的总闸门；总闸门只用于最终 Hello World 和整体报告验收。
 - 安装后以真实命令输出作为成功依据，不以 winget 的单一状态作为依据。
 - Git 安装后立即刷新 PATH，或使用已安装工具的绝对路径继续执行 clone。
-- 每一步都写入 `build/bootstrap-report.md`，包括资源 URL、版本、大小、SHA-256、命令、退出码和验证结果。
+- 每一步都写入 `build/bootstrap-report.md`，包括资源 URL、版本、大小、SHA-256、下载开始/结束时间、安装开始/结束时间、依赖等待状态、命令、退出码和验证结果。
+
+并行和即时安装必须能够从报告中验证。每项资源至少记录：
+
+```text
+artifact_id
+download_start
+download_end
+verify_end
+install_start
+install_end
+status
+waiting_for
+```
+
+只列出四条下载命令或只汇总最终速度，仍不足以构成并行证据；报告必须展示时间重叠和单项安装启动时间。
 
 ### 初始化完成条件
 
@@ -274,7 +319,7 @@ Fast Mode 的产品边界压缩为：**免费、本地、个人、通用**，再
 
 按下面顺序推进，先完成新 Windows 电脑初始化，再验证发行链路，最后扩展 Skill：
 
-1. **完成新 Windows 电脑初始化**：按本 README 先并行下载，再统一安装和验证。
+1. **完成新 Windows 电脑初始化**：按本 README 并行下载，单项完成后立即安装并验证。
 2. **走通最小 Hello World**：创建 WinUI 项目，执行 `dotnet restore`、`dotnet build` 和 `dotnet run`，确认 Agent 能完成生成、运行、修复循环。
 3. **走通本地打包**：执行 `dotnet publish` 与 `winapp pack`，安装测试包并重新启动。
 4. **准备 Microsoft Store 账号与应用名**：完成 Partner Center 入口、身份验证、应用名预留和首个应用资料。
@@ -312,6 +357,8 @@ Fast Publish Mode 先冻结底盘，再开放业务需求：
 .
 ├── README.md
 ├── skills/                         # 可安装 Skill
+├── toolchain/                      # 已锁定的工具链安装资源和校验文件
+│   └── winapp-cli/0.6.1/
 ├── templates/
 │   └── windows-golden-template/    # 经过验证的 WinUI 基础模板
 ├── apps/
@@ -376,7 +423,8 @@ apps/test-builds/<app-slug>/<version>/
 - [x] 建立 Skill、模板和研究目录
 - [x] 确定首个 Golden Path：本地决策器「别纠结了」
 - [ ] 建立新 Windows 电脑的并行下载清单
-- [ ] 建立统一安装和 bootstrap 报告流程
+- [ ] 建立下载完成即安装和 bootstrap 报告流程
+- [x] 下载并归档 WinAppCLI 0.6.1 x64 MSIX
 - [ ] 建立测试 Build 归档目录
 - [ ] 在 Windows 实机固定 Windows App SDK 与 `winapp` 版本
 - [x] 创建 `skills/vainreef-fast-publish`
