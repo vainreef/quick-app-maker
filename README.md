@@ -14,9 +14,9 @@
 
 本节是仓库级前置流程，优先级高于产品创意访谈和 App 生成功能。用户把仓库地址交给 Agent 后，Agent 先读取本节，准备开发工具；工具链完成验证后，再进入 App 需求发现。
 
-初始化目标是：**并行下载所有资源；任何资源下载完成并校验通过后，立即进入它自己的安装队列，不等待其他慢资源；最后再完成整体环境验证。**
+初始化目标是：**先把下载任务并发跑起来；Git 下载完成后优先安装并立即获取仓库；之后按依赖和资源体积连续安装，200 MB 级的 .NET SDK 放在后段；下载和安装过程持续反馈进度。**
 
-当前初始化模式：`parallel-download-install-on-complete`
+当前初始化模式：`parallel-download-git-first-sequential-install`
 
 ### 初始化顺序
 
@@ -24,10 +24,11 @@
 读取 README
 → 读取工具链下载清单
 → 检查 Windows、架构、磁盘空间和已有版本
-→ 并行下载所有必需资源
-→ 单项下载完成后立即校验
-→ 校验通过后立即触发对应安装任务
-→ 其他下载继续并行进行
+→ 启动多线程下载任务
+→ Git 下载完成后立即校验和安装
+→ Git 可用后立即 clone 仓库
+→ 其他下载继续并发运行
+→ 按依赖和体积顺序连续安装
 → 验证 Git、.NET、WinUI 模板、NuGet 和 winapp
 → 写入 bootstrap 报告
 → 进入 App 需求发现
@@ -219,33 +220,51 @@ Microsoft.Windows.SDK.BuildTools.WinApp
 下载规则：
 
 1. 所有资源先写入 `.part` 临时文件，下载完成后再改为正式文件名。
-2. 所有资源并行下载；每项单独记录开始时间、进度、速度、结果和错误信息。
-3. 主下载源、备用下载源和官方源只针对同一个固定版本，不跨版本替换。
-4. 单项下载完成后立即检查文件大小、SHA-256 和可用的 Authenticode 签名信息。
-5. 单项校验通过后立即提交安装队列；其他资源继续下载。
-6. 单项下载或校验失败时，只重试该资源或切换同版本备用源，其他安装任务继续运行。
+2. 使用多线程下载池；每个资源一个独立 worker，至少同时运行 4 个下载 worker。
+3. Git worker 设置为高优先级，但其他资源同步开始下载，不等待 Git 下载结束才启动。
+4. 主下载源、备用下载源和官方源只针对同一个固定版本，不跨版本替换。
+5. 每项下载完成后立即检查文件大小、SHA-256 和可用的 Authenticode 签名信息，并把状态写入报告。
+6. 单项下载或校验失败时，只重试该资源或切换同版本备用源，其他下载继续运行。
 
-### 第二阶段：下载完成即安装
+下载执行器要求：
 
-安装采用事件驱动队列：某项资源完成下载和校验后，立即进入安装。安装队列默认一次运行一个机器级安装器，避免多个 UAC、MSIX 或 PATH 变更同时发生；安装一个资源时，其他下载继续运行。
+```text
+download_workers = 4
+download_mode = concurrent
+git_priority = highest
+install_mode = one-at-a-time
+install_start = after-git-installed
+```
 
-安装依赖关系如下：
+下载器使用多线程 worker 池，不采用顺序 `foreach` 逐个下载，也不把四条测速命令当作下载池。实现可以使用多个 `curl.exe`/BITS 子进程或 PowerShell job，但报告必须能看到四个资源的时间重叠。
 
-1. Git for Windows 下载完成并校验通过后立即安装；安装后刷新当前 PowerShell 进程的 PATH，并用 `git --version` 验证。
-2. Git 安装验证通过后立即使用 Git 获取正式仓库：
+### 第二阶段：Git 优先、单线程连续安装
+
+安装阶段只运行一个安装任务。Git 是唯一的绝对前置；Git 安装完成后立即 clone 仓库，其他下载任务继续运行。Git 之后按“已就绪资源优先、体积较小优先、依赖关系优先”连续安装。
+
+安装队列顺序如下：
+
+1. **Git for Windows**：下载完成并校验通过后立即安装；安装后刷新当前 PowerShell 进程的 PATH，并用 `git --version` 验证。
+2. **获取仓库**：Git 验证通过后立即执行：
 
    ```powershell
    git clone https://gitee.com/freevian/quick-app-maker.git
    ```
 
    已存在工作区时，使用该工作区的远程地址和当前分支继续执行。
-3. .NET 10 SDK 下载完成并校验通过后立即安装；使用 `dotnet --list-sdks` 和 SDK 目录双重验证。
-4. WinAppCLI 下载完成并校验通过后立即安装或解压；用 `winapp --version` 验证。
-5. WinUI C# template 下载完成后，在 .NET SDK 可用时立即从本地 `.nupkg` 安装；用 `dotnet new list winui` 验证。
-6. Golden Template 依赖包下载完成后立即放入本地 NuGet feed；待 .NET 和模板可用后立即执行 restore。
-7. Git、.NET、WinAppCLI 和模板各自完成后，尽快启动 Hello World 的 restore、build 和 run smoke test。
+3. **WinAppCLI**：约 18 MB；如果已下载或仓库内副本已就绪，立即安装或解压；用 `winapp --version` 验证。
+4. **.NET 10 SDK**：约 205 MB；作为最后一个大型安装器执行；使用 `dotnet --list-sdks` 和 SDK 目录双重验证。
+5. **WinUI C# template**：约 373 KB；文件可以提前下载和校验，但 `dotnet new install` 依赖 .NET SDK，因此在 .NET 安装完成后立即从本地 `.nupkg` 安装；用 `dotnet new list winui` 验证。
+6. **Golden Template 依赖包**：下载完成后立即放入本地 NuGet feed；待 .NET 和模板可用后立即执行 restore。
+7. **Hello World**：Git、.NET、WinAppCLI 和模板满足依赖后立即启动 restore、build 和 run smoke test。
 
-依赖等待只针对具体任务：例如 WinUI 模板已经下载，但 .NET SDK 仍在安装，则模板任务进入 `waiting-for-dotnet`，Git 和 WinAppCLI 继续各自安装；.NET 完成后立即唤醒模板任务。
+安装选择规则：
+
+- Git 安装完成前，其他安装任务进入等待队列，下载任务持续运行。
+- Git 安装并 clone 启动后，优先安装已经就绪的较小独立资源，例如 WinAppCLI。
+- .NET SDK 作为 200 MB 级大型安装器放在后段，但它完成后立即唤醒 WinUI 模板安装。
+- 小文件优先服从依赖关系；下载完成不代表马上执行安装，安装队列会先检查 Git 前置和 .NET 前置。
+- 用户看到每个阶段的即时反馈，不等待全部下载结束才开始安装，也不等待大型 .NET 下载结束才获取仓库。
 
 Developer Mode、管理员权限、测试证书信任、Microsoft 登录和 Store 提交属于人工确认点；这些内容不放入下载批次，也不把账号、Token、私钥或 PFX 放入仓库。
 
@@ -253,13 +272,14 @@ Developer Mode、管理员权限、测试证书信任、Microsoft 登录和 Stor
 
 - 初始化阶段只处理工作站工具链，工具链验证完成后再开始产品访谈。
 - 版本和下载地址以工具链锁定清单为唯一来源；README 只描述流程和用户可见状态。
-- Agent 启动并行下载；每个资源完成校验后立即触发自己的安装任务。
-- Agent 不设置“等待所有下载结束”的总闸门；总闸门只用于最终 Hello World 和整体报告验收。
+- Agent 启动多线程下载；Git worker 优先完成并安装，其他下载同时运行。
+- Agent 使用单一安装队列，严格执行 Git → clone → 小型独立工具 → .NET SDK → WinUI 模板 → restore/build/run。
+- Agent 不设置“等待所有下载结束再安装”的总闸门；总闸门只用于最终 Hello World 和整体报告验收。
 - 安装后以真实命令输出作为成功依据，不以 winget 的单一状态作为依据。
 - Git 安装后立即刷新 PATH，或使用已安装工具的绝对路径继续执行 clone。
 - 每一步都写入 `build/bootstrap-report.md`，包括资源 URL、版本、大小、SHA-256、下载开始/结束时间、安装开始/结束时间、依赖等待状态、命令、退出码和验证结果。
 
-并行和即时安装必须能够从报告中验证。每项资源至少记录：
+多线程下载、Git 优先和安装顺序必须能够从报告中验证。每项资源至少记录：
 
 ```text
 artifact_id
@@ -270,6 +290,8 @@ install_start
 install_end
 status
 waiting_for
+worker_id
+queue_position
 ```
 
 只列出四条下载命令或只汇总最终速度，仍不足以构成并行证据；报告必须展示时间重叠和单项安装启动时间。
