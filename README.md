@@ -227,34 +227,38 @@ Microsoft.Windows.SDK.BuildTools.WinApp
 ```text
 download_workers = 4
 download_mode = concurrent
+download_worker_process = independent-terminal
+controller_process = separate-terminal
+one_artifact_per_terminal = true
 git_priority = highest
 install_mode = parallel-after-git
 install_workers_after_git = 2
+install_worker_process = independent-terminal
 install_start = after-git-installed
 start_all_workers_before_wait = true
 progress_poll_interval_seconds = 1
 ```
 
-下载器使用多线程 worker 池，不采用顺序 `foreach` 逐个下载，也不把四条测速命令当作下载池。实现可以使用多个 `curl.exe`/BITS 子进程或 PowerShell job，报告记录下载开始/结束时间。
+每个资源必须使用一个独立 PowerShell/cmd 终端进程；控制终端只负责启动和轮询。下载器使用多线程 worker 池，不采用一个终端里的顺序 `foreach` 逐个下载，也不把四条测速命令当作下载池。实现可以使用 `Start-Process powershell.exe`、Windows Terminal `wt.exe new-tab`、多个 `curl.exe`/BITS 子进程，但每个资源必须拥有独立 PID、独立日志和独立状态文件。
 
 执行器控制顺序：
 
 ```text
-1. 读取全部下载项并建立 4 个 worker
-2. 在等待任何结果前启动 Git、.NET、WinUI template 和 WinAppCLI 的下载任务
-3. 每 1 秒轮询所有 worker 的进度和文件大小
-4. Git 文件下载完成时，立即触发 Git 安装
-5. Git 安装完成后，立即启动 clone 和 .NET 安装；两项同时运行
-6. clone 完成后，立即启动 WinAppCLI 安装；.NET 安装继续运行
-7. .NET 安装完成后，立即启动 WinUI 模板安装
-8. 工具链完成后立即交接 Skill
+1. 启动一个控制终端和 4 个独立下载终端
+2. Git、.NET、WinUI template、WinAppCLI 各自占用一个下载终端
+3. 控制终端每 1 秒读取各终端的 PID、状态文件和进度
+4. Git 下载终端完成后，立即关闭该下载终端并启动 Git 安装终端
+5. Git 安装终端完成后，立即启动 clone 终端和 .NET 安装终端
+6. clone 完成后，启动 WinAppCLI 安装终端；.NET 安装终端继续运行
+7. .NET 安装终端完成后，启动 WinUI 模板安装终端
+8. 工具链完成后，控制终端交接 Skill
 ```
 
-Agent 的工具调用应体现这一点：同一轮启动多个下载进程；Git 安装后同时启动独立安装进程；WinUI 模板等待 .NET 就绪。逐个调用安装命令并等待上一个返回，会退化为串行安装。
+Agent 的工具调用应体现这一点：同一轮启动多个独立终端进程；控制终端不承担下载；Git 安装后同时启动 clone、.NET 和后续 WinAppCLI 终端；WinUI 模板等待 .NET 就绪。一个终端承载全部下载或全部安装，会退化为串行流程。
 
 ### 第二阶段：Git 优先、Git 之后并行安装
 
-Git 是唯一的绝对前置。Git 安装完成后立即 clone；随后 .NET SDK 和 WinAppCLI 并行安装，WinUI 模板在 .NET 可用后立即安装。
+Git 是唯一的绝对前置。Git 安装完成后立即 clone；随后 .NET SDK 和 WinAppCLI 由两个独立安装终端并行执行，WinUI 模板在 .NET 可用后由新的独立终端立即安装。
 
 安装关系如下：
 
@@ -274,7 +278,7 @@ Git 是唯一的绝对前置。Git 安装完成后立即 clone；随后 .NET SDK
 安装选择规则：
 
 - Git 安装完成前，其他安装任务保持等待，下载任务持续运行。
-- Git 安装完成后，clone、.NET SDK 安装和 WinAppCLI 安装同时运行。
+- Git 安装完成后，clone、.NET SDK 安装和 WinAppCLI 安装分别占用独立终端并同时运行。
 - WinAppCLI 外部下载遇到超时或连接错误时，Git 安装和仓库 clone继续推进；clone 完成后立即使用仓库内 `toolchain/winapp-cli/0.6.1/` 固定副本。
 - .NET SDK 完成后立即唤醒 WinUI 模板安装。
 - 用户看到每个阶段的即时反馈，不等待全部下载结束才开始安装。
@@ -285,8 +289,8 @@ Developer Mode、管理员权限、测试证书信任、Microsoft 登录和 Stor
 
 - 初始化阶段只处理工作站工具链，工具链验证完成后再开始产品访谈。
 - 版本和下载地址以工具链锁定清单为唯一来源；README 只描述流程和用户可见状态。
-- Agent 启动多线程下载；Git worker 优先完成并安装，其他下载同时运行。
-- Agent 使用 Git-first 安装门槛；Git 完成后同时运行 clone、.NET SDK 和 WinAppCLI 安装任务，.NET 完成后启动 WinUI 模板安装，再进入 Skill handoff。
+- Agent 启动多个独立下载终端；Git worker 优先完成并安装，其他下载终端同时运行。
+- Agent 使用 Git-first 安装门槛；Git 完成后启动独立 clone、.NET SDK 和 WinAppCLI 终端，.NET 完成后启动独立 WinUI 模板安装终端，再进入 Skill handoff。
 - Agent 不设置“等待所有下载结束再安装”的总闸门；总闸门只用于工具链状态和 Skill handoff 报告验收。
 - 安装后以真实命令输出作为成功依据，不以 winget 的单一状态作为依据。
 - Git 安装后立即刷新 PATH，或使用已安装工具的绝对路径继续执行 clone。
@@ -305,6 +309,8 @@ status
 waiting_for
 worker_id
 queue_position
+terminal_pid
+terminal_kind
 ```
 
 只列出四条下载命令或只汇总最终速度，仍不足以构成并行证据；报告必须展示时间重叠和单项安装启动时间。
@@ -470,7 +476,7 @@ apps/test-builds/<app-slug>/<version>/
 - [x] 初始化 Git 仓库
 - [x] 建立 Skill、模板和研究目录
 - [x] 确定首个 Golden Path：本地决策器「别纠结了」
-- [ ] 建立多线程下载器和 Git-first 并行安装器
+- [ ] 建立独立终端下载器和 Git-first 并行安装器
 - [ ] 建立 bootstrap → Skill 需求发现交接
 - [x] 下载并归档 WinAppCLI 0.6.1 x64 MSIX
 - [ ] 建立测试 Build 归档目录
