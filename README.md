@@ -293,6 +293,134 @@ terminal_kind
 
 只列出四条下载命令或只汇总最终速度，仍不足以构成并行证据；报告必须展示时间重叠和单项安装启动时间。
 
+### Bootstrap 操作手册：按步骤执行，不现场猜流程
+
+#### 1. 远程入口
+
+```text
+仓库页面：https://gitee.com/freevian/quick-app-maker
+默认分支：main
+clone 地址：https://gitee.com/freevian/quick-app-maker.git
+```
+
+- 直接读取 raw README 时使用 `main`，`master` 返回 404 后不要继续重试旧分支。
+- 页面读取成功后记录页面显示的最新 commit。
+- Git 安装完成后使用绝对路径执行 clone；不要依赖当前 PowerShell 是否已经刷新 PATH。
+- 仓库 ZIP 不是初始化入口；Git 直链可用时直接安装 Git 并 clone。
+- clone 完成后立即记录 `git rev-parse --short HEAD` 和 `git status -sb`，报告中标记实际使用的仓库版本。
+
+#### 2. 下载终端
+
+- 控制终端只负责创建缓存、启动 worker 和读取状态。
+- Git、.NET SDK、WinUI template 各自使用独立 PowerShell/cmd 进程；WinAppCLI 使用 clone 后的仓库固定副本。
+- 每个 worker 只负责一个资源，拥有独立 PID、日志和 JSON 状态文件。
+- launcher 使用已经验证过的脚本文件；参数以数组传递，启动前执行一次 PowerShell 语法检查。
+- launcher 启动完成后立即返回，不在前台进入十分钟循环等待。
+
+#### 3. Git 事件
+
+Git worker 状态变为 `ready` 后，控制器立即启动 Git 安装终端。Git 安装终端必须：
+
+```text
+启动安装器
+→ 等待安装器进程结束
+→ 写入 exit_code
+→ 刷新 PATH
+→ 使用 C:\Program Files\Git\cmd\git.exe 验证
+→ 启动 clone 终端
+```
+
+clone 终端使用 Git 的绝对路径，并把标准输出和错误输出分别写入日志；`Cloning into ...` 属于正常进度，不作为失败状态。
+
+#### 4. 并行安装事件
+
+Git 安装完成后，控制器立即启动两个独立任务：
+
+```text
+任务 A：clone Gitee 仓库
+任务 B：安装 .NET SDK
+```
+
+clone 完成后立即启动：
+
+```text
+任务 C：从 toolchain/winapp-cli/0.6.1/ 安装 WinAppCLI
+```
+
+任务 B 和任务 C 同时运行。任务 B 的 .NET SDK 状态变为 `installed` 后立即启动 WinUI template 安装。每个安装任务都使用独立进程和独立状态文件。
+
+#### 5. 安装器状态记录
+
+所有安装器都使用 `-PassThru -Wait` 获取真实进程退出码，状态写入 JSON；不要使用 `$LASTEXITCODE` 代替 `Start-Process` 的退出码，也不要依赖关闭终端后的 `Tee-Object` 输出。
+
+每个状态文件至少包含：
+
+```text
+artifact_id
+terminal_pid
+installer_pid
+terminal_kind
+install_start
+install_end
+exit_code
+status
+next_action
+error
+```
+
+`.NET SDK` 的完成判断顺序：
+
+```text
+安装器进程结束
+→ 读取 installer_pid 的 exit_code
+→ 执行 dotnet --list-sdks
+→ 找到 10.0.400
+→ 状态改为 installed
+→ 启动 WinUI template 安装
+```
+
+WinAppCLI 的完成判断顺序：
+
+```text
+Add-AppxPackage 进程结束
+→ Get-AppxPackage 查询 winapp
+→ winapp --version 显示 0.6.1
+→ 状态改为 installed
+```
+
+#### 6. 轮询和超时
+
+- 控制器使用短轮询或文件事件读取状态；每次读取迅速返回。
+- 下载 worker 和安装 worker 各自设置明确超时，超时后写入 `failed`，保留其他任务继续运行。
+- WinAppCLI 没有外部下载任务；clone 完成后直接读取仓库文件。
+- `.NET SDK` 安装期间只读取它自己的状态文件；安装器退出前不重复启动，也不反复查询造成假失败。
+- 报告显示 `waiting_for` 时，只代表该任务等待具体依赖，不代表整个 bootstrap 停住。
+
+#### 7. Bootstrap 的停止线
+
+以下内容属于真实 App 阶段，bootstrap 完成前保持关闭：
+
+```text
+创建 Hello World 项目
+dotnet new winui-navview -n HelloWorld
+dotnet run
+Developer Mode
+dotnet publish
+winapp pack
+MSIX 安装测试
+Microsoft Store 登录和提交
+```
+
+Bootstrap 的最后动作只有：
+
+```text
+写入 bootstrap-report.md
+bootstrap_status: ready
+skill_handoff: ready
+读取 SKILL.md
+向用户提问 App 想法
+```
+
 ### 初始化完成条件
 
 只有同时满足以下条件，Agent 才进入 App 需求发现：
@@ -350,7 +478,7 @@ Fast Mode 的产品边界压缩为：**免费、本地、个人、通用**，再
 
 按下面顺序推进：先完成工具链 bootstrap，再交接 Skill 需求发现，最后验证真实 App 的发行链路：
 
-1. **完成新 Windows 电脑 bootstrap**：多线程下载，Git 优先安装，立即 clone 仓库，随后按依赖和体积顺序完成工具链。
+1. **完成新 Windows 电脑 bootstrap**：多线程下载，Git 优先安装，立即 clone 仓库，随后并行安装 .NET SDK 和仓库内 WinAppCLI。
 2. **交接 `vainreef-fast-publish`**：向用户提问 App 想法，创建 living README，逐轮完成需求发现和可行性判断。
 3. **用户确认产品方向后创建真实 App**：从 Golden Template 生成项目，执行 restore、build、run 和修复循环。
 4. **走通本地打包**：执行 `dotnet publish` 与 `winapp pack`，安装真实 App 测试包并重新启动。
@@ -439,37 +567,3 @@ apps/test-builds/<app-slug>/<version>/
 ```
 
 `build-info.json` 至少记录：App 名称、版本、架构、源代码 commit、构建时间、.NET 版本、Windows App SDK 版本、`winapp` 版本和测试结果。开发证书、Token、私钥和本机配置留在机器上，归档目录只放可复现所需的公开信息。
-
-## 研究结论（2026-08-18）
-
-- 微软当前把 **WinUI 3** 定位为新 Windows 桌面应用的推荐原生 UI 框架，支持 C#/XAML，并覆盖 Windows 10 1809+ 与 Windows 11。
-- **.NET 10** 当前为 LTS，官方支持到 2028-11-14；Skill 只固定主版本，补丁版本跟随经过测试的工具链。
-- **`winapp` CLI** 覆盖 SDK、Package Identity、manifest、证书、MSIX 与 Store readiness，但官方文档当前标注为 public preview，因此版本和命令都要纳入验收矩阵。
-- 微软已经提供从空目录、命令行、AI Agent 到 MSIX 和 Microsoft Store 的官方 Quickstart；路径可作为本项目的基线。
-- 新的 Store 开发者账号流程显示注册费为 0，但仍需要 Microsoft 账号、身份验证、Partner Center 资料和人工确认点。
-- Store 提交仍需要应用价值主张、完整可用体验、年龄评级；涉及个人信息时还要提供隐私政策 URL。首个 App 采用本地化设计，可以减少发布变量。
-
-## 当前状态
-
-- [x] 初始化 Git 仓库
-- [x] 建立 Skill、模板和研究目录
-- [x] 确定首个 Golden Path：本地决策器「别纠结了」
-- [ ] 建立独立终端下载器和 Git-first 并行安装器
-- [ ] 建立 bootstrap → Skill 需求发现交接
-- [x] 下载并归档 WinAppCLI 0.6.1 x64 MSIX
-- [ ] 建立测试 Build 归档目录
-- [ ] 在 Windows 实机固定 Windows App SDK 与 `winapp` 版本
-- [x] 创建 `skills/vainreef-fast-publish`
-- [ ] 建出第一个可安装 MSIX
-- [ ] 完成一次 Microsoft Store 提交并记录结果
-
-## 官方资料
-
-- [WinUI 3](https://learn.microsoft.com/en-us/windows/apps/winui/winui3/)
-- [Windows App SDK](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/)
-- [Windows App Development CLI（winapp）](https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/)
-- [Quickstart: Build and publish a Windows app with AI](https://learn.microsoft.com/en-us/windows/apps/develop/ai-assisted/quickstart)
-- [.NET Support Policy](https://dotnet.microsoft.com/platform/support/policy)
-- [Open a Microsoft Store developer account](https://learn.microsoft.com/en-us/windows/apps/publish/partner-center/open-a-developer-account)
-- [Publish your first Windows app](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app)
-- [Microsoft Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies)
