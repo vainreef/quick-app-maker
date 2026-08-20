@@ -14,7 +14,7 @@
 
 本节是仓库级前置流程，优先级高于产品创意访谈和 App 生成功能。用户把仓库地址交给 Agent 后，Agent 先读取本节，准备开发工具；工具链完成验证后，再进入 App 需求发现。
 
-初始化目标是：**下载任务多线程并发；Git 下载完成后最先安装并立即 clone；Git 就绪后，.NET SDK 与 WinAppCLI 同时安装；WinUI 模板在 .NET 就绪后立即安装；工具链完成后马上交接 Skill。**
+初始化目标是：**下载任务多线程并发；Git 下载完成后最先安装并立即 clone；clone 期间启动 .NET SDK，clone 完成后立即加入仓库内 WinAppCLI 安装；WinUI 模板在 .NET 就绪后立即安装；工具链完成后马上交接 Skill。**
 
 当前初始化模式：`parallel-download-git-first-parallel-post-git-install`
 
@@ -28,7 +28,8 @@
 → Git 下载完成后立即安装
 → Git 可用后立即 clone 仓库
 → 其他下载继续并发运行
-→ Git 就绪后并行安装 .NET SDK 和 WinAppCLI
+→ Git 就绪后并行 clone 和安装 .NET SDK
+→ clone 完成后立即安装仓库内 WinAppCLI
 → .NET 就绪后立即安装 WinUI 模板
 → 验证 Git、.NET、WinUI 模板、NuGet 和 winapp
 → 写入 bootstrap 报告
@@ -57,7 +58,7 @@ New-Item -ItemType Directory -Force -Path $cache | Out-Null
 | Git for Windows x64 | 克隆、更新和提交仓库 | 真实 Windows 会话下载和安装成功 |
 | .NET 10 SDK x64 | 创建和编译 WinUI 项目 | 真实 Windows 会话下载和安装成功 |
 | WinUI C# template `.nupkg` | `dotnet new winui-navview` 和 Golden Template 维护 | 真实 Windows 会话安装成功 |
-| WinAppCLI x64 | 运行、打包、证书和 MSIX | 0.6.1 x64 MSIX 已放入仓库，安装队列待完成 |
+| WinAppCLI x64 | 运行、打包、证书和 MSIX | 0.6.1 x64 MSIX 随 Gitee 仓库 clone 获取，安装队列待完成 |
 | Golden Template 依赖包 | Windows App SDK、BuildTools 和项目还原 | 等待 NuGet 源或本地 feed |
 | WinApp/Windows App SDK 缓存 | 首次运行和打包所需的额外资源 | 按实机验证结果纳入 |
 
@@ -139,13 +140,12 @@ dotnet new list winui
 
 会话结果：模板安装成功，`winui-navview` 已注册；包体积约 373 KB。该版本属于 alpha，初始化始终使用固定版本。
 
-#### 4. WinAppCLI：官方 x64 包已确认
+#### 4. WinAppCLI：只使用仓库固定副本
 
 ```text
 版本：0.6.1
 架构：x64
 文件：winappcli_x64.msix
-地址：https://github.com/microsoft/winappcli/releases/download/v0.6.1/winappcli_x64.msix
 ```
 
 仓库内固定副本：
@@ -154,43 +154,20 @@ dotnet new list winui
 toolchain/winapp-cli/0.6.1/winappcli_x64.msix
 ```
 
-初始化时优先读取仓库内固定副本，复制到当前 bootstrap cache，文件就绪后立即进入 WinAppCLI 安装任务。GitHub、国内镜像和 winget 作为后续备用来源。
+初始化时先通过 Gitee clone 获取仓库，随后从 `toolchain/winapp-cli/0.6.1/winappcli_x64.msix` 复制到 bootstrap cache，并立即启动 WinAppCLI 安装任务。
 
-下载命令：
+WinAppCLI 的 bootstrap 来源策略固定为：
 
-```powershell
-$url = 'https://github.com/microsoft/winappcli/releases/download/v0.6.1/winappcli_x64.msix'
-$out = Join-Path $cache 'winappcli_x64.msix'
-Invoke-WebRequest -Uri $url -OutFile $out
-Get-Item $out | Select-Object FullName, Length
+```text
+Gitee clone 得到的仓库固定副本
+→ 本地 bootstrap cache
 ```
 
-也可以使用会话中查到的 winget 包标识：
-
-```powershell
-winget install --id Microsoft.WinAppCli --exact --source winget `
-  --accept-source-agreements --accept-package-agreements --silent --disable-interactivity
-```
-
-会话结果：官方 x64 MSIX 约 17.63 MB；下载资产大小已核对；安装过程在下载阶段被中断，因此安装结果仍需在下一次安装队列中验证。批量初始化优先下载 MSIX 或 standalone ZIP，下载完成后立即安装。
-
-GitHub 直连的当前实测结果：`0 bytes/s`，未建立有效传输。该结果说明国内网络路径上的 GitHub 直连存在连接瓶颈，暂时把 GitHub 作为备用来源；WinAppCLI 的主来源应使用本地缓存、国内镜像或 Gitee/对象存储镜像。
-
-`curl.exe -s` 会隐藏 DNS、代理、TLS 和连接超时等具体错误。排查时必须保留详细错误输出：
-
-```powershell
-Resolve-DnsName github.com
-Test-NetConnection github.com -Port 443
-curl.exe -v -L --connect-timeout 10 --max-time 30 `
-  -o NUL `
-  'https://github.com/microsoft/winappcli/releases/download/v0.6.1/winappcli_x64.msix'
-```
-
-报告至少记录 `dns_result`、`tcp_443_result`、`tls_result`、`http_status` 和 `curl_stderr`，仅显示 `0 bytes/s` 仍不足以定位具体瓶颈。网络诊断只在源连接失败时执行，不进入正常安装路径。
+安装阶段完全跳过 GitHub、GitHub Release、GitHub 网络探测和 `winget Microsoft.WinAppCli`。仓库 clone 成功后，WinAppCLI 直接使用仓库文件；仓库 clone 失败时记录 Gitee clone 错误并结束 bootstrap 分支。
 
 #### 5. 现阶段仍待补齐的下载项
 
-真实会话已经覆盖 Git、.NET SDK、WinUI 模板和 WinAppCLI。第一次编译 Golden Template 时，还要根据实际生成的 `.csproj` 收集并锁定：
+真实会话已经覆盖 Git、.NET SDK、WinUI 模板和仓库固定版 WinAppCLI。第一次编译 Golden Template 时，还要根据实际生成的 `.csproj` 收集并锁定：
 
 ```text
 Microsoft.WindowsAppSDK
@@ -225,7 +202,7 @@ Microsoft.Windows.SDK.BuildTools.WinApp
 下载执行器要求：
 
 ```text
-download_workers = 4
+download_workers = 3
 download_mode = concurrent
 download_worker_process = independent-terminal
 controller_process = separate-terminal
@@ -239,26 +216,26 @@ start_all_workers_before_wait = true
 progress_poll_interval_seconds = 1
 ```
 
-每个资源必须使用一个独立 PowerShell/cmd 终端进程；控制终端只负责启动和轮询。下载器使用多线程 worker 池，不采用一个终端里的顺序 `foreach` 逐个下载，也不把四条测速命令当作下载池。实现可以使用 `Start-Process powershell.exe`、Windows Terminal `wt.exe new-tab`、多个 `curl.exe`/BITS 子进程，但每个资源必须拥有独立 PID、独立日志和独立状态文件。
+每个下载资源必须使用一个独立 PowerShell/cmd 终端进程；控制终端只负责启动和轮询。下载器使用 3 个多线程 worker：Git、.NET SDK、WinUI template。WinAppCLI 不创建下载 worker，clone 后直接读取仓库固定副本。实现可以使用 `Start-Process powershell.exe`、Windows Terminal `wt.exe new-tab`、多个 `curl.exe`/BITS 子进程，但每个下载资源必须拥有独立 PID、独立日志和独立状态文件。
 
 执行器控制顺序：
 
 ```text
-1. 启动一个控制终端和 4 个独立下载终端
-2. Git、.NET、WinUI template、WinAppCLI 各自占用一个下载终端
+1. 启动一个控制终端和 3 个独立下载终端
+2. Git、.NET、WinUI template 各自占用一个下载终端
 3. 控制终端每 1 秒读取各终端的 PID、状态文件和进度
 4. Git 下载终端完成后，立即关闭该下载终端并启动 Git 安装终端
 5. Git 安装终端完成后，立即启动 clone 终端和 .NET 安装终端
-6. clone 完成后，启动 WinAppCLI 安装终端；.NET 安装终端继续运行
+6. clone 完成后，从仓库复制 WinAppCLI 并启动安装终端；.NET 安装终端继续运行
 7. .NET 安装终端完成后，启动 WinUI 模板安装终端
 8. 工具链完成后，控制终端交接 Skill
 ```
 
-Agent 的工具调用应体现这一点：同一轮启动多个独立终端进程；控制终端不承担下载；Git 安装后同时启动 clone、.NET 和后续 WinAppCLI 终端；WinUI 模板等待 .NET 就绪。一个终端承载全部下载或全部安装，会退化为串行流程。
+Agent 的工具调用应体现这一点：同一轮启动多个独立终端进程；控制终端不承担下载；Git 安装后同时启动 clone 和 .NET 安装终端；clone 完成后立即启动仓库内 WinAppCLI 安装终端；WinUI 模板等待 .NET 就绪。一个终端承载全部下载或全部安装，会退化为串行流程。
 
 ### 第二阶段：Git 优先、Git 之后并行安装
 
-Git 是唯一的绝对前置。Git 安装完成后立即 clone；随后 .NET SDK 和 WinAppCLI 由两个独立安装终端并行执行，WinUI 模板在 .NET 可用后由新的独立终端立即安装。
+Git 是唯一的绝对前置。Git 安装完成后立即 clone 并同时安装 .NET SDK；clone 完成后立即安装仓库内 WinAppCLI，.NET 安装继续运行；WinUI 模板在 .NET 可用后由新的独立终端立即安装。
 
 安装关系如下：
 
@@ -270,16 +247,17 @@ Git 是唯一的绝对前置。Git 安装完成后立即 clone；随后 .NET SDK
    ```
 
    已存在工作区时，使用该工作区的远程地址和当前分支继续执行。
-3. **.NET 10 SDK + WinAppCLI**：Git 安装完成后同时启动；WinAppCLI 约 18 MB，.NET SDK 约 205 MB。
-4. **WinUI C# template**：包可以提前下载；安装命令等待 .NET SDK 可用，随后立即执行。
-5. **Golden Template 依赖包**：下载完成后立即放入本地 NuGet feed；restore 延后到真实 App 项目创建后执行。
-6. **交接 Skill**：工具链满足条件后结束 bootstrap，进入 `vainreef-fast-publish` 的需求发现流程。
+3. **.NET 10 SDK**：Git 安装完成后立即启动，约 205 MB。
+4. **WinAppCLI**：clone 完成后从仓库固定副本立即启动安装，约 18 MB；.NET 安装继续运行。
+5. **WinUI C# template**：包可以提前下载；安装命令等待 .NET SDK 可用，随后立即执行。
+6. **Golden Template 依赖包**：下载完成后立即放入本地 NuGet feed；restore 延后到真实 App 项目创建后执行。
+7. **交接 Skill**：工具链满足条件后结束 bootstrap，进入 `vainreef-fast-publish` 的需求发现流程。
 
 安装选择规则：
 
 - Git 安装完成前，其他安装任务保持等待，下载任务持续运行。
-- Git 安装完成后，clone、.NET SDK 安装和 WinAppCLI 安装分别占用独立终端并同时运行。
-- WinAppCLI 外部下载遇到超时或连接错误时，Git 安装和仓库 clone继续推进；clone 完成后立即使用仓库内 `toolchain/winapp-cli/0.6.1/` 固定副本。
+- Git 安装完成后，clone 和 .NET SDK 安装分别占用独立终端并同时运行。
+- clone 完成后立即使用仓库内 `toolchain/winapp-cli/0.6.1/` 固定副本启动 WinAppCLI 安装终端。
 - .NET SDK 完成后立即唤醒 WinUI 模板安装。
 - 用户看到每个阶段的即时反馈，不等待全部下载结束才开始安装。
 
@@ -289,8 +267,8 @@ Developer Mode、管理员权限、测试证书信任、Microsoft 登录和 Stor
 
 - 初始化阶段只处理工作站工具链，工具链验证完成后再开始产品访谈。
 - 版本和下载地址以工具链锁定清单为唯一来源；README 只描述流程和用户可见状态。
-- Agent 启动多个独立下载终端；Git worker 优先完成并安装，其他下载终端同时运行。
-- Agent 使用 Git-first 安装门槛；Git 完成后启动独立 clone、.NET SDK 和 WinAppCLI 终端，.NET 完成后启动独立 WinUI 模板安装终端，再进入 Skill handoff。
+- Agent 启动 3 个独立下载终端；Git worker 优先完成并安装，.NET 和 WinUI 下载终端同时运行。
+- Agent 使用 Git-first 安装门槛；Git 完成后启动独立 clone 和 .NET SDK 终端，clone 完成后启动仓库内 WinAppCLI 终端，.NET 完成后启动独立 WinUI 模板安装终端，再进入 Skill handoff。
 - Agent 不设置“等待所有下载结束再安装”的总闸门；总闸门只用于工具链状态和 Skill handoff 报告验收。
 - 安装后以真实命令输出作为成功依据，不以 winget 的单一状态作为依据。
 - Git 安装后立即刷新 PATH，或使用已安装工具的绝对路径继续执行 clone。
