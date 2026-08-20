@@ -146,6 +146,7 @@ bootstrap/
 - 安装器进程结束后再执行 `dotnet --list-sdks`。
 - 发现 `10.0.400` 后才进入 WinUI 模板安装。
 - 安装过程中不重复启动第二个 .NET 安装器。
+- 电脑已有 .NET 6/8/9 时，先判断目标 SDK 是否为 `10.0.400`；目标版本就绪前跳过 `dotnet new list winui` 检查，避免旧 SDK 把 `list` 当作无效参数。
 
 ### WinAppCLI 安装
 
@@ -155,8 +156,15 @@ bootstrap/
 ### WinUI 模板安装
 
 - 直接执行仓库 worker，不使用 PowerShell 5.1 的 `2>&1 + ErrorActionPreference=Stop` 组合。
+- 安装和模板列表查询都通过独立 `Start-Process` 捕获 stdout、stderr 和 exit code。
 - `dotnet new list winui` 出现 item template 需要项目上下文的提示属于正常信息。
 - 只要列表中存在 `winui-navview`，模板即已就绪。
+
+### PowerShell 5.1 原生命令
+
+- Git clone 使用独立进程的 stdout/stderr 重定向；`Cloning into ...` 只作为进度。
+- .NET、WinAppCLI、WinUI 每个安装动作都由仓库 worker 写入自己的日志和退出码。
+- 控制器读取状态文件，不通过 `$LASTEXITCODE` 猜测 `Start-Process` 的结果。
 
 ## Bootstrap 的停止线
 

@@ -41,7 +41,10 @@ function Write-Step {
 
 function Test-DotNetSdk {
     if (-not (Test-Path -LiteralPath $dotnetExe)) { return $false }
+    $previousErrorPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     $sdks = (& $dotnetExe --list-sdks 2>$null | Out-String)
+    $ErrorActionPreference = $previousErrorPreference
     return $sdks -match "(?m)^$([regex]::Escape($dotnetVersion))"
 }
 
@@ -51,8 +54,11 @@ function Test-WinAppCli {
 }
 
 function Test-WinUiTemplate {
-    if (-not (Test-Path -LiteralPath $dotnetExe)) { return $false }
+    if (-not (Test-DotNetSdk)) { return $false }
+    $previousErrorPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     $templates = (& $dotnetExe new list winui 2>$null | Out-String)
+    $ErrorActionPreference = $previousErrorPreference
     return $templates -match 'winui-navview'
 }
 

@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory = $true)][string]$LogPath
 )
 
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
 
@@ -17,17 +17,34 @@ if (-not (Test-Path -LiteralPath $dotnet)) {
 }
 
 "[$(Get-Date -Format o)] START winui template install" | Set-Content -LiteralPath $LogPath -Encoding UTF8
-& $dotnet new install $PackagePath 1>> $LogPath 2>> $LogPath
-$installExitCode = $LASTEXITCODE
+$installStdout = "$LogPath.install.stdout"
+$installStderr = "$LogPath.install.stderr"
+Remove-Item $installStdout, $installStderr -Force -ErrorAction SilentlyContinue
+$installProcess = Start-Process -FilePath $dotnet `
+    -ArgumentList "new install `"$PackagePath`"" `
+    -RedirectStandardOutput $installStdout `
+    -RedirectStandardError $installStderr `
+    -PassThru -Wait
+$installExitCode = $installProcess.ExitCode
+if (Test-Path $installStdout) { Get-Content $installStdout | Add-Content -LiteralPath $LogPath -Encoding UTF8 }
+if (Test-Path $installStderr) { Get-Content $installStderr | Add-Content -LiteralPath $LogPath -Encoding UTF8 }
 
 if ($installExitCode -ne 0) {
     "[$(Get-Date -Format o)] FAIL winui template install exit=$installExitCode" | Add-Content -LiteralPath $LogPath -Encoding UTF8
     exit $installExitCode
 }
 
-$templateList = (& $dotnet new list winui 2>$null | Out-String)
+$listStdout = "$LogPath.list.stdout"
+$listStderr = "$LogPath.list.stderr"
+Remove-Item $listStdout, $listStderr -Force -ErrorAction SilentlyContinue
+$listProcess = Start-Process -FilePath $dotnet `
+    -ArgumentList 'new list winui' `
+    -RedirectStandardOutput $listStdout `
+    -RedirectStandardError $listStderr `
+    -PassThru -Wait
+$templateList = if (Test-Path $listStdout) { Get-Content $listStdout | Out-String } else { '' }
 if ($templateList -notmatch 'winui-navview') {
-    "[$(Get-Date -Format o)] FAIL winui-navview template missing" | Add-Content -LiteralPath $LogPath -Encoding UTF8
+    "[$(Get-Date -Format o)] FAIL winui-navview template missing exit=$($listProcess.ExitCode)" | Add-Content -LiteralPath $LogPath -Encoding UTF8
     exit 1
 }
 
