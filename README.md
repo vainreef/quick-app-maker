@@ -40,7 +40,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 1. 查找已安装的 Git。
 2. Git 缺失时下载固定版本 `2.47.1.windows.1`。
 3. 静默安装 Git 并读取真实安装器退出码。
-4. 使用 `C:\Program Files\Git\cmd\git.exe` 的绝对路径 clone。
+4. 安装完成后重新发现 `git.exe` 的实际位置，并用这个绝对路径 clone。
 5. clone 的标准输出和错误输出分别写入日志，`Cloning into ...` 只作为进度信息。
 6. 已有仓库时执行 `pull --ff-only`。
 7. clone 完成后调用仓库里的工具链安装器。
@@ -65,7 +65,7 @@ WinUI 模板：从 NuGet 下载固定 nupkg
 
 .NET SDK 和 WinUI 模板下载并行启动；仓库内 WinAppCLI 同时安装。.NET SDK 下载结束后立即启动安装；.NET 就绪后立即安装 WinUI 模板。
 
-版本、文件名和下载地址统一读取 `bootstrap/toolchain.json`；Agent 不在运行时选择其他版本。
+Bootstrap 的版本、文件名和下载地址统一读取 `bootstrap/toolchain.json`。这里是安装阶段唯一的版本来源，仓库不再维护重复的 `version-lock.md`。
 
 ## 固定版本和来源
 
@@ -133,7 +133,10 @@ bootstrap/
 ### Git 和 PATH
 
 - Git 安装后，不依赖新终端刷新 PATH。
-- clone 和后续 Git 命令始终使用 Git 的绝对路径。
+- 已有 Git 时先从 PATH 和常见安装位置发现真实路径。
+- 缺少 Git 时运行 Git for Windows 安装器；安装目录由该安装器选择，常见结果是 `C:\Program Files\Git`，当前用户安装也可能位于 `%LOCALAPPDATA%\Programs\Git`。
+- 安装后脚本重新发现并输出 `Git executable: ...`。
+- 这个绝对路径会传给 `bootstrap/install.ps1`，后续流程继续使用同一个 Git。
 
 ### clone 日志
 
@@ -165,6 +168,14 @@ bootstrap/
 - Git clone 使用独立进程的 stdout/stderr 重定向；`Cloning into ...` 只作为进度。
 - .NET、WinAppCLI、WinUI 每个安装动作都由仓库 worker 写入自己的日志和退出码。
 - 控制器读取状态文件，不通过 `$LASTEXITCODE` 猜测 `Start-Process` 的结果。
+
+### 下载和缓存
+
+- 正常路径直接使用已有缓存，不在每次执行前计算 SHA-256。
+- 下载写入 `.part`，下载进程成功后再移动到正式文件名。
+- 安装或包读取失败时，脚本记录失败文件的大小和 SHA-256。
+- 外部缓存文件在失败后删除、重新下载并自动重试一次。
+- SHA-256 在这里用于失败诊断和对比，不是正常启动前的固定关卡。
 
 ## Bootstrap 的停止线
 
@@ -205,6 +216,17 @@ skills/vainreef-fast-publish/references/discovery-interview.md
 
 用户给出第一段实质想法后，Skill 才创建真实 App 目录和 living README。用户确认完整需求后，才进入工程生成、运行、打包和 Store 流程。
 
+## App 工程怎么生成
+
+仓库只提供工具链和 Build 经验，不保存一套预写好的 Golden Template。Agent 读取：
+
+```text
+skills/vainreef-fast-publish/references/toolchain/v1/commands.md
+docs/windows-smoke-test.md
+```
+
+然后从当前 WinUI CLI 模板创建最小工程，读取真实生成结果，再根据当前 App 自由设计页面、代码结构、依赖和数据方案。`commands.md` 只记录 Windows 实测命令和真实踩坑结果。
+
 ## 项目结构
 
 ```text
@@ -213,9 +235,8 @@ skills/vainreef-fast-publish/references/discovery-interview.md
 ├── bootstrap/                      # 一键初始化实现
 ├── skills/vainreef-fast-publish/  # 需求发现、工程、打包和 Store Skill
 ├── toolchain/                      # 仓库内固定工具
-├── templates/                      # Golden Template
 ├── apps/                           # 真实测试 Build 归档
-└── docs/                           # 研究资料
+└── docs/                           # Smoke Test 与研究资料
 ```
 
-Fast Publish 的技术契约、需求边界、依赖 Registry 和 Store 流程都在 `skills/vainreef-fast-publish/` 内维护；根 README 只承担新电脑初始化手册职责。
+Fast Publish 的访谈流程、Windows Build 经验、Capability 建议和 Store 流程都在 `skills/vainreef-fast-publish/` 内维护；根 README 主要承担新电脑初始化手册职责。

@@ -43,7 +43,7 @@ $listProcess = Start-Process -FilePath $dotnet `
     -RedirectStandardError $listStderr `
     -PassThru -Wait
 $templateList = if (Test-Path $listStdout) { Get-Content $listStdout | Out-String } else { '' }
-if ($templateList -notmatch 'winui-navview') {
+if ($listProcess.ExitCode -ne 0 -or $templateList -notmatch 'winui-navview') {
     "[$(Get-Date -Format o)] FAIL winui-navview template missing exit=$($listProcess.ExitCode)" | Add-Content -LiteralPath $LogPath -Encoding UTF8
     exit 1
 }

@@ -112,6 +112,7 @@ else {
 
 $head = (& $git -C $Destination rev-parse --short HEAD | Out-String).Trim()
 Write-Step "Repository ready: $head"
+Write-Step "Git executable: $git"
 
 $installerScript = Join-Path $Destination 'bootstrap\install.ps1'
 if (-not (Test-Path -LiteralPath $installerScript)) {
@@ -119,7 +120,7 @@ if (-not (Test-Path -LiteralPath $installerScript)) {
 }
 
 Write-Step 'Starting repository toolchain installer'
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerScript -RepoRoot $Destination
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerScript -RepoRoot $Destination -GitPath $git
 if ($LASTEXITCODE -ne 0) {
     throw "Repository toolchain installer exit code $LASTEXITCODE"
 }

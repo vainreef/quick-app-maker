@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
+    [string]$GitPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +38,26 @@ $dotnetExe = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
 function Write-Step {
     param([string]$Message)
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $Message"
+}
+
+function Resolve-GitPath {
+    param([string]$PreferredPath)
+
+    if ($PreferredPath -and (Test-Path -LiteralPath $PreferredPath)) {
+        return (Resolve-Path -LiteralPath $PreferredPath).Path
+    }
+
+    $command = Get-Command git.exe -ErrorAction SilentlyContinue
+    if ($command) { return $command.Source }
+
+    $candidates = @(
+        'C:\Program Files\Git\cmd\git.exe',
+        (Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd\git.exe')
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
+    return $null
 }
 
 function Test-DotNetSdk {
@@ -96,8 +117,39 @@ function Wait-ProcessWithFeedback {
     Write-Step "$Name complete"
 }
 
-$gitPath = 'C:\Program Files\Git\cmd\git.exe'
-if (-not (Test-Path -LiteralPath $gitPath)) {
+function Write-ArtifactFailureDiagnostic {
+    param(
+        [string]$Path,
+        [string]$Name
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+
+    try {
+        $item = Get-Item -LiteralPath $Path
+        $hash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+        Write-Step "$Name failed artifact: bytes=$($item.Length) sha256=$hash"
+    }
+    catch {
+        Write-Step "$Name failed artifact could not be inspected: $($_.Exception.Message)"
+    }
+}
+
+function Start-DownloadProcess {
+    param(
+        [string]$Id,
+        [string]$Url,
+        [string]$OutputPath,
+        [string]$LogName
+    )
+
+    $downloadScript = Join-Path $workersRoot 'download-file.ps1'
+    $arguments = "-Id `"$Id`" -Url `"$Url`" -OutputPath `"$OutputPath`" -LogPath `"$(Join-Path $logsRoot $LogName)`""
+    return Start-ScriptProcess -ScriptPath $downloadScript -Arguments $arguments
+}
+
+$gitPath = Resolve-GitPath -PreferredPath $GitPath
+if (-not $gitPath) {
     throw 'Git is missing. Run bootstrap/entry.ps1 first.'
 }
 if (-not (Test-Path -LiteralPath $winAppPackage)) {
@@ -105,6 +157,7 @@ if (-not (Test-Path -LiteralPath $winAppPackage)) {
 }
 
 Write-Step "Repository ready: $RepoRoot"
+Write-Step "Git executable: $gitPath"
 
 $dotnetReady = Test-DotNetSdk
 $winAppReady = Test-WinAppCli
@@ -120,16 +173,12 @@ $winAppInstallProcess = $null
 
 if (-not $dotnetReady -and -not (Test-Path -LiteralPath $dotnetInstaller)) {
     Write-Step 'Starting .NET SDK download'
-    $downloadScript = Join-Path $workersRoot 'download-file.ps1'
-    $arguments = "-Id `"dotnet-sdk`" -Url `"$dotnetUrl`" -OutputPath `"$dotnetInstaller`" -LogPath `"$(Join-Path $logsRoot 'dotnet-download.log')`""
-    $dotnetDownloadProcess = Start-ScriptProcess -ScriptPath $downloadScript -Arguments $arguments
+    $dotnetDownloadProcess = Start-DownloadProcess -Id 'dotnet-sdk' -Url $dotnetUrl -OutputPath $dotnetInstaller -LogName 'dotnet-download.log'
 }
 
 if (-not $templateReady -and -not (Test-Path -LiteralPath $templatePackage)) {
     Write-Step 'Starting WinUI template download'
-    $downloadScript = Join-Path $workersRoot 'download-file.ps1'
-    $arguments = "-Id `"winui-template`" -Url `"$templateUrl`" -OutputPath `"$templatePackage`" -LogPath `"$(Join-Path $logsRoot 'winui-download.log')`""
-    $templateDownloadProcess = Start-ScriptProcess -ScriptPath $downloadScript -Arguments $arguments
+    $templateDownloadProcess = Start-DownloadProcess -Id 'winui-template' -Url $templateUrl -OutputPath $templatePackage -LogName 'winui-download.log'
 }
 
 if (-not $winAppReady) {
@@ -155,7 +204,20 @@ if ($templateDownloadProcess) {
 }
 
 if ($dotnetInstallProcess) {
-    Wait-ProcessWithFeedback -Process $dotnetInstallProcess -Name '.NET SDK install'
+    try {
+        Wait-ProcessWithFeedback -Process $dotnetInstallProcess -Name '.NET SDK install'
+    }
+    catch {
+        Write-ArtifactFailureDiagnostic -Path $dotnetInstaller -Name '.NET SDK install'
+        Remove-Item -LiteralPath $dotnetInstaller -Force -ErrorAction SilentlyContinue
+        Write-Step '.NET SDK install failed; refreshing the cached installer and retrying once'
+        $retryDownload = Start-DownloadProcess -Id 'dotnet-sdk-retry' -Url $dotnetUrl -OutputPath $dotnetInstaller -LogName 'dotnet-download-retry.log'
+        Wait-ProcessWithFeedback -Process $retryDownload -Name '.NET SDK retry download' -PartialPath "$dotnetInstaller.part"
+        $retryScript = Join-Path $workersRoot 'install-dotnet.ps1'
+        $retryArguments = "-InstallerPath `"$dotnetInstaller`" -LogPath `"$(Join-Path $logsRoot 'dotnet-install-retry.log')`""
+        $retryInstall = Start-ScriptProcess -ScriptPath $retryScript -Arguments $retryArguments
+        Wait-ProcessWithFeedback -Process $retryInstall -Name '.NET SDK retry install'
+    }
     if (-not (Test-DotNetSdk)) {
         throw ".NET SDK $dotnetVersion was not found after installation"
     }
@@ -171,10 +233,29 @@ if (-not $templateReady) {
 }
 
 if ($winAppInstallProcess) {
-    Wait-ProcessWithFeedback -Process $winAppInstallProcess -Name 'WinAppCLI install'
+    try {
+        Wait-ProcessWithFeedback -Process $winAppInstallProcess -Name 'WinAppCLI install'
+    }
+    catch {
+        Write-ArtifactFailureDiagnostic -Path $winAppPackage -Name 'WinAppCLI install'
+        throw
+    }
 }
 if ($templateInstallProcess) {
-    Wait-ProcessWithFeedback -Process $templateInstallProcess -Name 'WinUI template install'
+    try {
+        Wait-ProcessWithFeedback -Process $templateInstallProcess -Name 'WinUI template install'
+    }
+    catch {
+        Write-ArtifactFailureDiagnostic -Path $templatePackage -Name 'WinUI template install'
+        Remove-Item -LiteralPath $templatePackage -Force -ErrorAction SilentlyContinue
+        Write-Step 'WinUI template install failed; refreshing the cached package and retrying once'
+        $retryDownload = Start-DownloadProcess -Id 'winui-template-retry' -Url $templateUrl -OutputPath $templatePackage -LogName 'winui-download-retry.log'
+        Wait-ProcessWithFeedback -Process $retryDownload -Name 'WinUI template retry download' -PartialPath "$templatePackage.part"
+        $retryScript = Join-Path $workersRoot 'install-winui-template.ps1'
+        $retryArguments = "-PackagePath `"$templatePackage`" -LogPath `"$(Join-Path $logsRoot 'winui-install-retry.log')`""
+        $retryInstall = Start-ScriptProcess -ScriptPath $retryScript -Arguments $retryArguments
+        Wait-ProcessWithFeedback -Process $retryInstall -Name 'WinUI template retry install'
+    }
 }
 
 $dotnetReady = Test-DotNetSdk
