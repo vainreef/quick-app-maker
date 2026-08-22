@@ -16,4 +16,3 @@ Use these pages when current commands or platform behavior require verification:
 - [App capability declarations](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/app-capability-declarations)
 - [Set up Microsoft Marketplace payout and tax profiles](https://learn.microsoft.com/en-us/partner-center/account-settings/set-up-your-payout-account)
 - [Open a Microsoft Store developer account](https://learn.microsoft.com/en-us/windows/apps/publish/partner-center/open-a-developer-account)
-- [Microsoft Store policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies)

@@ -476,9 +476,7 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 ## 会话级流程规则
 
 - **Agent 不做 git 写操作**：不 add、不 commit、不 push（无凭据会弹窗打断用户，仓库是只读 skill）。每轮结束后把通用技术经验写到工作根目录 `round-notes/round-N.md`，由外部主控合并进仓库文档。
-- 工作目录规则：所有项目、README、临时文件都放在工作根目录（仓库的父目录）下、与 `quick-app-maker/` 同级。**禁止使用 `~/...` 或 `C:\Users\...` 等绝对路径写文件，禁止往系统目录/用户目录写东西。**
-- **仓库行尾符保护**：读取仓库文件不要用会改写 CRLF/LF 或加 BOM 的工具（实测第四轮 21 个文件被 CRLF 噪音污染）。`git status` 出现大量 modified 且 diff 只是行尾符变化时，用 `git -C <repo> checkout -- .` 还原。
-- **不要直接读打包应用 LocalState**：`%LOCALAPPDATA%\Packages\<PFN>\LocalState\` 在工作根目录外且受保护，读取会触发权限确认。验证数据落盘改用：`winapp ui search` 查 UI、应用日志写到工作区内、或 `Get-AppxPackage` 类只读系统查询。正确命令应是 `Get-Content`（无 `$` 前缀），但优先换用上述替代方案。
+- 工作目录规则、仓库行尾符保护、LocalState 读取替代方案：见 SKILL.md「工作目录规则」（权威版，此处不重复）。
 - 新发现的 Windows 行为经过复现后，先记入 `round-notes/`，由主控按下面格式并入本文件：
 
 ```markdown

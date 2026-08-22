@@ -90,6 +90,7 @@ Agent 工作根目录（就是仓库 clone 所在的父目录）
 bootstrap/toolchain.json
 references/toolchain/README.md
 references/toolchain/v1/commands.md
+references/test-assets.md
 docs/windows-smoke-test.md
 ```
 
@@ -99,6 +100,7 @@ docs/windows-smoke-test.md
 - 命令参数、退出码、日志位置和实测坑点读取 `commands.md`。
 - 标记为“待实测”的命令先在当前 Windows 环境运行，以真实输出为准。
 - 实测发现新的稳定规律时，补充命令、环境、错误原文和解决步骤。
+- **每轮开始前先 `git pull --ff-only`** 获取最新 skill 知识（只读操作，允许）；若 `commands.md` 有外部主控刚合并的新内容，以仓库为准。
 
 ## 3. Create the project
 
@@ -173,27 +175,7 @@ Agent 根据当前需求自由选择：
 3. 需要"真实内容"（照片/图标/字体/声音）才下载，且只走 test-assets.md 里的两条路：curl 直链（无 Key）或 git clone。
 4. 素材文件一律放在工作根目录内的项目目录下（如 `<app-slug>/Assets/`、`<app-slug>/testdata/`），不写工作区外。
 
-**执行命令的硬规则（两轮实测，违反必卡死）：**
-
-1. **禁止把 `dotnet run` 挂在后台等待**：`dotnet run` 启动打包应用后 dotnet 进程一直存活，工具调用会因进程树/管道不退出而挂起 10 分钟以上，timeout 不生效，只能用户手动打断（两轮已发生 7 次）。实测细节（别被表象骗了）：
-   - **`-PassThru` 没有保护作用**（7 次卡死里 3 次带了它照样卡）；
-   - **`-RedirectStandardOutput/Error` 到文件也防不住**（7 次全部重定向仍卡）——整棵进程树继承工具捕获管道句柄；
-   - **只在命令开头杀 app、不杀 dotnet 照样卡**；必须命令结尾把 `<AppName>` 和 `dotnet` 都杀净；
-   - **判别律**：命令不返回 = 应用进程还活着（或其残留）；命令正常返回 ≠ 应用正常——返回快可能是应用秒崩，必须 `Get-Process` + `Get-WinEvent` 双验证；
-   - **中断残留清理**：工具被手动打断后，残留的 dotnet run + app 进程树会污染下一条命令（实测一次纯 `dotnet build` 也因此卡死）。被打断后，下一条命令开头先 `Get-Process -Name <AppName>,dotnet -ErrorAction SilentlyContinue | Stop-Process -Force` 清残留；
-   - 正确姿势：
-     - 若用 `Start-Process dotnet "run"`，命令**结尾必须**杀干净 `<AppName>` 进程和 dotnet 进程再返回（先 app 后 dotnet，杀完验证两个都无输出）；
-     - 或不用 dotnet run，改 `explorer.exe "shell:AppsFolder\<PFN>!App"` 启动已注册应用（实测切换后零复发）；
-     - 或直接启动构建产物 exe 验证进程存活。
-2. **每个调用 dotnet 的命令必须显式传 `workdir` 参数**（绝对路径字面量，不展开 `$env:` 变量）。否则 `dotnet build` 跑在默认目录报 MSB1003。
-3. **大段脚本先写 `.ps1` 文件再执行**；长文件内容拆分写入。内联 here-string 和长 JSON 参数会被截断。
-4. **不要用截图验证 UI**：多数模型无视觉能力，截图是死路。用 `winapp ui search/inspect/invoke/set-value` 做 UI 自动化验证。
-5. **崩溃定位第一手段是 StartupProbe**：新建 `[ModuleInitializer]` 探针从 .NET 最早期入口逐阶段打点日志（module init → App ctor → InitializeComponent → OnLaunched → MainWindow → Activated），一次运行拿到精确堆栈。不要靠 UnhandledException（原生 stowed exception 0xc000027b 捕获不到）。
-6. **测试数据要写对位置**：打包应用数据在 `%LOCALAPPDATA%\Packages\<PFN>\LocalState\`，且每次 `dotnet run` 重注册调试身份会清空它；持久化验证放在真实安装后做。中文测试数据用 JSON Unicode 转义。
-7. **通知链路不要用空 catch**：静默吞异常会导致"没提醒"时无日志可查。本开发机是管理员会话，toast 永远弹不出来（系统限制），只能验证调度逻辑不报错。
-8. **改动模板结构时全局搜索孤儿 code-behind 调用**：删 TitleBar XAML 却残留 `AppWindow.TitleBar.PreferredHeightOption = Tall` 会启动即崩（0x8007139F）。
-
-完整细节和所有坑点见 `references/toolchain/v1/commands.md`「命令执行硬规则」和「Confirmed Windows findings」。
+**执行命令的硬规则：见 `references/toolchain/v1/commands.md`「命令执行硬规则」——这是权威完整版，每条都经过实机验证。** 最重要的一条：禁止把 `dotnet run` 挂在后台等待（会卡死整个会话，已发生 7 次）。每次执行命令前先对照该清单，遇到问题再回来查「Confirmed Windows findings」的 32 条坑点。
 
 遇到问题时依次查看：
 
@@ -281,8 +263,6 @@ Agent 根据当前 App 增加针对性测试。
 - 设计/流程层面的教训。
 
 **修改仓库文档（commands.md / SKILL.md / windows-smoke-test.md）由外部主控负责**：主控会读取 `round-notes/` 和会话日志，把通用经验合并进仓库文档并推送。Agent 不要自己改仓库内容，也不要 commit/push。
-
-**每轮开始前**：`git pull --ff-only` 获取最新 skill 知识（只读操作，允许）。若 `commands.md` 有外部主控刚合并的新内容，以仓库为准。
 
 两轮实测教训：实机经验此前要么没记录、要么直接改仓库却因无凭据 push 失败（弹窗打断用户）。正确路径：Agent 记录到 `round-notes/`，主控合并回仓库。
 
