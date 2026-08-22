@@ -37,7 +37,8 @@
 
 - 测试会话：`apps/<repo>/session-2.md`
 - 应用运行报告：`apps/<repo>/quick-app-maker/<app-slug>/build/run-report.md`
-- 第二轮关键新发现：`dotnet run` 后台挂起机制（命令执行硬规则 1）、StartupProbe ModuleInitializer 定位手段、`winapp ui` UI 自动化、`dotnet run` 清空 LocalState、Developer Mode 注册表、0x8007139F 孤儿 titlebar 调用
+- 第二轮关键新发现：`dotnet run` 后台挂起机制（命令执行硬规则 1，7 次卡死：-PassThru 无效、重定向无效、开头杀 app 不够、中断残留污染下一条命令、判别律"命令返回⇔进程退出"）、StartupProbe ModuleInitializer 定位手段、`winapp ui` UI 自动化、`dotnet run` 清空 LocalState、Developer Mode 注册表、0x8007139F 孤儿 titlebar 调用
+- 第二轮过程审计（2026-08-22 补充）：同一套设计被完整重推 4 次（L11-2526 占日志 39%），决策反复 6+ 次，API 行为纯猜不实测（ScheduledToast 时限 6 轮、MicaBackdrop 11 轮、崩溃原因 12 回合）；通知三层状态机与双路径存储 fallback 属过度工程；设计纪律与 MVP-first 规则已写入 SKILL.md 第 5 节
 - 未执行：第 8 步重复 Bootstrap
 
 ## 1. Run the public entry

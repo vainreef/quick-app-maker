@@ -138,12 +138,27 @@ Agent 根据当前需求自由选择：
 → 继续下一步
 ```
 
+**设计纪律（两轮实测：重复设计和过度工程是最大时间黑洞）：**
+
+1. **设计只做一遍，写完决策就动手**：进入工程前把架构决策（存储方案、通知方案、模型字段、UI 结构）写进项目 README 的「已确定」一节，之后禁止在思考里从头重推整套设计。第二轮实测：同一套设计被完整重推 4 次（占日志 39%），决策反复 6+ 次，第一行代码在第 2527 行才落盘。
+2. **API 行为不确定时禁止纯思考猜测**：任何 API（返回值类型、时限、平台限制）不确定，最多思考 1 个回合，然后必须查文档（webfetch 官方页面）或写最小实验验证。第二轮实测：ScheduledToast 时限猜 6 轮、MicaBackdrop 平台要求猜 11 轮、崩溃原因纯猜 12 回合，全部不如一次实测/一次 StartupProbe 日志。
+3. **先最小闭环再叠加功能（MVP-first）**：第一版先跑通「启动 → 数据存取 → 渲染 → 打包安装」最小闭环，再逐个叠加通知等特性。不要为"可能不会发生的场景"预设预案：unpackaged 运行（本应用永远打包运行）、重复 toast 恐惧、闰年边界、通知 4096 上限——这些是第二轮超卖的三层通知状态机、双路径存储 fallback（死代码）、now+1 分钟臆想弹窗的根源。
+4. **调试脚手架完工即拆**：StartupProbe、路径自报日志、双路径 fallback 这类为排障加的代码，问题定位后必须删除或移出产品路径，禁止"留着以后有用"（第二轮实测探针进了产品，每次启动写 7+ 行日志）。开发期验证代码与产品代码分离。
+5. **catch 必须留痕**：禁止空 catch。至少写一条日志（开发期用 StartupProbe/%TEMP% 日志），否则"功能静默失效"无法排查（第二轮：toast 调度静默失败，排查半天）。
+6. **改动模板结构时全局搜索孤儿 code-behind 调用**：删 XAML 控件时同步删 code-behind 里的对应调用（0x8007139F 教训）。
+
 **执行命令的硬规则（两轮实测，违反必卡死）：**
 
-1. **禁止把 `dotnet run` 挂在后台等待**：`dotnet run` 启动打包应用后 dotnet 进程一直存活，工具调用会因进程树/管道不退出而挂起 10 分钟以上，timeout 不生效，只能用户手动打断（已发生 6 次）。正确姿势：
-   - 若用 `Start-Process dotnet "run"`，命令**结尾必须**杀干净 `<AppName>` 进程和 dotnet 进程再返回；
-   - 或不用 dotnet run，改 `explorer.exe "shell:AppsFolder\<PFN>!App"` 启动已注册应用；
-   - 或直接启动构建产物 exe 验证进程存活。
+1. **禁止把 `dotnet run` 挂在后台等待**：`dotnet run` 启动打包应用后 dotnet 进程一直存活，工具调用会因进程树/管道不退出而挂起 10 分钟以上，timeout 不生效，只能用户手动打断（两轮已发生 7 次）。实测细节（别被表象骗了）：
+   - **`-PassThru` 没有保护作用**（7 次卡死里 3 次带了它照样卡）；
+   - **`-RedirectStandardOutput/Error` 到文件也防不住**（7 次全部重定向仍卡）——整棵进程树继承工具捕获管道句柄；
+   - **只在命令开头杀 app、不杀 dotnet 照样卡**；必须命令结尾把 `<AppName>` 和 `dotnet` 都杀净；
+   - **判别律**：命令不返回 = 应用进程还活着（或其残留）；命令正常返回 ≠ 应用正常——返回快可能是应用秒崩，必须 `Get-Process` + `Get-WinEvent` 双验证；
+   - **中断残留清理**：工具被手动打断后，残留的 dotnet run + app 进程树会污染下一条命令（实测一次纯 `dotnet build` 也因此卡死）。被打断后，下一条命令开头先 `Get-Process -Name <AppName>,dotnet -ErrorAction SilentlyContinue | Stop-Process -Force` 清残留；
+   - 正确姿势：
+     - 若用 `Start-Process dotnet "run"`，命令**结尾必须**杀干净 `<AppName>` 进程和 dotnet 进程再返回（先 app 后 dotnet，杀完验证两个都无输出）；
+     - 或不用 dotnet run，改 `explorer.exe "shell:AppsFolder\<PFN>!App"` 启动已注册应用（实测切换后零复发）；
+     - 或直接启动构建产物 exe 验证进程存活。
 2. **每个调用 dotnet 的命令必须显式传 `workdir` 参数**（绝对路径字面量，不展开 `$env:` 变量）。否则 `dotnet build` 跑在默认目录报 MSB1003。
 3. **大段脚本先写 `.ps1` 文件再执行**；长文件内容拆分写入。内联 here-string 和长 JSON 参数会被截断。
 4. **不要用截图验证 UI**：多数模型无视觉能力，截图是死路。用 `winapp ui search/inspect/invoke/set-value` 做 UI 自动化验证。

@@ -53,6 +53,8 @@ dotnet build -c Release
 
 运行验证的硬规则见下方「命令执行硬规则」——不要直接 `dotnet run` 挂在后台等待，它会阻塞整个会话。
 
+验证判别律：**命令不返回 = 应用进程还活着**；**命令正常返回 ≠ 应用正常**（返回快可能是应用秒崩）。任何一次运行验证都必须 `Get-Process` 查存活 + `Get-WinEvent` 查崩溃记录双确认。工具被手动打断后，下一条命令先清残留进程（见硬规则 1）。
+
 ## 4. Publish
 
 ```powershell
@@ -126,27 +128,36 @@ winapp store publish --help
 
 这些是 Agent 在 Windows 实机上执行命令时最容易踩的坑，每条都造成过真实损失（累计卡死约 40 分钟、用户手动打断 6 次）。
 
-### 1. 禁止把 `dotnet run` 挂在后台等待（最严重，6 次卡死）
+### 1. 禁止把 `dotnet run` 挂在后台等待（最严重，7 次卡死）
 
 `dotnet run` 在 winapp 集成下会启动打包应用，然后 **dotnet 进程一直活着直到应用退出**。如果命令结束时应用还活着：
 
 - 执行器的 stdout/stderr 管道被进程树握住，永不返回 → 工具调用挂起 10 分钟以上
-- **timeout 参数在这种场景下不可靠，不会自动触发**
+- **timeout 参数在这种场景下不可靠，不会自动触发**（7 次全部靠用户手动打断，无一次自动超时）
 - 只能靠用户手动打断
+
+**实测反直觉事实（别被表象骗了）：**
+
+- **`-PassThru` 没有保护作用**：7 次卡死中 3 次带 -PassThru 照样卡（L3812/L4376/L4503 带，L4627/L4761/L4941 不带，结果相同）
+- **重定向到文件也防不住**：7 次全部 `-RedirectStandardOutput/Error 到 $env:TEMP\*.txt` 仍卡——因为 `dotnet run` → app 整棵进程树都继承工具捕获管道句柄，与子进程 stdout 去向无关
+- **只在命令开头杀 app、不杀 dotnet 照样卡**：L4627/L4941 开头杀了 <AppName>，但 dotnet 存活 → 仍卡死
+- **纯 build 也会被残留污染**：L4814 一次不含 dotnet run 的纯 `dotnet build` 也卡死——上一命令被打断后残留的孤儿进程树（+obj 锁争用）污染了下一条命令
+- **对照组定律**：命令正常返回 ⇔ 应用进程已退出（崩溃/被杀）；命令不返回 ⇔ 应用还活着。同构命令在应用秒崩时全部正常返回（L2970/L3305/L3557/L4289），应用存活时全部卡死
 
 **正确姿势（三选一）：**
 
 ```powershell
-# 姿势 A：命令结尾必须杀干净进程再返回（两条都杀）
+# 姿势 A：命令结尾必须杀干净进程再返回（先 app 后 dotnet，杀完验证）
 $p = Start-Process dotnet -ArgumentList "run" -PassThru -RedirectStandardOutput f1 -RedirectStandardError f2
 Start-Sleep -Seconds 15
 Get-Process -Name <AppName> -ErrorAction SilentlyContinue | Select-Object Id, Responding
-Get-Process -Name <AppName> | Stop-Process -Force          # 杀 app
-Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue # 杀 dotnet
+Get-Process -Name <AppName> -ErrorAction SilentlyContinue | Stop-Process -Force          # 杀 app
+Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue                                # 杀 dotnet
+Get-Process -Name <AppName>,dotnet -ErrorAction SilentlyContinue   # 必须无输出，否则工具不返回
 ```
 
 ```powershell
-# 姿势 B：不经过 dotnet run，直接启动已注册的打包应用（推荐，最快）
+# 姿势 B：不经过 dotnet run，直接启动已注册的打包应用（推荐，实测切换后零复发）
 explorer.exe "shell:AppsFolder\<PFN>!App"
 ```
 
@@ -157,7 +168,13 @@ Start-Process $exe; Start-Sleep -Seconds 8
 Get-Process -Name <AppName> | Stop-Process -Force
 ```
 
-**验证**：如果应用启动即崩溃（进程树自己退出），命令会正常返回——所以"命令正常返回"不等于"应用正常"；要用 `Get-Process` 查存活 + `Get-WinEvent` 查崩溃记录来区分。
+**中断残留清理（工具被手动打断后必做）：**
+
+```powershell
+Get-Process -Name <AppName>,dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+**验证**：应用启动即崩溃时命令会正常返回——"命令正常返回"不等于"应用正常"，要用 `Get-Process` 查存活 + `Get-WinEvent` 查崩溃记录来区分。
 
 ### 2. 每个调用 dotnet 的命令必须显式传 workdir
 
