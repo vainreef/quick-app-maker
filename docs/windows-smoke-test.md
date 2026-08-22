@@ -4,7 +4,7 @@
 
 ## Test record
 
-实测记录使用匿名轮次编号（轮次 1、轮次 2…）。具体 App 项目、会话日志与运行报告归档在本地私有目录（`~/Developer/apps-archive/`），不入仓库、不 push。
+实测记录使用匿名轮次编号（轮次 1、轮次 2…）。具体 App 项目、会话日志与运行报告归档在 Agent 工作根目录（仓库父目录）下的各项目目录中，不入仓库、不 push。
 
 第一轮实测记录（2026-08-22，轮次 1）：
 
@@ -38,6 +38,23 @@
 - 第二轮关键新发现：`dotnet run` 后台挂起机制（命令执行硬规则 1，7 次卡死：-PassThru 无效、重定向无效、开头杀 app 不够、中断残留污染下一条命令、判别律"命令返回⇔进程退出"）、StartupProbe ModuleInitializer 定位手段、`winapp ui` UI 自动化、`dotnet run` 清空 LocalState、Developer Mode 注册表、0x8007139F 孤儿 titlebar 调用
 - 第二轮过程审计（2026-08-22 补充）：同一套设计被完整重推 4 次（占日志约 39%），决策反复 6+ 次，API 行为纯猜不实测（ScheduledToast 时限 6 轮、MicaBackdrop 11 轮、崩溃原因 12 回合）；通知三层状态机与双路径存储 fallback 属过度工程；设计纪律与 MVP-first 规则已写入 SKILL.md
 - 未执行：第 8 步重复 Bootstrap
+
+第三轮实测记录（2026-08-22，轮次 3）：
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-08-22 |
+| Tester | Agent (DeepSeek V4 Flash) |
+| Repository commit | 04a78ce（本轮经验由主控合并回仓库） |
+| Windows edition | Windows 10 Enterprise 2009（实际 26100/22631 镜像定制） |
+| Windows build | 26100 |
+| Architecture | x64 |
+| Fresh machine / existing tools | 已有工具链，直接工程阶段 |
+| Result | 链路全通：创建→Debug→Release→publish→MSIX（自包含）→安装→启动→UI 自动化全流程验证。新增 4 个坑点（0x80073CF3 框架依赖、0x80070490 自包含 auto-init、多 exe 歧义、CalendarDatePicker set-value），已并入 commands.md 第 22-25 条 |
+
+- 第三轮关键新发现：自包含打包三件套（csproj `WindowsAppSDKSelfContained` + `winapp --self-contained` + `--executable`）；`winapp ui` 完成添加→列表→详情→删除全流程自动化验证；应用内 `IsSupported()` 检测在管理员会话正确降级并留日志
+- 第三轮流程问题：Agent 按旧文档把项目写进了 `C:\Users\Administrator\Developer\apps-archive\`（违反工作目录规则），且尝试 git push 触发凭据弹窗——已通过"工作目录规则"+"仓库只读不 push"修正文档
+- 未执行：第 8 步重复 Bootstrap；真实 toast 弹出（管理员会话系统限制，需普通会话验证）
 
 ## 1. Run the public entry
 

@@ -330,6 +330,44 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 
 - `winapp ui search/inspect/invoke/set-value/get-value` 可驱动 WinUI 3 应用（已实测完成添加流程）。见「命令执行硬规则 4」
 
+### 第三轮坑点（轮次 3，新增）
+
+#### 22. 非自包含 MSIX 安装报 0x80073CF3（依赖 WindowsAppRuntime 框架包缺失）
+
+- Environment: Windows build 26100，WinAppSDK 2.4.0，winapp 0.6.1
+- Command: `Add-AppxPackage -Path <pkg>.msix`（首次 `winapp package ./publish --generate-cert --install-cert` 产物）
+- Error text: `0x80073CF3 无法注册包，因为以下依赖项缺失: Microsoft.WindowsAppRuntime.2 ... 2.4.0.0`
+- Root cause: 普通打包产物带框架包依赖，目标机器未装 WindowsAppRuntime 框架包（前两轮同机开发已装过故未暴露）
+- Fix: `winapp package ... --self-contained`（把 WinAppSDK 运行时打进包）
+- Retest result: 安装成功
+
+#### 23. 自包含包启动即崩 0x80070490（DeploymentManager AutoInitialize 找不到框架包）
+
+- Environment: 同上，csproj 未设 WindowsAppSDKSelfContained
+- Command: 启动自包含 MSIX 安装后的应用
+- Error text: `.NET Runtime 事件: COMException 0x80070490 找不到元素，at ABI...DeploymentManagerCS.AutoInitialize.AccessWindowsAppSDK()`，模块 WinRT.Runtime
+- Root cause: `winapp --self-contained` 只负责打包时捆绑运行时；编译期 auto-initializer 仍会去找已注册的框架包，自包含下不存在 → 崩溃在 Application.Start 阶段（ModuleInitializer 探针可定位：module-init 之后、App ctor 之前）
+- Fix: csproj 加 `<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>`，编译期排除 auto-initializer
+- Retest result: 启动正常
+
+#### 24. 自包含 publish 输出含多个 exe，winapp package 报歧义
+
+- Environment: 同上
+- Command: `winapp package ./publish --self-contained --cert ...`
+- Error text: `Failed to create MSIX package: The manifest contains a placeholder for the executable but multiple .exe files were found in the input folder`
+- Root cause: 自包含构建后 publish 目录含运行时 bootstrap exe 和主程序 exe
+- Fix: `winapp package ... --executable <AppName>.exe`
+- Retest result: 打包成功
+
+#### 25. CalendarDatePicker 无法用 winapp ui set-value 赋值
+
+- Environment: WinUI 3
+- Command: `winapp ui set-value "btn-xxx" "2026/8/30" -a <App>`
+- Error text: `Element (Button) could not be set via ValuePattern...`
+- Root cause: 日期选择器按钮不支持 ValuePattern 程序化赋值
+- Fix: 用默认日期（今天+N 天）走通流程，或 `winapp ui send-keys --verbatim "<date>" --target <sel> --via send-input`（需前台）
+- Retest result: 默认日期方案流程全通
+
 ### 崩溃定位流程（推荐顺序）
 
 ```text
@@ -361,15 +399,19 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 | 19 嵌套 ContentDialog | 是 | WinUI 框架行为 |
 | 20 静默 catch | 是 | 工程实践 |
 | 21 winapp ui | 是 | 工具能力 |
+| 22 框架包依赖 0x80073CF3 | 是 | MSIX 部署规则；换新机器装包必遇 |
+| 23 自包含 AutoInit 0x80070490 | 是 | WinAppSDK 编译期行为 |
+| 24 多 exe 歧义 | 是 | winapp 工具行为 |
+| 25 CalendarDatePicker set-value | 是 | WinUI 控件 UIA 行为 |
 | 1 ApplicationData | **否，两轮矛盾** | 真因未明；不要传播为通用规则 |
 | 13 数据路径/LocalState 清空 | 是（工具链行为） | 本机验证 |
 | 10 运行验证姿势 | 是 | 工具层 |
 
-## 会话级流程坑（每轮必做，违反即失败）
+## 会话级流程规则
 
-- **实机上修改的任何文档（commands.md、windows-smoke-test.md、SKILL.md、run-report）必须在本轮结束前 git add/commit/push 回 Gitee。** 三轮实测：第一轮经验没推回、第二轮基于旧基线又重踩 0x80073CFB、两轮之间零提交——知识闭环连续三次断裂。推送是硬性收尾步骤
-- 会话全程日志保存到 `apps/<slug>/session-<id>.md`
-- 新发现的 Windows 行为经过复现后，写回 `commands.md`（用下面的格式）
+- **Agent 不做 git 写操作**：不 add、不 commit、不 push（无凭据会弹窗打断用户，仓库是只读 skill）。每轮结束后把通用技术经验写到工作根目录 `round-notes/round-N.md`，由外部主控合并进仓库文档。
+- 工作目录规则：所有项目、README、临时文件都放在工作根目录（仓库的父目录）下、与 `quick-app-maker/` 同级。**禁止使用 `~/...` 或 `C:\Users\...` 等绝对路径写文件，禁止往系统目录/用户目录写东西。**
+- 新发现的 Windows 行为经过复现后，先记入 `round-notes/`，由主控按下面格式并入本文件：
 
 ```markdown
 #### 短标题

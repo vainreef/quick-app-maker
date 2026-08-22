@@ -199,9 +199,9 @@ BOOTSTRAP_READY
 NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery
 ```
 
-## 开工前检查（第三轮起强制）
+## 开工前检查（每轮强制）
 
-Bootstrap 完成后、进入 Skill 前，先确认仓库知识是最新的：
+Bootstrap 完成后、进入 Skill 前，先确认仓库知识是最新的（只读操作）：
 
 ```powershell
 git pull --ff-only origin main
@@ -209,9 +209,9 @@ git pull --ff-only origin main
 Select-String -Path skills/vainreef-fast-publish/references/toolchain/v1/commands.md -Pattern '^\- Status'
 ```
 
-两轮实测教训：实机经验两次都只写在本地没推回仓库，导致下一轮基于旧知识重踩坑（0x80073CFB 两轮都遇到）。如果 `commands.md` 的 Status 停在 `awaiting-windows-smoke-test` 或类似旧值，说明仓库不是最新，先找用户在 Gitee 上确认最新提交。
+两轮实测教训：实机经验此前要么没记录、要么直接改仓库却因无凭据 push 失败（弹窗打断用户）。正确路径：Agent 把通用经验记到工作根目录 `round-notes/`，由外部主控合并进仓库。**Agent 不做任何 git 写操作（add/commit/push），仓库是只读 skill。**
 
-**实机残留处理（同一台机器跑过多轮时必看）**：`entry.ps1` 和上面的 `git pull` 在本地存在未提交改动时会失败（`pull --ff-only` 与本地改动冲突）。前几轮的未提交改动如果已经由外部整理进仓库（本仓库的 commands.md/SKILL.md 已是权威版），直接丢弃本地残留：
+**实机残留处理（同一台机器跑过多轮时必看）**：如果上一轮的 Agent 曾误改过仓库文件导致 `git pull --ff-only` 失败，直接丢弃本地残留（仓库里才是权威内容）：
 
 ```powershell
 git -C <repo目录> checkout -- .
@@ -219,7 +219,18 @@ git -C <repo目录> checkout -- .
 Remove-Item -Recurse -Force <repo目录>
 ```
 
-不要尝试"合并"实机残留——实机上的旧改动是过期草稿，仓库里才是整理后的权威内容。
+## 工作目录规则（Agent 必须遵守）
+
+```text
+Agent 工作根目录（仓库 clone 所在的父目录）
+├── quick-app-maker/     ← 仓库：只读 skill，不改、不 commit、不 push
+├── <app-slug>/          ← 每个 App 的项目目录（与仓库同级）
+└── round-notes/         ← 本轮通用技术经验记录
+```
+
+1. **所有文件操作都在工作根目录内**：新项目、README、临时测试、安装包都放这里、与仓库同级。**禁止写其他盘符、系统目录、用户目录**（`C:\Users\...\Developer` 之类）——会触发权限弹窗且文件找不到。
+2. **仓库目录只读**：Agent 不修改仓库内容，不 git add/commit/push。
+3. 具体 App 的源码/README/会话日志/安装包**一律不进仓库**（仓库 `apps/` 已在 .gitignore，仅本地使用）。
 
 ## 命令执行的三个铁律（两轮血泪教训）
 

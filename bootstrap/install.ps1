@@ -272,4 +272,6 @@ Write-Host "Git: $(& $gitPath --version)"
 Write-Host ".NET SDK: $dotnetVersion"
 Write-Host "WinAppCLI: $winAppVersion"
 Write-Host "WinUI template: $templateVersion"
+Write-Host "WORKSPACE_ROOT: $(Split-Path -Parent $RepoRoot)（所有 App 项目、round-notes 与临时文件都放这里，与仓库同级；禁止写其他路径）"
+Write-Host '仓库目录只读：不修改仓库内容，不 git add/commit/push'
 Write-Host 'NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery'

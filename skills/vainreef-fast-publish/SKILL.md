@@ -41,6 +41,21 @@ Bootstrap 当前准备：
 
 这张表描述仓库已经准备好的路径。具体 App 需要其他架构或依赖时，Agent 根据产品目标选择，并在项目 README 和运行报告里记录理由与验证结果。
 
+## 工作目录规则（绝对禁止违反）
+
+```text
+Agent 工作根目录（就是仓库 clone 所在的父目录）
+├── quick-app-maker/     ← clone 下来的仓库：只读 skill，Agent 不改、不 commit、不 push
+├── <app-slug>/          ← 每个 App 的项目目录（与仓库同级！）
+├── 其他 app/
+└── 临时测试、下载、脚本等   ← 也放这里
+```
+
+1. **所有文件操作都在 Agent 工作根目录内**：新项目、README、临时测试、安装包、脚本，全部放在这个总文件夹里、仓库目录同级或之下。**禁止往其他盘符/系统目录/用户目录写任何东西**（如 `C:\Users\<user>\Developer\...`、`C:\temp`、桌面等）——那样会导致权限弹窗、文件找不到，且违反用户明确规则。
+2. **仓库目录只读**：clone 下来的 `quick-app-maker/` 对 Agent 是 skill 参考，**不修改其内容、不 git add/commit/push**。修改仓库内容由外部主控（Mac 端）负责。
+3. **禁止任何 git 推送**：Agent 不需要、也没有权限 push。git 操作最多是 `git pull` 获取最新 skill 知识；push/commit 一律不做（需要凭据，会弹窗打断用户）。
+4. 工作根目录的判定：`quick-app-maker` 仓库目录的父目录即是工作根目录。
+
 ## 1. Discover the app
 
 用户还没有表达具体想法时，先问：
@@ -52,7 +67,7 @@ Bootstrap 当前准备：
 用户给出第一段实质想法后：
 
 1. 生成暂定 App 名称和小写连字符目录名。
-2. 创建 `<app-slug>/README.md`（**位置在用户本地私有目录，如 `~/Developer/apps-archive/<app-slug>/`，不是仓库目录**；仓库里禁止出现任何具体 App 内容）。
+2. 在工作根目录下创建 `<app-slug>/README.md`（与 `quick-app-maker/` 同级，见上方工作目录规则）。**严禁在仓库目录里创建 App 内容，严禁使用任何 `~/...` 或 `C:\Users\...` 之类的绝对路径。**
 3. 以 [project-readme-template.md](assets/project-readme-template.md) 为起点记录需求。
 4. 每轮更新当前想法、用户需要、暂时省略、交互流程、风格、待明确项和用户决定。
 5. 每轮只问一个真正会影响产品体验的问题。
@@ -239,24 +254,27 @@ Agent 根据当前 App 增加针对性测试。
 - 新发现的 Windows 坑点及复现条件。
 - Store 人工确认项。
 
-## 10. Sync findings back to the repo（每轮必做，在实机上完成）
+## 10. Record findings locally（Agent 只记录，不 push）
 
-实机上每一轮结束前必须执行：
+**Agent 不做任何 git 写操作**（add/commit/push 全部禁止，需要凭据会弹窗打断用户，且仓库是只读 skill）。
 
-```powershell
-git add -A
-git commit -m "docs: record Windows findings from <app-slug> round"
-git push origin main
+每轮结束后，Agent 在**工作根目录**里写一份本轮技术记录：
+
+```text
+<工作根目录>/round-notes/round-N.md
 ```
 
-推回的内容只包括**通用技术经验**：
+内容包括（只写**通用技术经验**，不写具体 App 名/源码/会话内容）：
 
-- `references/toolchain/v1/commands.md` 的新增坑点（按 smoke-test 第 10 节的格式）。
-- `docs/windows-smoke-test.md` 的实测记录表（匿名轮次编号，不写具体 App 名）。
+- 新发现的 Windows 坑点（按 commands.md 的格式：Environment / Command / Error text / Root cause / Fix / Retest result）。
+- 新验证可行的命令、参数组合和退出码。
+- 设计/流程层面的教训。
 
-**严禁推回**：具体 App 的源码、README、run-report、会话日志、应用名、测试数据——这些属于用户本地私有归档（如 `~/Developer/apps-archive/`），仓库 `apps/` 目录已加入 `.gitignore`，`git add -A` 不会包含它们。提交前用 `git status` 检查，确保没有具体项目内容混入。
+**修改仓库文档（commands.md / SKILL.md / windows-smoke-test.md）由外部主控负责**：主控会读取 `round-notes/` 和会话日志，把通用经验合并进仓库文档并推送。Agent 不要自己改仓库内容，也不要 commit/push。
 
-**两轮实测教训（必须内化）：** 第一轮经验没推回仓库、第二轮基于旧基线重踩了 0x80073CFB——知识闭环连续断裂，开跑前必须确认仓库已是最新（`git pull`），结束后必须 push。会话日志与运行报告归档到本地私有目录不算完成，知识落进 `commands.md` 并 push 才算完成闭环。若检测到 `commands.md` 有未提交的本地分叉（本机 vs 仓库），先合并再开发。
+**每轮开始前**：`git pull --ff-only` 获取最新 skill 知识（只读操作，允许）。若 `commands.md` 有外部主控刚合并的新内容，以仓库为准。
+
+两轮实测教训：实机经验此前要么没记录、要么直接改仓库却因无凭据 push 失败（弹窗打断用户）。正确路径：Agent 记录到 `round-notes/`，主控合并回仓库。
 
 ## References
 

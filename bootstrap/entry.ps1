@@ -111,8 +111,11 @@ else {
 }
 
 $head = (& $git -C $Destination rev-parse --short HEAD | Out-String).Trim()
+$workspaceRoot = Split-Path -Parent $Destination
 Write-Step "Repository ready: $head"
 Write-Step "Git executable: $git"
+Write-Step "Workspace root (所有 App 项目、round-notes 与临时文件都放这里，与仓库同级): $workspaceRoot"
+Write-Step "仓库目录只读：不修改仓库内容，不 git add/commit/push"
 
 $installerScript = Join-Path $Destination 'bootstrap\install.ps1'
 if (-not (Test-Path -LiteralPath $installerScript)) {
