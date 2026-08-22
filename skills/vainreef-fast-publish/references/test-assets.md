@@ -1,94 +1,117 @@
-# 测试素材来源清单（Agent 开发用）
+# 测试素材获取速查（Agent 用）
 
-开发 WinUI 3 应用时可能需要测试素材：图标、占位图、音频、字体等。以下来源按 Agent 可编程下载的便利程度排序，全部为免费/可商用（CC0、免费许可证、明确可商用条款）来源。**优先选 CC0/Public Domain**；使用前确认具体许可条款。
+环境约束：**只有 git + curl.exe + PowerShell 5.1**（Windows 自带）。没有 node.js / Python / ffmpeg / ImageMagick，不要依赖它们。若实机额外有 ffmpeg/ImageMagick 可加分，但没有就用下面的方式。
 
-## 图标类（最高频）
+> 本清单所有来源已于 2026-08-22 实测验证可用（HTTP 200 / git HEAD 可达）。
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| UI 图标（按钮/菜单/工具栏，一站式） | **Iconify API**（聚合数千图标集） | `https://api.iconify.design/<set>/<name>.svg` 直链，脚本可批量拉取 |
-| 单个 SVG 图标 | SVGRepo、Tabler Icons、Lucide、Feather、Bootstrap Icons、Remix Icon | GitHub 仓库 clone 或单文件直链 |
-| 应用图标多尺寸生成 | favicon.io | 上传 PNG 生成 ICO/多尺寸 PNG |
-| Segoe Fluent Icons 码点表 | Microsoft Learn 官方图标表 | webfetch 抓取 |
+## 第一条原则：先判断"生成还是下载"
 
-## 图片 / 占位图
+```text
+能本地生成 → 本地生成（PowerShell + System.Drawing，零网络）
+需要"真实内容"（照片/图标/字体/声音）→ 才下载
+```
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| 任意尺寸占位图 | **picsum.photos**（`https://picsum.photos/800/600` 直接返回图片） | URL 即图片，最方便 |
-| 测试照片 | Unsplash（API 可按关键词+尺寸下载）、Pexels、Pixabay | API 或页面下载 |
-| 固定尺寸占位 | placeholder.com、dummyimage.com | URL 参数指定尺寸/颜色/文字 |
+- 测试图片控件：PowerShell 生成纯色/渐变 PNG 就够，不需要照片
+- 只有验证"搜索 cat 图片"这类真实功能时，才去 Openverse
 
-## SVG 矢量 / 插画
+## 本地生成（PowerShell，已验证可用）
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| 空状态/引导页插画 | unDraw、storyset、manypixels | SVG 直链或整包下载 |
-| 渐变背景图 | Cool Backgrounds、CSSGradient | 生成后存 PNG |
+```powershell
+# 纯色/渐变 PNG（System.Drawing）
+Add-Type -AssemblyName System.Drawing
+$bmp = New-Object System.Drawing.Bitmap 800,600
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.Clear([System.Drawing.Color]::Orange)
+$bmp.Save("$PWD\test.png")
+# 圆角/渐变/文字也可用 System.Drawing 完成（参考第一轮图标生成经验）
 
-## 音频
+# 文本/CSV/JSON 测试数据
+Set-Content -Path "$PWD\data.csv" -Value "id,name`n1,Alice`n2,Bob" -Encoding UTF8
+# 注意：PowerShell 5.1 执行含中文的 .ps1 必须 UTF-8 BOM，否则解析错误（commands.md 坑 31）
+```
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| 音效 SFX（CC0 整包） | **Kenney**（游戏音效包，zip 一次拉全部） | 直接下载 zip |
-| 音效/提示音 | Zapsplat、Mixkit、Pixabay Audio、freesound.org（有 API） | 页面下载或 API |
-| 背景音乐 | Incompetech（Kevin MacLeod）、Bensound | 页面下载 |
-| 纯测试音（正弦波/白噪/静音） | 无（用 ffmpeg 生成） | `ffmpeg -f lavfi -i sine=frequency=440:duration=2 out.wav` |
+## 直接下载（curl.exe，无 Key 无登录，全部实测 200）
 
-## 视频（媒体类功能才需要）
+```powershell
+# UI 图标 SVG（Iconify，聚合 30 万+ 图标）
+# 搜索图标名：curl.exe "https://api.iconify.design/search?query=cat&limit=10"
+curl.exe -L "https://api.iconify.design/lucide/cat.svg" -o Assets\cat.svg
+curl.exe -L "https://api.iconify.design/fluent/settings-24-regular.svg" -o Assets\settings.svg
+curl.exe -L "https://api.iconify.design/simple-icons/github.svg" -o Assets\github.svg
+# 常用集：fluent(UI控件) / lucide / mdi / tabler / material-symbols / bootstrap-icons / simple-icons(品牌Logo)
+# 注意：fluent 集只有 UI 控件类图标，没有动物/食物/自然等主题图标——主题图标用 lucide / mdi / tabler
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| 测试视频 | Pexels Videos、Mixkit、sample-videos.com、W3C test media | 直链下载 |
-| 合成测试视频 | 无（用 ffmpeg） | `ffmpeg -f lavfi -i testsrc=duration=5 out.mp4` |
+# 任意尺寸占位照片（Picsum，seed 固定可重复）
+curl.exe -L "https://picsum.photos/seed/winui-test/800/600.jpg" -o Assets\photo.jpg
 
-## 字体
+# 纯占位图（Placehold.co，尺寸/颜色/文字参数）
+curl.exe -L "https://placehold.co/320x180/FF7E67/white?text=Avatar" -o Assets\placeholder.svg
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| 中文字体（思源黑体/宋体、霞鹜文楷、得意黑） | GitHub Releases 直链 | `https://github.com/adobe-fonts/source-han-sans/releases` 等 |
-| 英文字体 | Google Fonts API、Fontsource（npm 包） | API 脚本批量下载 ttf |
-| Emoji 图片（PNG/SVG） | Twemoji、OpenMoji、Noto Emoji | GitHub 仓库整包 clone |
+# 头像（DiceBear，seed 固定可重复）
+curl.exe -L "https://api.dicebear.com/9.x/initials/svg?seed=Alice" -o Assets\avatar.svg
 
-## 动画 / Lottie（做动效时）
+# 真实照片搜索（Openverse，开放许可，匿名可用）
+curl.exe -sG "https://api.openverse.org/v1/images/" --data-urlencode "q=cat" --data "page_size=10"
+# 从 results[] 挑 license 允许的取 url 下载；Openverse 搜不到再用 Wikimedia Commons：
+# curl.exe "https://commons.wikimedia.org/w/api.php?action=query&format=json&list=search&srsearch=cat&srnamespace=6&srlimit=5"
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| Lottie JSON | lottiefiles.com（有搜索 API）、Lordicon | API 或页面下载 |
-| GIF 动图 | Giphy（有 API）、Tenor | API |
+# 假 JSON 数据
+curl.exe "https://jsonplaceholder.typicode.com/users" -o testdata\users.json
+curl.exe "https://dummyjson.com/products?limit=20" -o testdata\products.json
+```
 
-## 测试数据 / 文件
+## git clone（固定测试仓库，全部实测可达；大仓库用 sparse-checkout 只取需要的子目录）
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| 示例 JSON（用户/列表/嵌套） | **dummyjson.com**、jsonplaceholder.typicode.com、randomuser.me | API 直取 |
-| 自定义 schema 假数据（CSV/JSON） | mockaroo.com（有 API） | API 生成 |
-| 测试 PDF/Office | W3C test suites、微软官方示例 | 直链 |
-| 示例数据库 | sqlite sample databases、AdventureWorks 备份 | 直链 |
+```powershell
+# Emoji SVG（OpenMoji，CC BY-SA 4.0；color/svg 为彩色 4565 个，sparse 后约 35MB）
+git clone --depth 1 --filter=blob:none --sparse https://github.com/hfg-gmuend/openmoji.git
+git -C openmoji sparse-checkout set color/svg
+# 黑白版用 black/svg
 
-## 3D 模型（仅 3D 类 App）
+# Microsoft Fluent Icons：优先用 Iconify 的 fluent 集（curl 直取），仓库源码无现成 SVG 文件，不建议 clone
+# 需要批量/离线时才 clone（图标源在 packages/svg-icons 之外，需自行构建）：
+# git clone --depth 1 https://github.com/microsoft/fluentui-system-icons.git
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| GLB/GLTF（CC0） | Poly Pizza（Google）、Kenney 3D assets、Quaternius | 直链下载 |
+# Lottie 动画测试文件
+git clone --depth 1 https://github.com/LottieFiles/test-files.git
 
-## 调色板 / 主题
+# 3D 模型（Khronos glTF Sample Assets，注意各模型许可不同；仓库很大，clone 慢）
+# 建议：用 API 列出模型后用单文件直链下载，或小模型 sparse-checkout（如 Models/Box）
+curl.exe "https://api.github.com/repos/KhronosGroup/glTF-Sample-Assets/contents/Models/Box" | Select-Object -First 20
+curl.exe -L "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Box/glTF-Binary/Box.glb" -o Assets\box.glb
 
-| 用途 | 来源 | 获取方式 |
-| --- | --- | --- |
-| Material 色板 | Material Design 官方 JSON | 结构化文件直接引用 |
-| 通用色板 | Open Color、Coolors、Adobe Color | 文件或生成 |
+# 中文字体（思源黑体）— 官方 Release 直链（已验证 200）
+# 简体子集 SourceHanSansSC.zip 约 90MB；其他：07_J(日) 08_K(韩) 09_SC(简) 10_TC(繁) 11_HC(港)
+curl.exe -L "https://github.com/adobe-fonts/source-han-sans/releases/download/2.005R/09_SourceHanSansSC.zip" -o fonts\SourceHanSansSC.zip
+# 注意：source-han-sans 仓库本身只有构建脚本没有字体成品，字体必须在 Releases 页下载（不要 clone 该仓库）
+```
 
-## 优先级建议（覆盖 80% 场景）
+## 决策树（直接照着走）
 
-1. **Iconify API**（UI 图标）+ **picsum.photos**（占位图）+ **Kenney**（CC0 音效包）
-2. **ffmpeg / ImageMagick**（生成音频、视频、渐变图）——零网络依赖
-3. 中文字体走 GitHub Releases 直链
-4. 测试数据走 dummyjson API
+```text
+UI 图标        → Iconify（fluent 优先，UI 控件类）→ 主题图标用 lucide/mdi/tabler → 品牌 Logo 用 simple-icons
+任意照片       → Picsum
+指定内容照片   → Openverse → Wikimedia Commons
+占位图         → Placehold.co
+头像           → DiceBear
+Emoji          → OpenMoji（git clone）
+字体（中文）   → 思源黑体 GitHub
+Lottie         → LottieFiles/test-files
+3D             → Khronos glTF-Sample-Assets
+假 JSON        → JSONPlaceholder / DummyJSON
+测试音/视频    → 没有 ffmpeg 时跳过；有则 ffmpeg 生成
+图标/占位 PNG  → PowerShell + System.Drawing 本地生成
+损坏/边界文件  → 正常文件复制后截断/改头（PowerShell 即可）
+```
 
 ## 许可红线
 
-- 首选 CC0/Public Domain：Kenney、Poly Pizza、OpenMoji、picsum
-- Unsplash/Pexels/Pixabay：免费可商用，注意各自条款与署名要求
-- Google Fonts：各字体有自己的 OFL 许可，发布时保留声明
-- Font Awesome Pro / 任何付费版：不用
+- 首选 CC0/Public Domain；OpenMoji 是 CC BY-SA（保留署名）
+- Simple Icons 文件开源 ≠ 品牌商标可商用；正式产品 UI 遵循品牌规范
+- 测试内部用无所谓，上架前清理所有测试素材
+
+## 素材分类（24 类，按需取用）
+
+App 图标/MSIX 资源、UI 图标、品牌 Logo、位图、SVG、头像、Emoji、插画、纹理背景、色板主题、字体、音效、音乐、视频、动画/Lottie、3D 模型、JSON 假数据、CSV 表格数据、Office/PDF 文档、压缩包、数据库、二维码/条形码、剪贴板/拖拽素材、损坏/边界/压力测试素材。
+
+每个素材再考虑 4 个维度：正常 / 边界 / 损坏 / 大型。异常文件（0 字节、损坏 PNG、截断 MP4、无效 JSON）用 PowerShell 从正常文件复制后截断/改字节生成，不找网站。
