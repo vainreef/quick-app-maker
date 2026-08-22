@@ -142,7 +142,7 @@ winapp store publish --help
 
 - **`-PassThru` 没有保护作用**：7 次卡死中 3 次带 -PassThru 照样卡（L3812/L4376/L4503 带，L4627/L4761/L4941 不带，结果相同）
 - **重定向到文件也防不住**：7 次全部 `-RedirectStandardOutput/Error 到 $env:TEMP\*.txt` 仍卡——因为 `dotnet run` → app 整棵进程树都继承工具捕获管道句柄，与子进程 stdout 去向无关
-- **只在命令开头杀 app、不杀 dotnet 照样卡**：L4627/L4941 开头杀了 <AppName>，但 dotnet 存活 → 仍卡死
+- **只在命令开头杀 app、不杀 dotnet 照样卡**：实测命令开头杀了 `<AppName>`，但 dotnet 存活 → 仍卡死
 - **纯 build 也会被残留污染**：L4814 一次不含 dotnet run 的纯 `dotnet build` 也卡死——上一命令被打断后残留的孤儿进程树（+obj 锁争用）污染了下一条命令
 - **对照组定律**：命令正常返回 ⇔ 应用进程已退出（崩溃/被杀）；命令不返回 ⇔ 应用还活着。同构命令在应用秒崩时全部正常返回（L2970/L3305/L3557/L4289），应用存活时全部卡死
 
@@ -196,7 +196,7 @@ Get-Process -Name <AppName>,dotnet -ErrorAction SilentlyContinue | Stop-Process 
 DeepSeek V4 Flash 等模型无视觉能力：read 工具读图返回 "Image read successfully" 但模型无法解读内容。截图验证是死路。**改用 `winapp ui` 做 UI 自动化验证**（已实测可用）：
 
 ```powershell
-winapp ui search "应用" -a <AppName>            # 按文本找元素
+winapp ui search "<文本>" -a <AppName>            # 按文本找元素
 winapp ui inspect "<selector>" -a <AppName>      # 读元素树
 winapp ui invoke "<selector>" -a <AppName>       # 点按钮
 winapp ui set-value "<selector>" "文本" -a <AppName>  # 填输入框
@@ -218,7 +218,7 @@ UI 自动化交互（点添加 → 填名字 → 点保存）已验证可完整�
 
 Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号，产品名疑似镜像定制），.NET SDK 10.0.400，WinUI 模板 0.0.6-alpha（winui-navview），Microsoft.WindowsAppSDK 2.4.0，WinAppCLI 0.6.1，Administrator（提升）会话，winapp 调试身份。两轮整条链路均验证通过：创建 → Debug 运行 → Release → publish → MSIX → 安装 → 启动 → 重打包升版本。
 
-### 第一轮坑点（应用 App，13 条）
+### 第一轮坑点（轮次 1，13 条）
 
 #### 1. WinRT ApplicationData 启动早期崩溃（两轮结论矛盾，真因未明）
 
@@ -287,7 +287,7 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 - 中文测试数据用 JSON Unicode 转义（`\uXXXX`）写入，彻底避开编码问题
 - 验证方式：`winapp ui` 驱动 UI 添加数据 → 检查 days.json；或预置数据 → 启动 → 检查 LastReminded 等字段是否被写回
 
-### 第二轮坑点（应用 App，新增）
+### 第二轮坑点（轮次 2，新增）
 
 #### 14. 启动崩溃的定位标准手段：ModuleInitializer 启动探针
 

@@ -52,7 +52,7 @@ Bootstrap 当前准备：
 用户给出第一段实质想法后：
 
 1. 生成暂定 App 名称和小写连字符目录名。
-2. 创建 `<app-slug>/README.md`。
+2. 创建 `<app-slug>/README.md`（**位置在用户本地私有目录，如 `~/Developer/apps-archive/<app-slug>/`，不是仓库目录**；仓库里禁止出现任何具体 App 内容）。
 3. 以 [project-readme-template.md](assets/project-readme-template.md) 为起点记录需求。
 4. 每轮更新当前想法、用户需要、暂时省略、交互流程、风格、待明确项和用户决定。
 5. 每轮只问一个真正会影响产品体验的问题。
@@ -249,15 +249,14 @@ git commit -m "docs: record Windows findings from <app-slug> round"
 git push origin main
 ```
 
-推回的内容包括：
+推回的内容只包括**通用技术经验**：
 
 - `references/toolchain/v1/commands.md` 的新增坑点（按 smoke-test 第 10 节的格式）。
-- `docs/windows-smoke-test.md` 的实测记录表。
-- `apps/<slug>/build/run-report.md`（每个 App 必写）。
+- `docs/windows-smoke-test.md` 的实测记录表（匿名轮次编号，不写具体 App 名）。
 
-会话全程日志（`apps/<slug>/session-<id>.md`）由外部环境归档，不是 Agent 的职责——Agent 的职责是把知识落进 `commands.md` 并 push，run-report 记录本轮结果。
+**严禁推回**：具体 App 的源码、README、run-report、会话日志、应用名、测试数据——这些属于用户本地私有归档（如 `~/Developer/apps-archive/`），仓库 `apps/` 目录已加入 `.gitignore`，`git add -A` 不会包含它们。提交前用 `git status` 检查，确保没有具体项目内容混入。
 
-**两轮实测教训（必须内化）：** 第一轮经验没推回仓库、第二轮基于旧基线重踩了 0x80073CFB、两轮之间零提交——知识闭环连续三次断裂，第三轮开跑前必须确认仓库已是最新（`git pull`），结束后必须 push。会话日志只归档到本机不算完成，知识落进 `commands.md` 并 push 才算完成闭环。若检测到 `commands.md` 有未提交的本地分叉（本机 vs 仓库），先合并再开发。
+**两轮实测教训（必须内化）：** 第一轮经验没推回仓库、第二轮基于旧基线重踩了 0x80073CFB——知识闭环连续断裂，开跑前必须确认仓库已是最新（`git pull`），结束后必须 push。会话日志与运行报告归档到本地私有目录不算完成，知识落进 `commands.md` 并 push 才算完成闭环。若检测到 `commands.md` 有未提交的本地分叉（本机 vs 仓库），先合并再开发。
 
 ## References
 

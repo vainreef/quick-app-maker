@@ -31,5 +31,5 @@ packages/
 # Local tool caches
 .nuget/
 
-# Keep the repository's test-build archive visible to Git.
-# Final MSIX/MSIXBUNDLE files belong under apps/test-builds/.
+# User app workspace: local only, never push to repository
+apps/

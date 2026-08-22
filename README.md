@@ -267,8 +267,10 @@ docs/windows-smoke-test.md
 ├── bootstrap/                      # 一键初始化实现
 ├── skills/vainreef-fast-publish/  # 需求发现、工程、打包和 Store Skill
 ├── toolchain/                      # 仓库内固定工具
-├── apps/                           # 真实测试 Build 归档
-└── docs/                           # Smoke Test 与研究资料
+├── docs/                           # Smoke Test 与研究资料
+└── apps/                           # 用户作品本地目录（已在 .gitignore，绝不 push）
 ```
 
 Fast Publish 的访谈流程、Windows Build 经验、Capability 建议和 Store 流程都在 `skills/vainreef-fast-publish/` 内维护；根 README 主要承担新电脑初始化手册职责。
+
+**仓库纯净性规则**：`apps/` 是用户放自己做好的应用的工作目录，只在本地使用，已在 `.gitignore` 中排除。任何具体 App 的源码、README、会话日志、运行报告、应用名都不得进入仓库或 push 到 Gitee——仓库只保存工具链与通用技术经验。
