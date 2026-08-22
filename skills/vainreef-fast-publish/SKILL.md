@@ -52,9 +52,10 @@ Agent 工作根目录（就是仓库 clone 所在的父目录）
 ```
 
 1. **所有文件操作都在 Agent 工作根目录内**：新项目、README、临时测试、安装包、脚本，全部放在这个总文件夹里、仓库目录同级或之下。**禁止往其他盘符/系统目录/用户目录写任何东西**（如 `C:\Users\<user>\Developer\...`、`C:\temp`、桌面等）——那样会导致权限弹窗、文件找不到，且违反用户明确规则。
-2. **仓库目录只读**：clone 下来的 `quick-app-maker/` 对 Agent 是 skill 参考，**不修改其内容、不 git add/commit/push**。修改仓库内容由外部主控（Mac 端）负责。
+2. **仓库目录只读（含行尾符保护）**：clone 下来的 `quick-app-maker/` 对 Agent 是 skill 参考，**不修改其内容、不 git add/commit/push**。修改仓库内容由外部主控（Mac 端）负责。**读取仓库文件时禁止用会改写行尾符（CRLF/LF）或加 BOM 的编辑器/命令**——实测多次因读取动作把仓库文件从 LF 改成 CRLF，`git status` 出现大量假 modified。发现行尾符噪音时：`git -C <repo> checkout -- .` 还原即可，不要手动"修复"。
 3. **禁止任何 git 推送**：Agent 不需要、也没有权限 push。git 操作最多是 `git pull` 获取最新 skill 知识；push/commit 一律不做（需要凭据，会弹窗打断用户）。
-4. 工作根目录的判定：`quick-app-maker` 仓库目录的父目录即是工作根目录。
+4. **验证数据落盘不要直接读打包应用的 LocalState**：`C:\Users\<user>\AppData\Local\Packages\<PFN>\LocalState\` 在 Agent 工作根目录之外且受 MSIX 保护，直接 `Get-Content` 会触发权限确认框（实测第四轮踩过）。**正确做法**：用 `winapp ui search` 查 UI 是否显示新数据；或让应用把状态日志写到工作根目录内（如 `<app-slug>/logs/`）；或通过应用自身导出/打印。任何需要读 `C:\Users\...` 路径的操作先想替代方案，不要直接读。
+5. 工作根目录的判定：`quick-app-maker` 仓库目录的父目录即是工作根目录。
 
 ## 1. Discover the app
 
@@ -283,5 +284,6 @@ Agent 根据当前 App 增加针对性测试。
 - [toolchain/v1/commands.md](references/toolchain/v1/commands.md)：当前 Windows 命令和实测记录。
 - [capabilities/registry.md](capabilities/registry.md)：可选能力建议与历史经验。
 - [delivery-considerations.md](references/delivery-considerations.md)：联网、权限、发布和规模方面的设计提示。
+- [test-assets.md](references/test-assets.md)：测试素材来源清单（图标/图片/音频/字体/数据，含许可红线）。
 - [official-sources.md](references/official-sources.md)：官方文档入口。
 - [project-readme-template.md](assets/project-readme-template.md)：每个 App 的 living README 起点。

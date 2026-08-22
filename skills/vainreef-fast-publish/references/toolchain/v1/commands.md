@@ -368,6 +368,67 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 - Fix: 用默认日期（今天+N 天）走通流程，或 `winapp ui send-keys --verbatim "<date>" --target <sel> --via send-input`（需前台）
 - Retest result: 默认日期方案流程全通
 
+### 第四轮坑点（轮次 4，新增）
+
+#### 26. WinUI 3 的 Window 没有 Resources 属性
+
+- Error text: `XamlCompiler error WMC0011: Unknown member 'Resources' on element 'Window'`
+- Root cause: WinUI 3 的 `Window` 不是 FrameworkElement，不支持 `Window.Resources`（WPF 才有）
+- Fix: 全局资源（如渐变画刷）放 `App.xaml` 的 `Application.Resources`
+- Retest result: 构建通过
+
+#### 27. RectangleGeometry 没有 RadiusX/RadiusY
+
+- Error text: `XamlCompiler error WMC0011: Unknown member 'RadiusX' on element 'RectangleGeometry'`
+- Root cause: WinUI 3 的 `RectangleGeometry` 只有 `Rect`（圆角是 WPF 专属）
+- Fix: 圆角图片用 `ImageBrush` 作为 `Border.Background`（背景按 Border 圆角裁剪，天然圆角）；图片缺失时背景用渐变占位
+- Retest result: 图片正常显示且无崩溃
+
+#### 28. Window 没有 Loaded 事件
+
+- Error text: `CS0103: 当前上下文中不存在名称 "Loaded"`
+- Root cause: WinUI 3 的 `Window` 只有 `Activated`
+- Fix: `Activated += ...` + 一次性初始化标志位
+- Retest result: 构建通过，首次激活时初始化数据
+
+#### 29. AppNotificationManager.IsSupported() 是静态方法
+
+- Error text: `CS0176: 无法使用实例引用来访问成员 "AppNotificationManager.IsSupported()"`
+- Fix: 直接 `AppNotificationManager.IsSupported()`，不要用 `Default.IsSupported()`
+- Retest result: 编译通过，运行时在提升会话返回 false（与坑 3 一致）
+
+#### 30. Manifest 的 ToastActivatorCLSID / com:Class Id 不能带花括号
+
+- Command: `winapp package ./publish --self-contained ...`
+- Error text: `error C00CE169: App manifest validation error ... '{GUID}' 不符合 '[0-9a-fA-F]{8}-...' 模式`
+- Root cause: AppX manifest schema 要求 GUID 不带 `{}` 花括号
+- Fix: 去掉花括号
+- Retest result: 打包成功
+
+#### 31. PowerShell 5.1 执行含中文的 .ps1 必须 UTF-8 BOM
+
+- Command: `powershell.exe -File seed.ps1`（文件含中文字符串）
+- Error text: `字符串缺少终止符` / ParserError
+- Root cause: PS 5.1 无 BOM 时按 ANSI 代码页读取 .ps1，中文多字节把引号吃掉了
+- Fix: 用 `[IO.File]::WriteAllText(path, content, [Text.UTF8Encoding]::new($true))` 加 BOM 重写
+- Retest result: 脚本正常执行
+- 注意: 这是"脚本文件编码"坑，与坑 13 的"写入数据编码"不同
+
+#### 32. FontIcon 内容的按钮没有自动化名称
+
+- Command: `winapp ui search "编辑"`（按钮 Content 是 FontIcon glyph）
+- Error text: Found 0 matches
+- Root cause: 图标按钮的自动化名称为空，ToolTipService.ToolTip 不成为可搜索名
+- Fix: XAML 加 `AutomationProperties.Name="编辑"`（同时利于无障碍）
+- Retest result: `winapp ui search/invoke` 可定位并点击
+
+### 已验证可复用的组合（轮次 4）
+
+- 数据预置法：应用关闭时直接写 `LocalState\days.json`（中文用 JSON Unicode 转义）+ 复制图片到 `LocalState\images\`，重启应用即可验证图片显示、提醒调度、过期清理，全程无需碰文件选择器
+- 升级重装（manifest Version 递增）后 LocalState 数据保留，可在真实安装环境下做持久化验证
+- ContentDialog 子类（XAML 根元素为 ContentDialog）是添加/编辑表单的干净形态，`winapp ui` 可完整驱动：set-value 填文本框 → invoke PrimaryButton 保存
+- 删除确认对话框与编辑对话框错开使用，规避嵌套 ContentDialog 崩溃（坑 19）
+
 ### 崩溃定位流程（推荐顺序）
 
 ```text
@@ -403,6 +464,11 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 | 23 自包含 AutoInit 0x80070490 | 是 | WinAppSDK 编译期行为 |
 | 24 多 exe 歧义 | 是 | winapp 工具行为 |
 | 25 CalendarDatePicker set-value | 是 | WinUI 控件 UIA 行为 |
+| 26-28 Window 无 Resources/Loaded、RectGeometry 无圆角 | 是 | WinUI 3 框架 API 差异 |
+| 29 IsSupported 静态方法 | 是 | WinAppSDK API 签名 |
+| 30 GUID 不带花括号 | 是 | AppX manifest schema |
+| 31 .ps1 中文需 BOM | 是 | PowerShell 5.1 行为 |
+| 32 AutomationProperties.Name | 是 | UIA 规范 |
 | 1 ApplicationData | **否，两轮矛盾** | 真因未明；不要传播为通用规则 |
 | 13 数据路径/LocalState 清空 | 是（工具链行为） | 本机验证 |
 | 10 运行验证姿势 | 是 | 工具层 |
@@ -411,6 +477,8 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 
 - **Agent 不做 git 写操作**：不 add、不 commit、不 push（无凭据会弹窗打断用户，仓库是只读 skill）。每轮结束后把通用技术经验写到工作根目录 `round-notes/round-N.md`，由外部主控合并进仓库文档。
 - 工作目录规则：所有项目、README、临时文件都放在工作根目录（仓库的父目录）下、与 `quick-app-maker/` 同级。**禁止使用 `~/...` 或 `C:\Users\...` 等绝对路径写文件，禁止往系统目录/用户目录写东西。**
+- **仓库行尾符保护**：读取仓库文件不要用会改写 CRLF/LF 或加 BOM 的工具（实测第四轮 21 个文件被 CRLF 噪音污染）。`git status` 出现大量 modified 且 diff 只是行尾符变化时，用 `git -C <repo> checkout -- .` 还原。
+- **不要直接读打包应用 LocalState**：`%LOCALAPPDATA%\Packages\<PFN>\LocalState\` 在工作根目录外且受保护，读取会触发权限确认。验证数据落盘改用：`winapp ui search` 查 UI、应用日志写到工作区内、或 `Get-AppxPackage` 类只读系统查询。正确命令应是 `Get-Content`（无 `$` 前缀），但优先换用上述替代方案。
 - 新发现的 Windows 行为经过复现后，先记入 `round-notes/`，由主控按下面格式并入本文件：
 
 ```markdown

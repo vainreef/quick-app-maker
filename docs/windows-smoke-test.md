@@ -56,6 +56,23 @@
 - 第三轮流程问题：Agent 按旧文档把项目写进了 `C:\Users\Administrator\Developer\apps-archive\`（违反工作目录规则），且尝试 git push 触发凭据弹窗——已通过"工作目录规则"+"仓库只读不 push"修正文档
 - 未执行：第 8 步重复 Bootstrap；真实 toast 弹出（管理员会话系统限制，需普通会话验证）
 
+第四轮实测记录（2026-08-22，轮次 4）：
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-08-22 |
+| Tester | Agent (DeepSeek V4 Flash) |
+| Repository commit | 0a809b7（本轮经验由主控合并回仓库） |
+| Windows edition | Windows 10 Enterprise 2009（实际 26100/22631 镜像定制） |
+| Windows build | 26100 |
+| Architecture | x64 |
+| Fresh machine / existing tools | 已有工具链，直接工程阶段 |
+| Result | 链路全通：创建→Debug→Release→publish→MSIX（自包含）→安装→启动→UI 自动化全流程验证（添加/编辑/删除/确认对话框）。新增 7 个坑点（26-32 条）与 4 条可复用组合，已并入 commands.md |
+
+- 第四轮关键新发现：Window 无 Resources/Loaded、RectangleGeometry 无圆角、IsSupported 静态方法、manifest GUID 不带花括号、.ps1 中文需 BOM、图标按钮需 AutomationProperties.Name；数据预置法（写 LocalState JSON + images 目录）可全流程验证图片/提醒/清理，无需碰文件选择器
+- 第四轮流程问题：工作目录规则已落实（项目/仓库/round-notes 同级），无 push；但 Agent 读取仓库文件产生了 CRLF 行尾符噪音（21 个文件假 modified），且直接读打包应用 LocalState 触发权限确认框——已新增"仓库行尾符保护"与"不直接读 LocalState"规则
+- 未执行：第 8 步重复 Bootstrap；真实 toast 弹出（管理员会话系统限制，需普通会话验证）
+
 ## 1. Run the public entry
 
 在 Windows PowerShell 中执行：
