@@ -187,7 +187,7 @@ bootstrap/
 dotnet run
 Developer Mode
 dotnet publish
-winapp pack
+winapp package
 MSIX 安装测试
 Microsoft Store 登录和提交
 ```
@@ -210,6 +210,16 @@ Select-String -Path skills/vainreef-fast-publish/references/toolchain/v1/command
 ```
 
 两轮实测教训：实机经验两次都只写在本地没推回仓库，导致下一轮基于旧知识重踩坑（0x80073CFB 两轮都遇到）。如果 `commands.md` 的 Status 停在 `awaiting-windows-smoke-test` 或类似旧值，说明仓库不是最新，先找用户在 Gitee 上确认最新提交。
+
+**实机残留处理（同一台机器跑过多轮时必看）**：`entry.ps1` 和上面的 `git pull` 在本地存在未提交改动时会失败（`pull --ff-only` 与本地改动冲突）。前几轮的未提交改动如果已经由外部整理进仓库（本仓库的 commands.md/SKILL.md 已是权威版），直接丢弃本地残留：
+
+```powershell
+git -C <repo目录> checkout -- .
+# 或整体清理后重新 clone：
+Remove-Item -Recurse -Force <repo目录>
+```
+
+不要尝试"合并"实机残留——实机上的旧改动是过期草稿，仓库里才是整理后的权威内容。
 
 ## 命令执行的三个铁律（两轮血泪教训）
 

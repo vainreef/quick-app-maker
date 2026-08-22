@@ -117,6 +117,8 @@ dotnet build -c Release
 $releaseBuildExit = $LASTEXITCODE
 ```
 
+注意：`dotnet run` 会阻塞当前会话直到 App 退出（winapp 集成）。人工检查时窗口关闭后命令才会返回；自动化会话不要用它做后台启动（见 commands.md「命令执行硬规则 1」——7 次卡死教训，正确姿势是 `explorer shell:AppsFolder\<PFN>!App` 或结尾杀进程）。
+
 人工检查：
 
 - 窗口是否打开。
@@ -140,13 +142,13 @@ Get-ChildItem ./publish -Recurse | Select-Object FullName, Length
 先保存当前工具帮助：
 
 ```powershell
-winapp pack --help | Tee-Object -FilePath ./winapp-pack-help.txt
+winapp package --help | Tee-Object -FilePath ./winapp-pack-help.txt
 ```
 
 然后试运行当前候选命令：
 
 ```powershell
-winapp pack ./publish --generate-cert --install-cert
+winapp package ./publish --generate-cert --install-cert
 $packExit = $LASTEXITCODE
 ```
 
@@ -161,7 +163,7 @@ $packExit = $LASTEXITCODE
 
 ## 7. Install, launch, uninstall, reinstall
 
-使用 `winapp pack --help` 和打包输出给出的实际安装方式完成：
+使用 `winapp package --help` 和打包输出给出的实际安装方式完成：
 
 1. 首次安装。
 2. 从开始菜单启动。

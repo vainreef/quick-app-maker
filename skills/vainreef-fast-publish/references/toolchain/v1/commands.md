@@ -16,6 +16,8 @@ dotnet new list winui
 Get-AppxPackage -Name winapp | Select-Object Name, Version, InstallLocation
 winapp --version
 winapp --help
+# Developer Mode（打包运行 dotnet run 必需，见坑点 15）
+Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' -Name AllowDevelopmentWithoutDevLicense -ErrorAction SilentlyContinue
 ```
 
 记录每条命令的退出码：
