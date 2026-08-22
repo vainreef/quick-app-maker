@@ -133,10 +133,26 @@ Agent 根据当前需求自由选择：
 实现一个完整小步骤
 → dotnet build
 → 处理当前错误
-→ dotnet run 验证体验
+→ 验证运行（见下方硬规则）
 → 更新 README / run-report
 → 继续下一步
 ```
+
+**执行命令的硬规则（两轮实测，违反必卡死）：**
+
+1. **禁止把 `dotnet run` 挂在后台等待**：`dotnet run` 启动打包应用后 dotnet 进程一直存活，工具调用会因进程树/管道不退出而挂起 10 分钟以上，timeout 不生效，只能用户手动打断（已发生 6 次）。正确姿势：
+   - 若用 `Start-Process dotnet "run"`，命令**结尾必须**杀干净 `<AppName>` 进程和 dotnet 进程再返回；
+   - 或不用 dotnet run，改 `explorer.exe "shell:AppsFolder\<PFN>!App"` 启动已注册应用；
+   - 或直接启动构建产物 exe 验证进程存活。
+2. **每个调用 dotnet 的命令必须显式传 `workdir` 参数**（绝对路径字面量，不展开 `$env:` 变量）。否则 `dotnet build` 跑在默认目录报 MSB1003。
+3. **大段脚本先写 `.ps1` 文件再执行**；长文件内容拆分写入。内联 here-string 和长 JSON 参数会被截断。
+4. **不要用截图验证 UI**：多数模型无视觉能力，截图是死路。用 `winapp ui search/inspect/invoke/set-value` 做 UI 自动化验证。
+5. **崩溃定位第一手段是 StartupProbe**：新建 `[ModuleInitializer]` 探针从 .NET 最早期入口逐阶段打点日志（module init → App ctor → InitializeComponent → OnLaunched → MainWindow → Activated），一次运行拿到精确堆栈。不要靠 UnhandledException（原生 stowed exception 0xc000027b 捕获不到）。
+6. **测试数据要写对位置**：打包应用数据在 `%LOCALAPPDATA%\Packages\<PFN>\LocalState\`，且每次 `dotnet run` 重注册调试身份会清空它；持久化验证放在真实安装后做。中文测试数据用 JSON Unicode 转义。
+7. **通知链路不要用空 catch**：静默吞异常会导致"没提醒"时无日志可查。本开发机是管理员会话，toast 永远弹不出来（系统限制），只能验证调度逻辑不报错。
+8. **改动模板结构时全局搜索孤儿 code-behind 调用**：删 TitleBar XAML 却残留 `AppWindow.TitleBar.PreferredHeightOption = Tall` 会启动即崩（0x8007139F）。
+
+完整细节和所有坑点见 `references/toolchain/v1/commands.md`「命令执行硬规则」和「Confirmed Windows findings」。
 
 遇到问题时依次查看：
 
@@ -206,6 +222,24 @@ Agent 根据当前 App 增加针对性测试。
 - 最终包路径、架构、版本和 SHA-256。
 - 新发现的 Windows 坑点及复现条件。
 - Store 人工确认项。
+
+## 10. Sync findings back to the repo（每轮必做，在实机上完成）
+
+实机上每一轮结束前必须执行：
+
+```powershell
+git add -A
+git commit -m "docs: record Windows findings from <app-slug> round"
+git push origin main
+```
+
+推回的内容包括：
+
+- `references/toolchain/v1/commands.md` 的新增坑点（按 smoke-test 第 10 节的格式）。
+- `docs/windows-smoke-test.md` 的实测记录表。
+- `apps/<slug>/session-<id>.md` 会话日志和 `build/run-report.md`（可选，但建议）。
+
+**两轮实测教训（必须内化）：** 第一轮经验没推回仓库、第二轮基于旧基线重踩了 0x80073CFB、两轮之间零提交——知识闭环连续三次断裂，第三轮开跑前必须确认仓库已是最新（`git pull`），结束后必须 push。会话日志只归档到本机不算完成，知识落进 `commands.md` 并 push 才算完成闭环。若检测到 `commands.md` 有未提交的本地分叉（本机 vs 仓库），先合并再开发。
 
 ## References
 

@@ -199,6 +199,28 @@ BOOTSTRAP_READY
 NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery
 ```
 
+## 开工前检查（第三轮起强制）
+
+Bootstrap 完成后、进入 Skill 前，先确认仓库知识是最新的：
+
+```powershell
+git pull --ff-only origin main
+# 确认 commands.md 头部 Status 行不是旧状态
+Select-String -Path skills/vainreef-fast-publish/references/toolchain/v1/commands.md -Pattern '^\- Status'
+```
+
+两轮实测教训：实机经验两次都只写在本地没推回仓库，导致下一轮基于旧知识重踩坑（0x80073CFB 两轮都遇到）。如果 `commands.md` 的 Status 停在 `awaiting-windows-smoke-test` 或类似旧值，说明仓库不是最新，先找用户在 Gitee 上确认最新提交。
+
+## 命令执行的三个铁律（两轮血泪教训）
+
+```text
+1. 禁止把 dotnet run 挂在后台等待 —— 命令结尾必须杀干净进程，否则工具调用挂起 10 分钟以上
+2. 每个调用 dotnet 的命令必须显式带工作目录参数
+3. 大段脚本先写 .ps1 文件再执行；不要用截图验证 UI（模型无视觉，用 winapp ui）
+```
+
+完整规则见 `skills/vainreef-fast-publish/references/toolchain/v1/commands.md`「命令执行硬规则」。
+
 ## 接下来立即进入 Skill
 
 Agent 读取：

@@ -4,18 +4,41 @@
 
 ## Test record
 
-填写本次环境：
+第一轮实测记录（2026-08-22，轮次 1 App）：
 
 | Field | Value |
 | --- | --- |
-| Date | pending |
-| Tester | pending |
-| Repository commit | pending |
-| Windows edition | pending |
-| Windows build | pending |
-| Architecture | pending |
-| Fresh machine / existing tools | pending |
-| Result | pending |
+| Date | 2026-08-22 |
+| Tester | Agent (Build · DeepSeek V4 Flash) |
+| Repository commit | 60194b8 (注意：实机经验未推回，见 commands.md 会话级流程坑) |
+| Windows edition | Windows 10 Enterprise 2009 |
+| Windows build | 26100 |
+| Architecture | x64 |
+| Fresh machine / existing tools | 全新 Windows 实机，Bootstrap 从零安装 |
+| Result | 链路全通（创建→Debug 运行→Release→publish→MSIX→安装→启动→卸载→重装），遇到 13 个坑已全部解决并写入 commands.md |
+
+- 测试会话：`apps/important-reminders/session-1.md`
+- 应用运行报告：`apps/important-reminders/build/run-report.md`
+- 结论：模板 0.0.6-alpha + WinAppSDK 2.4.0 链路可用；ApplicationData 原生崩溃、调试身份冲突、PublishTrimmed、通知注册位置等坑见 commands.md「Confirmed Windows findings」
+- 未执行：第 8 步重复 Bootstrap（本次未验证二次执行耗时）
+
+第二轮实测记录（2026-08-22，轮次 2 App）：
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-08-22 |
+| Tester | Agent (DeepSeek V4 Flash → Ox Alpha) |
+| Repository commit | 60194b8（仍未推回；第二轮基于旧基线开发，重踩了 0x80073CFB） |
+| Windows edition | Windows 10 Enterprise 2009 |
+| Windows build | 26100 |
+| Architecture | x64 |
+| Fresh machine / existing tools | 已有工具链，直接从工程阶段开始 |
+| Result | 链路全通，最终交付 v1.0.1.0 MSIX。新增 10 个坑点。但出现 6 次命令卡死（dotnet run 挂在后台导致），需用户手动打断；新增坑与卡死机制已全部写入 commands.md |
+
+- 测试会话：`apps/<repo>/session-2.md`
+- 应用运行报告：`apps/<repo>/quick-app-maker/<app-slug>/build/run-report.md`
+- 第二轮关键新发现：`dotnet run` 后台挂起机制（命令执行硬规则 1）、StartupProbe ModuleInitializer 定位手段、`winapp ui` UI 自动化、`dotnet run` 清空 LocalState、Developer Mode 注册表、0x8007139F 孤儿 titlebar 调用
+- 未执行：第 8 步重复 Bootstrap
 
 ## 1. Run the public entry
 
