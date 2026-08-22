@@ -265,6 +265,7 @@ skills/vainreef-fast-publish/references/discovery-interview.md
 
 ```text
 skills/vainreef-fast-publish/references/toolchain/v1/commands.md
+skills/vainreef-fast-publish/references/test-assets.md   # 需要测试素材时（图标/图片/音频/字体/数据）
 docs/windows-smoke-test.md
 ```
 

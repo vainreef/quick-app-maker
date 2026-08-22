@@ -1,5 +1,7 @@
 # 测试素材获取速查（Agent 用）
 
+**何时查本文件**：开发中任何时刻需要"图标 / 图片 / 音频 / 字体 / 测试数据 / 动画 / 3D 模型 / 损坏文件 / 边界文件"时，先到这里找答案，再决定生成还是下载。SKILL.md 第 4 节（设计阶段）和第 5 节（编码循环）都会引导到这里。
+
 环境约束：**只有 git + curl.exe + PowerShell 5.1**（Windows 自带）。没有 node.js / Python / ffmpeg / ImageMagick，不要依赖它们。若实机额外有 ffmpeg/ImageMagick 可加分，但没有就用下面的方式。
 
 > 本清单所有来源已于 2026-08-22 实测验证可用（HTTP 200 / git HEAD 可达）。
