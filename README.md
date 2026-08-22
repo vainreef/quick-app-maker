@@ -20,188 +20,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 
 这三行就是唯一入口。Agent 不现场编写下载器、launcher、安装器或 clone 脚本。
 
-## 一键脚本会做什么
+一键脚本会安装 Git（缺时）、clone 仓库、安装 .NET SDK / WinAppCLI / WinUI 模板（只装缺的），完成后输出 `BOOTSTRAP_READY`。实现细节见 [bootstrap/README.md](bootstrap/README.md)。
 
-```text
-检查 Git
-→ 缺少 Git 时从 npmmirror 下载并静默安装
-→ 立即 clone Gitee 仓库
-→ 调用仓库内 bootstrap/install.ps1
-→ 检查 .NET SDK、WinAppCLI、WinUI 模板
-→ 只下载和安装缺少的部分
-→ 输出 BOOTSTRAP_READY
-→ 交接 vainreef-fast-publish Skill
-```
-
-### 第一阶段：Git 和仓库
-
-`bootstrap/entry.ps1` 负责：
-
-1. 查找已安装的 Git。
-2. Git 缺失时下载固定版本 `2.47.1.windows.1`。
-3. 静默安装 Git 并读取真实安装器退出码。
-4. 安装完成后重新发现 `git.exe` 的实际位置，并用这个绝对路径 clone。
-5. clone 的标准输出和错误输出分别写入日志，`Cloning into ...` 只作为进度信息。
-6. 已有仓库时执行 `pull --ff-only`。
-7. clone 完成后调用仓库里的工具链安装器。
-
-### 第二阶段：缺什么安装什么
-
-`bootstrap/install.ps1` 会先检测：
-
-```text
-.NET SDK 10.0.400
-WinAppCLI 0.6.1
-Microsoft.WindowsAppSDK.WinUI.CSharp.Templates 0.0.6-alpha
-```
-
-已存在的组件直接跳过。缺失组件按下面方式处理：
-
-```text
-WinAppCLI：直接安装仓库内 toolchain/winapp-cli/0.6.1/winappcli_x64.msix
-.NET SDK：从 Microsoft CDN 下载
-WinUI 模板：从 NuGet 下载固定 nupkg
-```
-
-.NET SDK 和 WinUI 模板下载并行启动；仓库内 WinAppCLI 同时安装。.NET SDK 下载结束后立即启动安装；.NET 就绪后立即安装 WinUI 模板。
-
-Bootstrap 的版本、文件名和下载地址统一读取 `bootstrap/toolchain.json`。这里是安装阶段唯一的版本来源，仓库不再维护重复的 `version-lock.md`。
-
-## 固定版本和来源
-
-| 组件 | 固定版本 | 来源 |
-| --- | --- | --- |
-| Git for Windows | `2.47.1.windows.1` | `registry.npmmirror.com` |
-| .NET SDK x64 | `10.0.400` | `download.microsoft.com` |
-| WinUI C# templates | `0.0.6-alpha` | `api.nuget.org` |
-| WinAppCLI x64 | `0.6.1` | Gitee 仓库固定副本 |
-
-初始化过程只使用：
-
-```text
-Gitee
-npmmirror
-Microsoft CDN
-NuGet
-```
-
-WinAppCLI 没有外部下载任务，也不经过其他代码托管站点或 winget。
-
-## 仓库内安装脚本
-
-```text
-bootstrap/
-├── entry.ps1                         # 安装 Git、clone、启动仓库安装器
-├── install.ps1                       # 检查并安装缺少的组件
-├── toolchain.json                    # 固定版本、文件名和来源
-└── workers/
-    ├── download-file.ps1             # 单文件下载 worker
-    ├── install-dotnet.ps1            # .NET SDK 安装 worker
-    ├── install-winappcli.ps1         # 仓库内 WinAppCLI 安装 worker
-    └── install-winui-template.ps1    # WinUI 模板安装 worker
-```
-
-这些脚本是流程唯一实现。Agent 只执行脚本，不在临时目录重新生成同名逻辑。
-
-## 进度和日志
-
-一键安装会持续输出：
-
-```text
-[START] 正在下载/安装什么
-[RUNNING] 当前任务和已下载大小
-[OK] 已完成的组件
-[FAIL] 错误和日志位置
-```
-
-缓存和日志位于：
-
-```text
-%LOCALAPPDATA%\Vainreef\QuickAppMaker\
-```
-
-正常完成后不生成 `bootstrap-report.md`。出现问题时读取对应日志，修复后重新运行同一个入口；已安装组件会自动跳过。
-
-## 已知坑和固定处理方式
-
-### README 地址
-
-- 默认分支是 `main`。
-- raw 地址使用 `/raw/main/...`。
-- `/raw/master/...` 返回 404 时直接改用 `main`。
-
-### Git 和 PATH
-
-- Git 安装后，不依赖新终端刷新 PATH。
-- 已有 Git 时先从 PATH 和常见安装位置发现真实路径。
-- 缺少 Git 时运行 Git for Windows 安装器；安装目录由该安装器选择，常见结果是 `C:\Program Files\Git`，当前用户安装也可能位于 `%LOCALAPPDATA%\Programs\Git`。
-- 安装后脚本重新发现并输出 `Git executable: ...`。
-- 这个绝对路径会传给 `bootstrap/install.ps1`，后续流程继续使用同一个 Git。
-
-### clone 日志
-
-- Git 会把 `Cloning into ...` 写入 stderr，这属于正常进度。
-- clone 是否成功只看 Git 退出码和目标目录中的 `.git`。
-
-### .NET 安装
-
-- 使用 `Start-Process -PassThru -Wait` 获取真实安装器退出码。
-- 安装器进程结束后再执行 `dotnet --list-sdks`。
-- 发现 `10.0.400` 后才进入 WinUI 模板安装。
-- 安装过程中不重复启动第二个 .NET 安装器。
-- 电脑已有 .NET 6/8/9 时，先判断目标 SDK 是否为 `10.0.400`；目标版本就绪前跳过 `dotnet new list winui` 检查，避免旧 SDK 把 `list` 当作无效参数。
-
-### WinAppCLI 安装
-
-- 只使用仓库内 MSIX。
-- `Add-AppxPackage` 完成后通过 `Get-AppxPackage -Name winapp` 确认版本。
-
-### WinUI 模板安装
-
-- 直接执行仓库 worker，不使用 PowerShell 5.1 的 `2>&1 + ErrorActionPreference=Stop` 组合。
-- 安装和模板列表查询都通过独立 `Start-Process` 捕获 stdout、stderr 和 exit code。
-- `dotnet new list winui` 出现 item template 需要项目上下文的提示属于正常信息。
-- 只要列表中存在 `winui-navview`，模板即已就绪。
-
-### PowerShell 5.1 原生命令
-
-- Git clone 使用独立进程的 stdout/stderr 重定向；`Cloning into ...` 只作为进度。
-- .NET、WinAppCLI、WinUI 每个安装动作都由仓库 worker 写入自己的日志和退出码。
-- 控制器读取状态文件，不通过 `$LASTEXITCODE` 猜测 `Start-Process` 的结果。
-
-### 下载和缓存
-
-- 正常路径直接使用已有缓存，不在每次执行前计算 SHA-256。
-- 下载写入 `.part`，下载进程成功后再移动到正式文件名。
-- 安装或包读取失败时，脚本记录失败文件的大小和 SHA-256。
-- 外部缓存文件在失败后删除、重新下载并自动重试一次。
-- SHA-256 在这里用于失败诊断和对比，不是正常启动前的固定关卡。
-
-## Bootstrap 的停止线
-
-工具链初始化阶段只准备环境。下面这些动作由真实 App 流程负责：
-
-```text
-创建 Hello World
-创建临时测试项目
-dotnet run
-Developer Mode
-dotnet publish
-winapp package
-MSIX 安装测试
-Microsoft Store 登录和提交
-```
-
-一键安装完成时只输出：
+## 一键安装完成时只输出
 
 ```text
 BOOTSTRAP_READY
+WORKSPACE_ROOT: <仓库的父目录>
 NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery
 ```
 
+- `WORKSPACE_ROOT` 是 Agent 工作根目录，所有项目、临时文件、经验记录都放这里（与仓库同级）。
+- 仓库目录只读：Agent 不改仓库内容、不 git add/commit/push。经验记录与坑点由外部主控合并回仓库。
+
 ## 开工前检查（每轮强制）
 
-Bootstrap 完成后、进入 Skill 前，先确认仓库知识是最新的（只读操作）：
+进入 Skill 前先确认仓库知识是最新的（只读操作）：
 
 ```powershell
 git pull --ff-only origin main
@@ -209,38 +43,11 @@ git pull --ff-only origin main
 Select-String -Path skills/vainreef-fast-publish/references/toolchain/v1/commands.md -Pattern '^\- Status'
 ```
 
-两轮实测教训：实机经验此前要么没记录、要么直接改仓库却因无凭据 push 失败（弹窗打断用户）。正确路径：Agent 把通用经验记到工作根目录 `round-notes/`，由外部主控合并进仓库。**Agent 不做任何 git 写操作（add/commit/push），仓库是只读 skill。**
-
-**实机残留处理（同一台机器跑过多轮时必看）**：如果上一轮的 Agent 曾误改过仓库文件导致 `git pull --ff-only` 失败，直接丢弃本地残留（仓库里才是权威内容）：
+如果上一轮 Agent 误改过仓库文件导致 pull 失败，丢弃本地残留（仓库里才是权威内容）：
 
 ```powershell
 git -C <repo目录> checkout -- .
-# 或整体清理后重新 clone：
-Remove-Item -Recurse -Force <repo目录>
 ```
-
-## 工作目录规则（Agent 必须遵守）
-
-```text
-Agent 工作根目录（仓库 clone 所在的父目录）
-├── quick-app-maker/     ← 仓库：只读 skill，不改、不 commit、不 push
-├── <app-slug>/          ← 每个 App 的项目目录（与仓库同级）
-└── round-notes/         ← 本轮通用技术经验记录
-```
-
-1. **所有文件操作都在工作根目录内**：新项目、README、临时测试、安装包都放这里、与仓库同级。**禁止写其他盘符、系统目录、用户目录**（`C:\Users\...\Developer` 之类）——会触发权限弹窗且文件找不到。
-2. **仓库目录只读**：Agent 不修改仓库内容，不 git add/commit/push。
-3. 具体 App 的源码/README/会话日志/安装包**一律不进仓库**（仓库 `apps/` 已在 .gitignore，仅本地使用）。
-
-## 命令执行的三个铁律（两轮血泪教训）
-
-```text
-1. 禁止把 dotnet run 挂在后台等待 —— 命令结尾必须杀干净进程，否则工具调用挂起 10 分钟以上
-2. 每个调用 dotnet 的命令必须显式带工作目录参数
-3. 大段脚本先写 .ps1 文件再执行；不要用截图验证 UI（模型无视觉，用 winapp ui）
-```
-
-完整规则见 `skills/vainreef-fast-publish/references/toolchain/v1/commands.md`「命令执行硬规则」。
 
 ## 接下来立即进入 Skill
 
@@ -259,30 +66,18 @@ skills/vainreef-fast-publish/references/discovery-interview.md
 
 用户给出第一段实质想法后，Skill 才创建真实 App 目录和 living README。用户确认完整需求后，才进入工程生成、运行、打包和 Store 流程。
 
-## App 工程怎么生成
-
-仓库只提供工具链和 Build 经验，不保存一套预写好的 Golden Template。Agent 读取：
-
-```text
-skills/vainreef-fast-publish/references/toolchain/v1/commands.md
-skills/vainreef-fast-publish/references/test-assets.md   # 需要测试素材时（图标/图片/音频/字体/数据）
-docs/windows-smoke-test.md
-```
-
-然后从当前 WinUI CLI 模板创建最小工程，读取真实生成结果，再根据当前 App 自由设计页面、代码结构、依赖和数据方案。`commands.md` 只记录 Windows 实测命令和真实踩坑结果。
+**工作目录规则、命令执行硬规则、素材获取、设计纪律等全部见 SKILL.md——这是权威入口，README 不重复这些内容。**
 
 ## 项目结构
 
 ```text
 .
-├── README.md
-├── bootstrap/                      # 一键初始化实现
-├── skills/vainreef-fast-publish/  # 需求发现、工程、打包和 Store Skill
+├── README.md                       # Agent 入口（本页）
+├── bootstrap/                      # 一键初始化实现（细节见 bootstrap/README.md）
+├── skills/vainreef-fast-publish/  # Skill：需求发现、工程、打包和 Store 流程
 ├── toolchain/                      # 仓库内固定工具
 ├── docs/                           # Smoke Test 与研究资料
 └── apps/                           # 用户作品本地目录（已在 .gitignore，绝不 push）
 ```
-
-Fast Publish 的访谈流程、Windows Build 经验、Capability 建议和 Store 流程都在 `skills/vainreef-fast-publish/` 内维护；根 README 主要承担新电脑初始化手册职责。
 
 **仓库纯净性规则**：`apps/` 是用户放自己做好的应用的工作目录，只在本地使用，已在 `.gitignore` 中排除。任何具体 App 的源码、README、会话日志、运行报告、应用名都不得进入仓库或 push 到 Gitee——仓库只保存工具链与通用技术经验。
