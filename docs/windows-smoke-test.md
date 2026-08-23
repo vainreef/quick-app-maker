@@ -73,6 +73,23 @@
 - 第四轮流程问题：工作目录规则已落实（项目/仓库/round-notes 同级），无 push；但 Agent 读取仓库文件产生了 CRLF 行尾符噪音（21 个文件假 modified），且直接读打包应用 LocalState 触发权限确认框——已新增"仓库行尾符保护"与"不直接读 LocalState"规则
 - 未执行：第 8 步重复 Bootstrap；真实 toast 弹出（管理员会话系统限制，需普通会话验证）
 
+第五轮实测记录（2026-08-23，轮次 5）：
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-08-23 |
+| Tester | Agent (DeepSeek V4 Flash) |
+| Target App | RememberWhat（记得什么） |
+| Windows edition | Windows 10 Enterprise 2009（实际 26100/22631 镜像定制） |
+| Windows build | 26100 |
+| Architecture | x64 |
+| Total Time | 约 31 分钟（全流程提速显著） |
+| Result | 链路全通：访谈需求→本地生成渐变图库→自包含 MSIX 打包→安装运行→UI 自动化黑盒测试（添加/删除二次确认/分区/升级持久化）。新增 4 个坑点（33-36 条）已并入 commands.md |
+
+- 第五轮关键新发现：WinAppSDK 2.4.0 缺失计划通知投影（改用 Windows.UI.Notifications.ToastNotificationManager + ScheduledToastNotification，坑 33）；ItemsControl 忘挂 ItemTemplate 直接 ToString 打印类型名（坑 34）；打包应用 LocalApplicationData 被系统重定向（坑 35）；winapp ui 列表操作多元素歧义需精准 UID 定位（坑 36）。
+- 第五轮流程与人机交互教训：工程速度极快且零挂起，但在首版交付时出现了“向用户倾倒管理员通知限制技术黑话”与“过早推销商店上架”的沟通失准——已重构 SKILL.md「对用户的语言与心智规则」，确立“内部环境降噪屏障”与“交付首版是邀请把玩与共创迭代的起点，严禁在首版主动推销上架”的偏好引导。
+- 未执行：第 8 步重复 Bootstrap；真实 toast 弹出（管理员会话系统限制，需普通会话验证）
+
 ## 1. Run the public entry
 
 在 Windows PowerShell 中执行：

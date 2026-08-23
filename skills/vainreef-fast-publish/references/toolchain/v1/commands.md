@@ -422,12 +422,52 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 - Fix: XAML 加 `AutomationProperties.Name="编辑"`（同时利于无障碍）
 - Retest result: `winapp ui search/invoke` 可定位并点击
 
-### 已验证可复用的组合（轮次 4）
+### 第五轮坑点（轮次 5，新增）
+
+#### 33. WinAppSDK 2.4.0 的 AppNotifications 投影没有计划通知 API
+
+- Environment: WinAppSDK 2.4.0，.NET 10，WinUI 模板 0.0.6-alpha，Windows build 26100
+- Command: `dotnet build`（引用 `AppNotificationScheduledNotification` / `AddToSchedule`）
+- Error text: `CS0246 未找到类型 AppNotificationScheduledNotification`；`CS1061 AppNotificationManager 未包含 AddToSchedule`
+- Root cause: 该版本 `Microsoft.WindowsAppSDK.AppNotifications.Projection.dll` 中不存在计划通知类型（Unicode 字符串扫描 0 匹配确认）
+- Fix: 改用 Windows Runtime 原生底层 `Windows.UI.Notifications.ToastNotificationManager.CreateToastNotifier()` + `ScheduledToastNotification`（打包应用带包身份，100% 可用；构造 XML 用 `XmlDocument`，文本特殊字符需转义）
+- Retest result: 调度成功（日志确认 `scheduled 1 reminders`），无异常
+
+#### 34. ItemsControl 未挂 ItemTemplate 时渲染裸类型名
+
+- Environment: WinUI 3
+- Command: `winapp ui inspect`
+- Error text: 卡片区域文本直接显示 `RememberWhat.Models.DayItemViewModel`
+- Root cause: 忘写 `ItemTemplate="{StaticResource ...}"`，ItemsControl 默认直接调用数据项的 `ToString()`
+- Fix: 显式挂载 `ItemTemplate`
+- Retest result: 卡片视图正常显示
+
+#### 35. 打包应用 LocalApplicationData 被系统重定向
+
+- Environment: MSIX 安装的 WinUI 3 应用
+- Command: 应用内写调试日志到 `%LOCALAPPDATA%\<AppName>\log.txt`
+- Error text: 文件未在预期绝对路径生成
+- Root cause: 带包身份的应用 `Environment.GetFolderPath(SpecialFolder.LocalApplicationData)` 被系统虚拟化重定向到 `Packages\<PFN>\LocalCache\Local`
+- Fix: 状态日志写到工作根目录 `<app-slug>/logs/`（符合 SKILL 工作目录规则 4）
+- Retest result: 日志正常落盘且易于测试验证
+
+#### 36. winapp ui 列表操作中重复文本匹配歧义
+
+- Environment: winapp ui 自动化测试
+- Command: `winapp ui invoke "删除"`
+- Error text: `winapp.exe : Selector matched 6 elements`
+- Root cause: 列表多张卡片均有"删除"按钮，按纯文本匹配存在多元素歧义
+- Fix: 先用 `winapp ui search` 或 `inspect` 定位具体卡片，获取唯一 UID（如 `btn-684d`）进行精准触发
+- Retest result: 自动化点击精准执行
+
+### 已验证可复用的组合（轮次 4 & 5）
 
 - 数据预置法：应用关闭时直接写 `LocalState\days.json`（中文用 JSON Unicode 转义）+ 复制图片到 `LocalState\images\`，重启应用即可验证图片显示、提醒调度、过期清理，全程无需碰文件选择器
 - 升级重装（manifest Version 递增）后 LocalState 数据保留，可在真实安装环境下做持久化验证
 - ContentDialog 子类（XAML 根元素为 ContentDialog）是添加/编辑表单的干净形态，`winapp ui` 可完整驱动：set-value 填文本框 → invoke PrimaryButton 保存
 - 删除确认对话框与编辑对话框错开使用，规避嵌套 ContentDialog 崩溃（坑 19）
+- 计划通知调度：采用 `ToastNotificationManager.CreateToastNotifier().AddToSchedule(new ScheduledToastNotification(...))`，在管理员提权会话下检测无崩溃、日志正常打点，非提权环境正常弹出通知
+- 单页 Window + Grid.Resources DataTemplate + x:Bind：模板内 Button Click 事件绑定窗口 code-behind 正常
 
 ### 崩溃定位流程（推荐顺序）
 
@@ -469,6 +509,10 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 | 30 GUID 不带花括号 | 是 | AppX manifest schema |
 | 31 .ps1 中文需 BOM | 是 | PowerShell 5.1 行为 |
 | 32 AutomationProperties.Name | 是 | UIA 规范 |
+| 33 WinAppSDK 计划通知缺失 | 是 | 2.4.0 投影行为，回退 ScheduledToastNotification |
+| 34 ItemsControl 裸类型名 | 是 | XAML 框架默认行为 |
+| 35 LocalAppData 虚拟化重定向 | 是 | MSIX 安全沙箱行为 |
+| 36 winapp ui 列表多元素歧义 | 是 | UIA 选择器行为，需用唯一 UID |
 | 1 ApplicationData | **否，两轮矛盾** | 真因未明；不要传播为通用规则 |
 | 13 数据路径/LocalState 清空 | 是（工具链行为） | 本机验证 |
 | 10 运行验证姿势 | 是 | 工具层 |
@@ -477,6 +521,7 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 
 - **Agent 不做 git 写操作**：不 add、不 commit、不 push（无凭据会弹窗打断用户，仓库是只读 skill）。每轮结束后把通用技术经验写到工作根目录 `round-notes/round-N.md`，由外部主控合并进仓库文档。
 - 工作目录规则、仓库行尾符保护、LocalState 读取替代方案：见 SKILL.md「工作目录规则」（权威版，此处不重复）。
+- 交付与共创规则：交付第一版是邀请用户试用与收集反馈的起点，严禁在首版主动推销上架；内部测试环境特例（提权通知限制）不得转嫁给用户，详见 SKILL.md「对用户的语言与心智规则」。
 - 新发现的 Windows 行为经过复现后，先记入 `round-notes/`，由主控按下面格式并入本文件：
 
 ```markdown
