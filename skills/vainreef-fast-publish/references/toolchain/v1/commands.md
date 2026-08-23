@@ -469,6 +469,52 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 - Fix: 先用 `winapp ui search` 或 `inspect` 定位具体卡片，获取唯一 UID（如 `btn-684d`）进行精准触发
 - Retest result: 自动化点击精准执行
 
+### 第六轮坑点（OldTimes 实测新增）
+
+#### 37. DataTemplate 内 x:Bind 漏写 x:DataType 触发 XamlCompiler 假死报错（WMC9999）
+
+- Environment: WinUI 3，WinAppSDK 2.4.0，.NET 10
+- Command: `dotnet build`（DataTemplate 内 `{x:Bind Name}`，无 `x:DataType`）
+- Error text: `error WMC9999: 未能找到任何适合于指定的区域性或非特定区域性的资源。请确保 ErrorMessages.resources 正确嵌入...`
+- Root cause: DataTemplate 缺少 `x:DataType` 时，XamlCompiler Pass2 无法推断本地类型导致内部未捕获异常，抛出极其误导的假资源错误
+- Fix: DataTemplate 根节点必须显式声明 `x:DataType="models:ClassName"`，且 XAML 根节点声明 `xmlns:models="using:YourApp.Models"`
+- 警示: **看到 WMC9999 资源错误，100% 是漏写了 x:DataType！严禁改 csproj 降级依赖或换包！**
+- Retest result: 补上 x:DataType 后瞬间 0 错误编译通过
+
+#### 38. ContentDialog 漏设 XamlRoot 打开即秒崩（0xc000027b）
+
+- Environment: WinUI 3，WinAppSDK 2.4.0
+- Command: `new CustomDialog().ShowAsync()`
+- Error text: 事件日志 `0xc000027b` stowed exception，faulting module `Microsoft.UI.Xaml.dll`，应用当场闪退
+- Root cause: WinUI 3 中 ContentDialog 不是独立顶级窗口，必须挂载在当前窗口视觉树上
+- Fix: 必须显式设置 XamlRoot：`new CustomDialog { XamlRoot = this.Content.XamlRoot }.ShowAsync()`
+- Retest result: 对话框正常弹出，无任何崩溃
+
+#### 39. ScheduledToastNotification 投影无 Recurrence 属性
+
+- Environment: WinAppSDK 2.4.0，.NET 10
+- Command: `toast.Recurrence = PeriodicRecurrence.Year;`
+- Error text: `CS0117 ScheduledToastNotification 未包含 Recurrence 的定义`
+- Root cause: CsWinRT 托管投影不含 Recurrence 属性
+- Fix: 改为在应用启动时通过 `for` 循环为未来几年分别构造单次通知调度
+- Retest result: 编译通过，调度逻辑正常运行
+
+#### 40. 证书安装严禁使用 LocalMachine（防 UAC 管理员提权弹窗）
+
+- Environment: Windows 打包签名测试
+- Command: `Import-PfxCertificate ... -CertStoreLocation Cert:\LocalMachine\TrustedPeople`
+- Error text: 弹出 Windows UAC 管理员提权确认框，打断自动化与用户体验
+- Root cause: `LocalMachine` 属于系统全局区，需要特权
+- Fix: 一律导入当前用户信任区 `Cert:\CurrentUser\TrustedPeople`，无需提权，零弹窗
+- Retest result: 静默导入成功，MSIX 安装正常受信
+
+#### 41. 国内 NuGet 还原极速镜像源
+
+- Environment: 中国境内网络
+- Command: `dotnet restore`（直连境外 api.nuget.org 超时挂起）
+- Fix: 显式指定微软官方中国 Azure CDN 源：`dotnet restore --source https://nuget.azure.cn/v3/index.json`
+- Retest result: 依赖秒级还原成功，杜绝超时挂起
+
 ### 已验证可复用的组合（轮次 4 & 5）
 
 - 数据预置法：应用关闭时直接写 `LocalState\days.json`（中文用 JSON Unicode 转义）+ 复制图片到 `LocalState\images\`，重启应用即可验证图片显示、提醒调度、过期清理，全程无需碰文件选择器
@@ -522,6 +568,11 @@ Windows 10 Enterprise 2009 build 26100 x64（26100 实为 Win11 24H2 版本号�
 | 34 ItemsControl 裸类型名 | 是 | XAML 框架默认行为 |
 | 35 LocalAppData 虚拟化重定向 | 是 | MSIX 安全沙箱行为 |
 | 36 winapp ui 列表多元素歧义 | 是 | UIA 选择器行为，需用唯一 UID |
+| 37 DataTemplate 漏写 x:DataType | 是 | 导致 WMC9999 假资源错误 |
+| 38 ContentDialog 漏设 XamlRoot | 是 | 导致 0xc000027b 启动闪退 |
+| 39 ScheduledToast 无 Recurrence | 是 | CsWinRT 投影行为，需循环构造单次通知 |
+| 40 LocalMachine 证书弹窗 | 是 | 改用 CurrentUser 信任区免提权 |
+| 41 国内 NuGet 还原镜像 | 是 | 使用 nuget.azure.cn 防超时 |
 | 1 ApplicationData | **否，两轮矛盾** | 真因未明；不要传播为通用规则 |
 | 13 数据路径/LocalState 清空 | 是（工具链行为） | 本机验证 |
 | 10 运行验证姿势 | 是 | 工具层 |

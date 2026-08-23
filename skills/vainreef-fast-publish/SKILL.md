@@ -136,6 +136,26 @@ Set-Location APP_NAME
 4. **调试脚手架完工即拆**：StartupProbe、路径自报日志、双路径 fallback 为排障加的代码，问题定位后必须删除或移出产品路径（第二轮探针进产品，每次启动写 7+ 行日志）。
 5. **catch 必须留痕**：禁止空 catch，至少写一条日志。否则"功能静默失效"无法排查。
 
+### WinUI 3 一次性写对的 5 大黄金铁律（防假死报错、防运行时秒崩）
+
+1. **【铁律 1】DataTemplate 必须显式声明 `x:DataType`（防 WMC9999 假资源错误）**：
+   - 凡是在 `<DataTemplate>` 内部使用 `{x:Bind ...}`，根节点必须显式声明 `x:DataType="models:YourClass"`，且 XAML 根节点必须引入命名空间 `xmlns:models="using:YourApp.Models"`。
+   - **避坑警示**：如果漏写，XamlCompiler 内部崩溃会报假死错误 `error WMC9999: 未能找到任何适合于指定的区域性... ErrorMessages.resources`。**看到 WMC9999 假错误，100% 是 DataTemplate 漏写了 x:DataType！绝对禁止改 csproj、降级依赖或换包！**
+2. **【铁律 2】所有 ContentDialog 弹窗必须显式设置 `XamlRoot`（防 0xc000027b 启动秒崩）**：
+   - WinUI 3 的 `ContentDialog` 必须依附在窗口视觉树上，打开前必须设置 `XamlRoot`：
+     ```csharp
+     var dialog = new CustomDialog { XamlRoot = this.Content.XamlRoot };
+     await dialog.ShowAsync();
+     ```
+   - **避坑警示**：漏设 `XamlRoot` 直接 `ShowAsync()` 会当场触发底层原生 `0xc000027b` 闪退崩溃！
+3. **【铁律 3】计划通知的标准调度范式（防 CS0117 与空消息异常）**：
+   - `ScheduledToastNotification` 没有 `Recurrence` 属性（写了必报 CS0117）；每年重复提醒通过 `for` 循环为未来几年分别构造单次通知调度；
+   - 使用 `Windows.UI.Notifications.ToastNotificationManager.CreateToastNotifier().AddToSchedule(...)`；XML 特殊字符（`&`, `<`, `>`, `"`）必须转义；catch 时必须打印 `ex.HResult`（提权环境 0x803E0120 时 Message 为空）。
+4. **【铁律 4】严禁操作 `HKLM:` 注册表与 `Cert:\LocalMachine\` 证书（杜绝 UAC 权限弹窗）**：
+   - 证书导入一律限定在当前用户上下文（`Cert:\CurrentUser\TrustedPeople`），严禁执行任何针对 `HKLM:` 或 `Cert:\LocalMachine\` 的写操作，绝不触发管理员提权确认框打扰用户。
+5. **【铁律 5】国内 NuGet 还原镜像源（防 restore 超时卡死）**：
+   - 还原依赖必须指定国内源：`dotnet restore --source https://nuget.azure.cn/v3/index.json`，严禁直连境外 `api.nuget.org`。
+
 设计阶段如果 App 需要图片/图标/音频/字体等素材（卡片配图、空状态插画、通知音、标题字体……），先读 [test-assets.md](references/test-assets.md) 看获取方式，把"用什么素材、从哪拿"写进 README 的「已确定」一节——不要在编码时才临时找。
 
 Agent 根据当前需求自由选择：

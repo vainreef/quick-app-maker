@@ -90,6 +90,27 @@
 - 第五轮流程与人机交互教训：工程速度极快且零挂起，但在首版交付时出现了“向用户倾倒管理员通知限制技术黑话”与“过早推销商店上架”的沟通失准——已重构 SKILL.md「对用户的语言与心智规则」，确立“内部环境降噪屏障”与“交付首版是邀请把玩与共创迭代的起点，严禁在首版主动推销上架”的偏好引导。
 - 未执行：第 8 步重复 Bootstrap；真实 toast 弹出（管理员会话系统限制，需普通会话验证）
 
+第六轮实测记录（2026-08-23，轮次 6）：
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-08-23 |
+| Tester | Agent (DeepSeek V4 Flash) |
+| Target App | OldTimes（旧时光） |
+| Windows edition | Windows 10 Enterprise 2009（实际 26100/22631 镜像定制） |
+| Windows build | 26100 |
+| Architecture | x64 |
+| Result | 链路全通：定位并修复了导致 LLM 发狂调试的 XAML 假资源错误；自包含 MSIX 打包安装全通，UI 自动化测试添加/删除/编辑/二次确认全通过。新增 5 个坑点（37-41 条）并入 commands.md |
+
+- 第六轮关键新发现与重大排障突破：
+  1. DataTemplate 内部漏写 `x:DataType` 会导致 XamlCompiler 抛出假死错误 `WMC9999 ErrorMessages.resources`，极具误导性（坑 37）；
+  2. WinUI 3 中 ContentDialog 漏设 `XamlRoot` 会直接触发 `0xc000027b` 原生闪退崩溃（坑 38）；
+  3. `ScheduledToastNotification` 投影无 `Recurrence` 属性，每年提醒需循环单次调度（坑 39）；
+  4. 证书导入严禁使用 `LocalMachine` 避免 UAC 提权弹窗，改用 `CurrentUser\TrustedPeople`（坑 40）；
+  5. 国内 NuGet 还原镜像使用 `https://nuget.azure.cn/v3/index.json` 防超时（坑 41）。
+- 第六轮重大教训：在 SKILL.md 注入“WinUI 3 一次性写对的 5 大黄金铁律”，彻底从源头杜绝 LLM 漏写 `x:DataType` 和 `XamlRoot` 造成的盲目试错与权限弹窗。
+- 未执行：第 8 步重复 Bootstrap；真实 toast 弹出（管理员会话系统限制，需普通会话验证）
+
 ## 1. Run the public entry
 
 在 Windows PowerShell 中执行：
