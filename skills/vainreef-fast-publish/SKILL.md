@@ -175,12 +175,19 @@ Agent 根据当前需求自由选择：
 
 **素材获取（需要图标/图片/音频/字体/测试数据/动画/3D/异常文件时）：**
 
-1. **遇到任何素材需求，先查 [test-assets.md](references/test-assets.md)**——里面所有命令都经过实测，直接复制即可。不要自己搜网站、不要自己造轮子、不要用不存在的工具（node/python/ffmpeg 都没有）。
-2. **第一条原则：能本地生成就别下载**（PowerShell + System.Drawing 画 PNG、写假数据、复制截断造损坏文件），覆盖大部分测试场景。
-3. 需要"真实内容"（照片/图标/字体/声音）才下载，且只走 test-assets.md 里的两条路：curl 直链（无 Key）或 git clone。
-4. 素材文件一律放在工作根目录内的项目目录下（如 `<app-slug>/Assets/`、`<app-slug>/testdata/`），不写工作区外。
+1. **【绝对红线】严禁一切下载海外资源的尝试！开发环境在中国境内，直连海外公网必被墙、必超时卡死！** 严禁心存侥幸使用 curl/git 直接访问境外未镜像站点（如 GitHub releases, raw.githubusercontent, 海外 API/CDN 等）。
+2. **遇到任何素材需求，先查 [test-assets.md](references/test-assets.md)**——里面所有命令都经过国内实机实测，直接复制即可。不要自己去公网盲搜，不要用不存在的工具（node/python/ffmpeg 默认都没有）。
+3. **首选本地原生/系统自带，零网络最稳**：
+   - 纯色/渐变/图标 PNG：用 PowerShell + `System.Drawing` 本地绘制；
+   - 短音效/提示音/铃声：直接复制 Windows 自带 `C:\Windows\Media\*.wav`；
+   - UI 图标与头像：直接用 XAML 内置 `Segoe Fluent Icons` 字体字形与 `PersonPicture` 控件；
+   - 测试压缩包/数据：用 PowerShell 原生 `Compress-Archive` 与 `Set-Content` 本地生成。
+4. **下载资源的铁律：必须使用明确的国内资源，搜不到国内资源就必须立刻放弃下载！**
+   - 确实需要真实外部文件时，只走 `test-assets.md` 中记录的国内源（Gitee 镜像、清华 TUNA、阿里云 OSS、npmmirror、img.scdn.io 等）；
+   - **如果某项资源找不到可用的国内源，必须彻底放弃下载该资源！绝对禁止尝试海外下载，必须换用本地生成、系统自带或 XAML 控件拟态等替代方案！**
+5. 素材文件一律放在工作根目录内的项目目录下（如 `<app-slug>/Assets/`、`<app-slug>/testdata/`），不写工作区外。
 
-**执行命令的硬规则：见 `references/toolchain/v1/commands.md`「命令执行硬规则」——这是权威完整版，每条都经过实机验证。** 最重要的一条：禁止把 `dotnet run` 挂在后台等待（会卡死整个会话，已发生 7 次）。每次执行命令前先对照该清单，遇到问题再回来查「Confirmed Windows findings」的 32 条坑点。
+**执行命令的硬规则：见 `references/toolchain/v1/commands.md`「命令执行硬规则」——这是权威完整版，每条都经过实机验证。** 最重要的一条：禁止把 `dotnet run` 挂在后台等待（会卡死整个会话，已发生 7 次）。每次执行命令前先对照该清单，遇到问题再回来查「Confirmed Windows findings」的 36 条坑点。
 
 遇到问题时依次查看：
 
