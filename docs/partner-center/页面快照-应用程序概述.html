@@ -1,0 +1,320 @@
+<div id="productWeb">
+  <div>
+    <router-outlet></router-outlet>
+    <ng-component>
+      <div class="flex-display">
+        <mix-focus-nav>
+          <he-task-menu role="navigation" class="he-task-menu" task-menu="" item-type="page" view="default">
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" selected="">
+              应用程序概述
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">加载项</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品页面试验
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">试验详细信息</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品管理
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品标识</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理应用名称</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">WNS/MPNS</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              服务
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 服务</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 预览体验计划</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">地图</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品收集和购买</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理员同意</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              补充信息
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">其他测试信息</he-task-item>
+            </he-task-item>
+
+          </he-task-menu>
+        </mix-focus-nav>
+
+        <page-main-content style="padding: 0px 2em;">
+          <main role="main" id="3ppmaincontent">
+            <router-outlet></router-outlet>
+            <ng-component>
+              <div>
+                <app-comprehensive-overview-dashboard>
+                  <div class="wrapper">
+
+                    <div>
+                      <app-app-profile-header>
+                        <div class="title-area row">
+
+                          <div class="col-md-19">
+                            <div class="micro-d-flex align-items-center">
+                              <h1 class="title">TestProjectABCDEFG99871</h1>
+
+                              <div class="dropdown">
+                                <he-dropdown position="bottom-end" class="options bg-color he-dropdown" dropdown="" aria-label="删除产品的下拉列表">
+                                  <a href="javascript:;" slot="trigger" class="no-bg btn-icon dropdown-toggle"
+                                     aria-expanded="false" aria-haspopup="menu" id="he-dropdown-button-1">
+                                    <he-icon name="more" class="he-icon" icon=""></he-icon>
+                                  </a>
+                                  <he-menu class="no-bg he-menu he-uses-arrow-keys" menu="" role="menu" id="he-menu-2" aria-labelledby="he-dropdown-button-1">
+                                    <he-menu-item class="options-menu-item he-menu-item" menu-item="" role="menuitem" submenu-fixed-placement="" tabindex="0">
+                                      <he-icon name="delete" class="delete-btn he-icon" icon=""></he-icon>
+                                      <span class="delete-draft">删除产品</span>
+                                    </he-menu-item>
+                                  </he-menu>
+                                </he-dropdown>
+                              </div>
+                            </div>
+
+                            <p class="title-sub-text"><span>MSIX 或 PWA 应用</span></p>
+
+                            <div class="list-of-lable">
+                              <div>
+                                <div class="status-lable-item status-yellow">
+                                  <span>处于草稿状态</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="col-md-5">
+                            <div class="support-container">
+                              <span class="support-label">是否需要帮助?</span>
+                              <a target="_blank" href="https://aka.ms/storedevsupport" class="support-label-bold" aria-label="联系客户支持">联系客户支持</a>
+                            </div>
+                          </div>
+
+                        </div>
+
+                        <lib-modal>
+                          <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                            <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                          </div>
+                        </lib-modal>
+                      </app-app-profile-header>
+
+                      <div class="card-wrapper"></div>
+
+                      <div class="alert-band"><errors-display></errors-display></div>
+                      <div class="alert-band"><errors-display></errors-display></div>
+                      <div class="alert-band"><errors-display></errors-display></div>
+
+                      <div class="app-release-wrapper mb-26">
+                        <div class="micro-row">
+                          <div class="card-title app-release micro-col">
+                            <span class="app-release-header">产品版本</span>
+                            <p class="title-sub-text" data-l10n-key="Application_Dashboard_Description_Submit">使用此部分提交产品。</p>
+                          </div>
+                        </div>
+
+                        <app-submission-setup>
+                          <he-card class="no-padding-card he-card" card="">
+                            <span slot="heading">
+                              <div class="accordion-header">
+                                <div class="accordion-header-icon">
+                                  <img src="/dashboard/product/staticres/assets/SubmissionSetupOverview.svg" alt="">
+                                </div>
+                                <div class="accordion-header-container micro-row mb-0">
+                                  <div class="micro-col mr-5">
+                                    <div class="accordion-header-title">
+                                      <span>提交产品</span>
+                                    </div>
+                                    <div class="accordion-header-text">
+                                      <span>请参阅此<a href="https://go.microsoft.com/fwlink/?linkid=2247663" target="_blank" aria-label="Documentation for Product submission">文档</a>以将产品提交到 Microsoft Store。</span>
+                                    </div>
+                                  </div>
+                                  <div class="accordion-header-sub-action micro-col-auto">
+                                    <he-button appearance="primary"
+                                               class="micro-col-auto mr-5 btn-radius he-button he-focusable"
+                                               button=""
+                                               data-l10n-key="Start_Submission"
+                                               type="button">开始提交</he-button>
+                                    <div class="accordion-header-actions bg-color hide">
+                                      <a href="javascript:;" role="button" data-toggle="collapse"
+                                         data-collapse-icon="ChevronDown" data-expand-icon="ChevronUp"
+                                         aria-controls="collapseSubmissionSetup" data-target="#collapseSubmissionSetup"
+                                         class="btn-icon no-bg" aria-label="切换产品更新" aria-expanded="true">
+                                        <span class="win-icon toggle-icon win-icon-ChevronDown"></span>
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </span>
+                          </he-card>
+
+                          <lib-modal>
+                            <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                              <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                            </div>
+                          </lib-modal>
+                        </app-submission-setup>
+                      </div>
+
+                      <div class="mb-26">
+                        <app-addition-feature>
+                          <app-add-ons></app-add-ons>
+                          <app-bundle></app-bundle>
+                        </app-addition-feature>
+                      </div>
+
+                      <div class="mb-26">
+                        <div class="card-title"><span>常规</span></div>
+
+                        <app-application-identity>
+                          <he-card class="no-padding-card he-card" card="">
+                            <span slot="heading">
+                              <div class="accordion-header">
+                                <div class="accordion-header-icon">
+                                  <img src="/dashboard/product/staticres/assets/ApplicationIdentityOverview.svg" alt="">
+                                </div>
+                                <div class="accordion-header-container micro-row mb-0">
+                                  <div class="accordion-header-titlearea micro-col mr-5">
+                                    <div class="accordion-header-title">
+                                      <span>查看产品标识</span>
+                                    </div>
+                                    <div class="accordion-header-text">
+                                      <span>你可以共享 Microsoft Store 深层链接，以帮助客户在 Microsoft Store 中查找你的产品。</span>
+                                    </div>
+                                  </div>
+                                  <div class="accordion-header-sub-action micro-col-auto"></div>
+                                </div>
+                                <div class="accordion-header-actions bg-color">
+                                  <a href="javascript:;" role="button" data-toggle="collapse"
+                                     data-collapse-icon="ChevronDown" data-expand-icon="ChevronUp"
+                                     aria-controls="collapseApplicationIdentity" data-target="#collapseApplicationIdentity"
+                                     class="btn-icon no-bg" aria-label="切换产品标识" aria-expanded="false">
+                                    <span class="win-icon toggle-icon win-icon-ChevronDown"></span>
+                                  </a>
+                                </div>
+                              </div>
+                            </span>
+
+                            <div class="body">
+                              <div id="collapseApplicationIdentity" class="accordion-body collapse">
+
+                                <div class="divider">
+                                  <ul class="accordion-body-ul app-id-lower-card">
+                                    <li>
+                                      <div class="key"><span>Package/Identity/Name</span></div>
+                                      <div class="ml-auto text">
+                                        <span class="app-id-contents">Vainreef.TestProjectABCDEFG99871</span>
+                                        <button class="btn-link copy-btn" aria-label="复制包/标识/名称。">
+                                          <he-icon name="copy" class="he-icon" icon=""></he-icon>
+                                        </button>
+                                      </div>
+                                    </li>
+                                    <li>
+                                      <div class="key"><span>Package/Identity/Publisher</span></div>
+                                      <div class="ml-auto text">
+                                        <span class="app-id-contents">CN=311E7A53-AF43-454B-821E-5554DC1F27F5</span>
+                                        <button class="btn-link copy-btn" aria-label="复制包/标识/发布者。">
+                                          <he-icon name="copy" class="he-icon" icon=""></he-icon>
+                                        </button>
+                                      </div>
+                                    </li>
+                                    <li>
+                                      <div class="key"><span>Package/Properties/PublisherDisplayName</span></div>
+                                      <div class="ml-auto text">
+                                        <span class="app-id-contents">Vainreef</span>
+                                        <button class="btn-link copy-btn" aria-label="复制包/属性/发布者显示名称。">
+                                          <he-icon name="copy" class="he-icon" icon=""></he-icon>
+                                        </button>
+                                      </div>
+                                    </li>
+                                  </ul>
+                                </div>
+
+                                <div class="divider">
+                                  <ul class="accordion-body-ul app-id-lower-card">
+                                    <li>
+                                      <div class="key"><span>Package Family Name (PFN)</span></div>
+                                      <div class="ml-auto text">
+                                        <span class="app-id-contents">Vainreef.TestProjectABCDEFG99871_tbcnmw1yjv394</span>
+                                        <button class="btn-link copy-btn" aria-label="辅助软件包系列名称(PFN)。">
+                                          <he-icon name="copy" class="he-icon" icon=""></he-icon>
+                                        </button>
+                                      </div>
+                                    </li>
+                                    <li>
+                                      <div class="key"><span>Package SID</span></div>
+                                      <div class="ml-auto text">
+                                        <span class="app-id-contents">S-1-15-2-1608095143-2846274818-3670008961-2812161334-2238714474-3970647913-3819985392</span>
+                                        <button class="btn-link copy-btn" aria-label="复制软件包 SID">
+                                          <he-icon name="copy" class="he-icon" icon=""></he-icon>
+                                        </button>
+                                      </div>
+                                    </li>
+                                  </ul>
+                                </div>
+
+                                <div>
+                                  <ul class="accordion-body-ul app-id-lower-card">
+                                    <li>
+                                      <div class="key"><span class="app-id-list-items">Store ID</span></div>
+                                      <div class="ml-auto text">
+                                        <span class="app-id-contents">9P91R044KH9G</span>
+                                        <button class="btn-link copy-btn" aria-label="复制 Store ID">
+                                          <he-icon name="copy" class="he-icon" icon=""></he-icon>
+                                        </button>
+                                      </div>
+                                    </li>
+                                    <li>
+                                      <div class="key"><span>Microsoft Store 深层链接</span></div>
+                                      <div class="ml-auto text-disabled"><span>产品上线后可用</span></div>
+                                    </li>
+                                    <li>
+                                      <div class="key"><span>Web Store URL</span></div>
+                                      <div class="ml-auto text-disabled"><span>产品上线后可用</span></div>
+                                    </li>
+                                  </ul>
+                                </div>
+
+                              </div>
+                            </div>
+                          </he-card>
+                        </app-application-identity>
+                      </div>
+
+                    </div>
+
+                    <lib-modal>
+                      <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                        <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                      </div>
+                    </lib-modal>
+                  </div>
+                </app-comprehensive-overview-dashboard>
+              </div>
+            </ng-component>
+          </main>
+        </page-main-content>
+
+      </div>
+    </ng-component>
+  </div>
+
+  <div class="loading-overlay" style="opacity: 0;">
+    <webcore-progress>
+      <div class="progress indeterminate">
+        <div role="progressbar" class="progress-bar indeterminate indeterminate-bar" aria-label="Progress bar">
+          <div class="indeterminate-indicators">
+            <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+          </div>
+        </div>
+      </div>
+    </webcore-progress>
+  </div>
+</div>

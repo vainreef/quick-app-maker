@@ -1,0 +1,863 @@
+<div id="productWeb">
+  <div>
+    <router-outlet></router-outlet>
+    <ng-component>
+      <div class="flex-display">
+        <mix-focus-nav>
+          <he-task-menu role="navigation" class="he-task-menu" task-menu="" item-type="page" view="default">
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">应用程序概述</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              提交 1
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">定价和可用性</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item" selected="">属性</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">年龄分级</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Store 一览</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">提交选项</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">加载项</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品页面试验
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">试验详细信息</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品管理
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品标识</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理应用名称</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">WNS/MPNS</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              服务
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 服务</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 预览体验计划</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">地图</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品收集和购买</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理员同意</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              补充信息
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">其他测试信息</he-task-item>
+            </he-task-item>
+
+          </he-task-menu>
+        </mix-focus-nav>
+
+        <page-main-content style="padding: 0px 2em;">
+          <main role="main" id="3ppmaincontent">
+            <router-outlet></router-outlet>
+            <app-non-jaguar-properties>
+              <app-non-jaguar-apps-properties>
+
+                <mix-command-bar>
+                  <command-bar>
+                    <div class="command-bar-container" style="top: 0px;">
+                      <div class="title-and-commands">
+                        <div class="content-start">
+                          <div class="title">
+                            <h1 class="text-subheader"> TestProjectABCDEFG99871 <span style="font-weight: normal;"> | 属性</span></h1>
+                          </div>
+                        </div>
+                        <div class="content-end"></div>
+                      </div>
+                      <div></div>
+                    </div>
+                  </command-bar>
+                </mix-command-bar>
+
+                <section class="section spacer-sm-top">
+                  <header class="section-header">
+                    <h3 class="section-title spacer-16-bottom" data-l10n-key="appsubmission_appproperty_category_categoryandsubcategory">类别和子类别*</h3>
+                  </header>
+                  <div class="section-body">
+                    <category-section>
+                      <div dcl10n="appsubmission_appproperty_category_comment" class="spacer-sm-bottom" data-l10n-key="appsubmission_appproperty_category_comment">选择最恰当地描述你的产品的类别(在适用的情况下还包括子类别)。<a target="_blank" href="https://go.microsoft.com/fwlink/?linkid=2300784">详细了解类别和子类别</a></div>
+                      <div class="row">
+                        <div class="col-xl-6 col-lg-8 col-md-12 col-xs-24">
+                          <div class="jaguar-dropdown spacer-sm-top">
+                            <div id="category-dropdown" class="combobox">
+                              <select name="CategorySelect" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用类别组合框">
+                                <option value="NotSet">选取类别</option>
+                                <option value="Security"> 安全性 </option>
+                                <option value="NavigationAndMaps"> 导航 + 地图 </option>
+                                <option value="MultimediaDesign"> 多媒体设计 </option>
+                                <option value="PersonalFinance"> 个人理财 </option>
+                                <option value="Personalization"> 个性化 </option>
+                                <option value="Shopping"> 购物 </option>
+                                <option value="KidsAndFamily"> 孩子 + 家庭 </option>
+                                <option value="HealthAndFitness"> 健康 + 健身 </option>
+                                <option value="Education"> 教育 </option>
+                                <option value="DeveloperTools"> 开发人员工具 </option>
+                                <option value="Travel"> 旅游 </option>
+                                <option value="Business"> 商务 </option>
+                                <option value="Social"> 社交 </option>
+                                <option value="Productivity"> 生产率 </option>
+                                <option value="Lifestyle"> 生活方式 </option>
+                                <option value="UtilitiesAndTools"> 实用工具 + 工具 </option>
+                                <option value="FoodAndDining"> 食品 + 餐饮 </option>
+                                <option value="BooksAndReference"> 书籍 + 参考 </option>
+                                <option value="Sports"> 体育 </option>
+                                <option value="NewsAndWeather"> 新闻 + 天气 </option>
+                                <option value="Medical"> 医疗 </option>
+                                <option value="Music"> 音乐 </option>
+                                <option value="Entertainment"> 娱乐 </option>
+                                <option value="PhotoAndVideo"> 照片 + 视频 </option>
+                                <option value="GovernmentAndPolitics"> 政策与时事 </option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-xl-6 col-lg-8 col-md-12 col-xs-24">
+                          <div class="jaguar-dropdown spacer-sm-top">
+                            <div id="subcategory-dropdown" class="combobox">
+                              <select name="SubcategorySelect" class="form-control ng-untouched ng-pristine" aria-label="应用子类别组合框" disabled="">
+                                <option value="NotSet">无</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-xl-6 col-lg-8 col-md-12 col-xs-24">
+                          <div class="jaguar-dropdown spacer-sm-top">
+                            <div id="secondary-category-dropdown" class="combobox">
+                              <select name="SecondaryCategorySelect" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用类别组合框">
+                                <option value="NotSet">选取次要类别(可选)</option>
+                                <option value="Security"> 安全性 </option>
+                                <option value="NavigationAndMaps"> 导航 + 地图 </option>
+                                <option value="MultimediaDesign"> 多媒体设计 </option>
+                                <option value="PersonalFinance"> 个人理财 </option>
+                                <option value="Personalization"> 个性化 </option>
+                                <option value="Shopping"> 购物 </option>
+                                <option value="KidsAndFamily"> 孩子 + 家庭 </option>
+                                <option value="HealthAndFitness"> 健康 + 健身 </option>
+                                <option value="Education"> 教育 </option>
+                                <option value="DeveloperTools"> 开发人员工具 </option>
+                                <option value="Travel"> 旅游 </option>
+                                <option value="Business"> 商务 </option>
+                                <option value="Social"> 社交 </option>
+                                <option value="Productivity"> 生产率 </option>
+                                <option value="Lifestyle"> 生活方式 </option>
+                                <option value="UtilitiesAndTools"> 实用工具 + 工具 </option>
+                                <option value="FoodAndDining"> 食品 + 餐饮 </option>
+                                <option value="BooksAndReference"> 书籍 + 参考 </option>
+                                <option value="Sports"> 体育 </option>
+                                <option value="NewsAndWeather"> 新闻 + 天气 </option>
+                                <option value="Medical"> 医疗 </option>
+                                <option value="Music"> 音乐 </option>
+                                <option value="Entertainment"> 娱乐 </option>
+                                <option value="PhotoAndVideo"> 照片 + 视频 </option>
+                                <option value="GovernmentAndPolitics"> 政策与时事 </option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </category-section>
+                  </div>
+                </section>
+
+                <section class="section">
+                  <header class="section-header">
+                    <h3 class="section-title spacer-16-bottom" data-l10n-key="properties_privacy_policy">隐私策略</h3>
+                  </header>
+                  <div class="section-body">
+                    <support-info>
+                      <div class="spacer-xxs-bottom div-align-center">
+                        <div data-l10n-key="properties_privacy_policy_info_required">此产品是否访问、收集或传输个人信息(可用于识别个人身份的数据)?*</div>
+                        <he-button id="privacy-policy-heading" appearance="link" class="he-button he-focusable" button="" type="button">
+                          <he-icon name="info" label="Info" class="icon he-icon" icon=""></he-icon>
+                        </he-button>
+                        <he-tooltip anchor="privacy-policy-heading" placement="top-start" class="he-tooltip" tooltip="">
+                          <span data-l10n-key="appsubmission_privacypolicy_inforamtion">个人信息示例: 姓名、电话号码、生物识别标识符、位置、联系人、照片、录音、文档、通信、屏幕截图等。</span>
+                        </he-tooltip>
+                      </div>
+                      <div class="row">
+                        <div class="col-sm-15 spacer-sm-top spacer-sm-bottom">
+                          <div id="subcategory-dropdown" class="combobox">
+                            <select name="privacyPolicySelection" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用子类别组合框">
+                              <option value="NotSet" data-l10n-key="appsubmission_privacypolicy_default_option">选择一个答案以查看相应的操作</option>
+                              <option value="Yes" data-l10n-key="appsubmission_privacypolicy_option1">是，我的产品使用个人信息</option>
+                              <option value="No" data-l10n-key="appsubmission_privacypolicy_option2">否，我的产品不使用任何个人信息</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <section class="section spacer-32-top section-width">
+                        <header class="support-info-header">
+                          <div>
+                            <h3 class="section-title spacer-16-bottom" data-l10n-key="properties_support_info_optional">Support info (optional)</h3>
+                            <div class="spacer-xxs-bottom" data-l10n-key="properties_support_info_description_individual">This optional information will be shown on your store listing page to help customers contact you for support.</div>
+                          </div>
+                          <div>
+                            <he-button appearance="secondary" class="he-button he-focusable" button="" data-l10n-key="preview_button_text" type="button">Preview</he-button>
+                          </div>
+                        </header>
+                        <div class="section-body">
+                          <div>
+                            <support-contact-details>
+                              <div class="spacer-xs-top">
+                                <label id="website" dcl10n="appsubmission_listings_website" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_website">网站</label>
+                                <div class="spacer-xs-bottom">
+                                  <div inputcounter="" class="input-counter">
+                                    <input for="website" type="text" maxlength="2048" style="width: 100%;" aria-label="应用网站网址">
+                                  </div>
+                                </div>
+                                <div class="spacer-xxs-bottom"></div>
+                              </div>
+                              <div class="spacer-xs-top">
+                                <div>
+                                  <label id="contact" dcl10n="appsubmission_listings_supportcontactinfo" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_supportcontactinfo">支持部门联系信息</label>
+                                  <div class="spacer-xs-bottom">
+                                    <div inputcounter="" class="input-counter">
+                                      <input for="contact" type="text" maxlength="2048" style="width: 100%;" aria-label="应用支持联系网址">
+                                    </div>
+                                  </div>
+                                  <div class="spacer-xxs-bottom"></div>
+                                </div>
+                                <div>
+                                  <div class="spacer-xs-top">
+                                    <div class="two-column-row">
+                                      <div class="two-column-half">
+                                        <label id="supportPhone" dcl10n="appsubmission_listings_supportphone" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_supportphone">电话号码</label>
+                                        <div inputcounter="" class="input-counter">
+                                          <input for="contact" type="text" maxlength="40" style="width: 100%;" aria-label="电话号码">
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div class="spacer-xs-top">
+                                    <div class="two-column-row">
+                                      <div class="two-column-half">
+                                        <label id="supportAddress1" dcl10n="appsubmission_listings_supportaddress1" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_supportaddress1">地址行 1</label>
+                                        <div inputcounter="" class="input-counter">
+                                          <input for="supportAddress1" type="text" maxlength="50" style="width: 100%;" aria-label="地址行 1">
+                                        </div>
+                                      </div>
+                                      <div class="two-column-half">
+                                        <label id="supportAddress2" dcl10n="appsubmission_listings_supportaddress2" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_supportaddress2">地址行 2 (公寓、套房等)</label>
+                                        <div inputcounter="" class="input-counter">
+                                          <input for="supportAddress2" type="text" maxlength="50" style="width: 100%;" aria-label="地址行 2 (公寓、套房等)">
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div class="spacer-xs-top">
+                                    <div class="two-column-row">
+                                      <div class="two-column-half">
+                                        <label id="postalCode" dcl10n="appsubmission_listings_supportpostalcode" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_supportpostalcode">邮政编码</label>
+                                        <div inputcounter="" class="input-counter">
+                                          <input for="postalCode" type="text" maxlength="50" style="width: 100%;" aria-label="邮政编码">
+                                        </div>
+                                      </div>
+                                      <div class="two-column-half">
+                                        <label id="city" dcl10n="appsubmission_listings_supportcity" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_supportcity">市/县</label>
+                                        <div inputcounter="" class="input-counter">
+                                          <input for="city" type="text" maxlength="50" style="width: 100%;" aria-label="市/县">
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div class="spacer-xs-top">
+                                    <div class="two-column-row">
+                                      <div class="two-column-half">
+                                        <label id="state" dcl10n="appsubmission_listings_supportstate" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_supportstate">省/自治区/直辖市</label>
+                                        <div inputcounter="" class="input-counter">
+                                          <input for="state" type="text" maxlength="50" style="width: 100%;" aria-label="省/自治区/直辖市">
+                                        </div>
+                                      </div>
+                                      <div class="two-column-half">
+                                        <label id="country" dcl10n="appsubmission_listings_supportcountry" class="spacer-xxs-bottom" data-l10n-key="appsubmission_listings_supportcountry">国家/地区</label>
+                                        <div inputcounter="" class="input-counter">
+                                          <input for="country" type="text" maxlength="50" style="width: 100%;" aria-label="国家/地区">
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </support-contact-details>
+                          </div>
+                        </div>
+                      </section>
+
+                      <lib-modal>
+                        <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                          <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                        </div>
+                      </lib-modal>
+                      <lib-modal>
+                        <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                          <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                        </div>
+                      </lib-modal>
+                      <lib-modal>
+                        <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                          <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                        </div>
+                      </lib-modal>
+                    </support-info>
+                  </div>
+                </section>
+
+                <section class="section spacer-sm-top">
+                  <header class="section-header">
+                    <h3 class="section-title spacer-16-bottom" data-l10n-key="properties_displaymode_sectionheader">显示模式</h3>
+                  </header>
+                  <div class="section-body">
+                    <div class="spacer-xs-top">
+                      <display-mode>
+                        <div class="row spacer-xxs-bottom">
+                          <div class="col-sm-18" data-l10n-key="advcapabilities_mr">若要获得此体验，需要在以下 Windows Mixed Reality 平台的沉浸式(而非 2D)视图下运行:</div>
+                        </div>
+                        <div class="row spacer-xxs-bottom">
+                          <div class="col-sm-2">
+                            <lib-checkbox elementid="'pc-checkbox'">
+                              <div class="checkbox">
+                                <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'pc-checkbox'" value="">
+                                  <span class="text-body">电脑</span>
+                                </he-checkbox>
+                              </div>
+                            </lib-checkbox>
+                          </div>
+                          <div class="col-sm-2">
+                            <lib-checkbox elementid="'hololens-checkbox'">
+                              <div class="checkbox">
+                                <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'hololens-checkbox'" value="">
+                                  <span class="text-body">HoloLens</span>
+                                </he-checkbox>
+                              </div>
+                            </lib-checkbox>
+                          </div>
+                        </div>
+                        <div class="row spacer-sm-bottom">
+                          <div class="col-sm-18" data-l10n-key="advcapabilities_mr_experience">边界设置(仅限电脑):</div>
+                        </div>
+                        <div class="row-spacer-xxs-bottom">
+                          <div role="radiogroup">
+                            <div class="radio remove-vertical-margin">
+                              <input type="radio" name="pcSeatingStanding" id="pcSeatingStanding" aria-label="坐姿 + 站姿 - 这款应用在坐姿或站姿中使用，不要求四处移动，而且无需用户创建边界即可使用。" class="ng-untouched ng-pristine" disabled="">
+                              <label for="pcSeatingStanding" class="text-body" data-l10n-key="advcapabilities_mr_seatedstandingexp">坐姿 + 站姿 - 这款应用在坐姿或站姿中使用，不要求四处移动，而且无需用户创建边界即可使用。</label>
+                            </div>
+                            <div class="radio remove-vertical-margin">
+                              <input type="radio" name="pcAllExperiences" id="pcAllExperiences" aria-label="所有体验 - 这款应用允许或要求用户四处移动，因此用户需要在设置过程中创建边界。" class="ng-untouched ng-pristine" disabled="">
+                              <label for="pcAllExperiences" class="text-body" data-l10n-key="advcapabilities_mr_allexp">所有体验 - 这款应用允许或要求用户四处移动，因此用户需要在设置过程中创建边界。</label>
+                            </div>
+                          </div>
+                        </div>
+                      </display-mode>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="section">
+                  <header class="section-header">
+                    <h3 class="section-title spacer-16-bottom" data-l10n-key="appsubmission_appproperty_appdeclarations">产品声明</h3>
+                  </header>
+                  <div class="section-body">
+                    <div dcl10n="appsubmission_appproperty_appdeclarations_comment" class="spacer-sm-bottom" data-l10n-key="appsubmission_appproperty_appdeclarations_comment">在下面选中任何适用的复选框。这可能会影响产品的显示方式，或者影响是否只向特定用户提供你的产品。<a target="_blank" href="https://go.microsoft.com/fwlink/?LinkId=528679">详细了解产品声明</a></div>
+                    <product-declarations>
+                      <div>
+                        <lib-checkbox elementid="'store-checkbox'">
+                          <div class="checkbox">
+                            <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'store-checkbox'" value="">
+                              <span class="text-body">此产品允许用户购买，但不使用 Microsoft Store 商务系统。</span>
+                            </he-checkbox>
+                          </div>
+                        </lib-checkbox>
+                        <lib-checkbox elementid="'accessibility-checkbox'">
+                          <div class="checkbox">
+                            <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'accessibility-checkbox'" value="">
+                              <span class="text-body">此产品已经过测试，符合辅助功能准则。</span>
+                            </he-checkbox>
+                          </div>
+                        </lib-checkbox>
+                      </div>
+                      <div>
+                        <lib-checkbox elementid="'storage-checkbox'">
+                          <div class="checkbox">
+                            <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" checked="" name="'storage-checkbox'" value="">
+                              <span class="text-body">客户可以将此产品安装到备用驱动器或可移动存储。</span>
+                            </he-checkbox>
+                          </div>
+                        </lib-checkbox>
+                      </div>
+                      <div>
+                        <lib-checkbox elementid="'backups-checkbox'">
+                          <div class="checkbox">
+                            <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" checked="" name="'backups-checkbox'" value="">
+                              <span class="text-body">Windows 可以将此产品的数据包括在 OneDrive 的自动备份中。</span>
+                            </he-checkbox>
+                          </div>
+                        </lib-checkbox>
+                        <lib-checkbox elementid="'windows-checkbox'">
+                          <div class="checkbox">
+                            <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" checked="" name="'windows-checkbox'" value="">
+                              <span class="text-body">Customers can use Windows 10/11 features to record and broadcast clips of this product.</span>
+                            </he-checkbox>
+                          </div>
+                        </lib-checkbox>
+                        <span class="win-icon win-icon-Warning win-color-fg-yellow spacer-xxs-right"></span>
+                        <span data-l10n-key="appsubmission_appproperty_gamedvr_notsupported">只有"游戏"类别中的应用才支持广播和录制。</span>
+                      </div>
+                      <div>
+                        <lib-checkbox elementid="'penInk-checkbox'">
+                          <div class="checkbox">
+                            <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'penInk-checkbox'" value="">
+                              <span class="text-body">本产品支持笔墨输入。</span>
+                            </he-checkbox>
+                          </div>
+                        </lib-checkbox>
+                      </div>
+                      <div>
+                        <lib-checkbox elementid="'usesGenAI-checkbox'">
+                          <div class="checkbox">
+                            <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'usesGenAI-checkbox'" value="">
+                              <span class="text-body">本产品整合了生成式 AI 功能，利用人工智能创建新内容，包括文本、图像、音频、视频和代码。</span>
+                            </he-checkbox>
+                          </div>
+                        </lib-checkbox>
+                      </div>
+                    </product-declarations>
+                  </div>
+                </section>
+
+                <section class="section spacer-sm-top">
+                  <header class="section-header">
+                    <h3 class="section-title spacer-16-bottom" data-l10n-key="hardwarereq_sectionheading">系统要求</h3>
+                  </header>
+                  <div class="section-body">
+                    <div dcl10n="hardwarereq_sectionsummarytext1" class="spacer-sm-bottom" data-l10n-key="hardwarereq_sectionsummarytext1">指定任何必需或推荐的硬件功能，以便你的产品正常运行。<a target="_blank" href="https://go.microsoft.com/fwlink/?LinkId=870961">详细了解应用属性</a></div>
+                    <div dcl10n="hardwarereq_sectionsummarytext2_win11" class="spacer-sm-bottom" data-l10n-key="hardwarereq_sectionsummarytext2_win11">你在此处提供的信息将显示在产品的 Store 一览的"系统要求"部分，可供 Windows 10/11 客户查看。如果 Microsoft Store 检测到客户使用的硬件不满足最低要求，则该客户将在下载产品前看到一条警告，并且无法对其进行评分或评价，具体取决于他们使用的 Windows 版本和你规定的特定要求。对于建议的要求，则不显示任何警告。</div>
+                    <system-requirements>
+                      <table class="table">
+                        <thead>
+                          <tr>
+                            <th dcl10n="hardwarereq_featureheading" class="col-sm-6" data-l10n-key="hardwarereq_featureheading">功能</th>
+                            <th dcl10n="hardwarereq_minhwheading" class="col-sm-6" data-l10n-key="hardwarereq_minhwheading">最低硬件</th>
+                            <th dcl10n="hardwarereq_rechwheading" class="col-sm-6" data-l10n-key="hardwarereq_rechwheading">推荐的硬件</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+
+                          <tr>
+                            <td>触摸屏</td>
+                            <td id="tch-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">触摸屏</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">触摸屏</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>键盘</td>
+                            <td id="kbd-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">键盘</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">键盘</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>鼠标</td>
+                            <td id="mse-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">鼠标</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">鼠标</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>相机</td>
+                            <td id="cmr-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">相机</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">相机</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>NFC HCE</td>
+                            <td id="hce-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">NFC HCE</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">NFC HCE</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>NFC 邻近感应</td>
+                            <td id="nfc-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">NFC 邻近感应</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">NFC 邻近感应</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>蓝牙&nbsp;LE</td>
+                            <td id="ble-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">蓝牙&nbsp;LE</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">蓝牙&nbsp;LE</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>电话服务</td>
+                            <td id="tel-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">电话服务</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">电话服务</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>麦克风</td>
+                            <td id="mic-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">麦克风</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">麦克风</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>Xbox 控制器或手柄</td>
+                            <td id="xgp-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">Xbox 控制器或手柄</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">Xbox 控制器或手柄</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>Windows Mixed Reality 运动控制器</td>
+                            <td id="mct-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">Windows Mixed Reality 运动控制器</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">Windows Mixed Reality 运动控制器</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td>Windows Mixed Reality 沉浸式头戴显示设备</td>
+                            <td id="mrc-minimum">
+                              <lib-checkbox>
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                    <span class="text-body sr-only">Windows Mixed Reality 沉浸式头戴显示设备</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                            <td aria-label="false">
+                              <lib-checkbox elementid="'shortCode'+'-recommended'">
+                                <div class="checkbox">
+                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" name="'shortCode'+'-recommended'" value="">
+                                    <span class="text-body sr-only">Windows Mixed Reality 沉浸式头戴显示设备</span>
+                                  </he-checkbox>
+                                </div>
+                              </lib-checkbox>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td dcl10n="hardwarereq_memory" data-l10n-key="hardwarereq_memory">内存</td>
+                            <td>
+                              <div id="ram-min-dropdown" class="combobox" style="width: 150px;">
+                                <select name="RamMinSelect" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用最小内存组合框">
+                                  <option value="">未指定</option>
+                                  <option value="m30"> 300 MB </option>
+                                  <option value="m75"> 750 MB </option>
+                                  <option value="mA0"> 1 GB </option>
+                                  <option value="mT0"> 2 GB </option>
+                                  <option value="m04"> 4 GB </option>
+                                  <option value="m06"> 6 GB </option>
+                                  <option value="m08"> 8 GB </option>
+                                  <option value="m12"> 12 GB </option>
+                                  <option value="m16"> 16 GB </option>
+                                  <option value="m20"> 20 GB </option>
+                                </select>
+                              </div>
+                            </td>
+                            <td>
+                              <div id="ram-rec-dropdown" class="combobox" style="width: 150px;">
+                                <select name="RamRecSelect" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用推荐的内存组合框">
+                                  <option value="">未指定</option>
+                                  <option value="m30"> 300 MB </option>
+                                  <option value="m75"> 750 MB </option>
+                                  <option value="mA0"> 1 GB </option>
+                                  <option value="mT0"> 2 GB </option>
+                                  <option value="m04"> 4 GB </option>
+                                  <option value="m06"> 6 GB </option>
+                                  <option value="m08"> 8 GB </option>
+                                  <option value="m12"> 12 GB </option>
+                                  <option value="m16"> 16 GB </option>
+                                  <option value="m20"> 20 GB </option>
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td dcl10n="hardwarereq_directx" data-l10n-key="hardwarereq_directx">DirectX</td>
+                            <td>
+                              <div id="directx-min-dropdown" class="combobox" style="width: 300px;">
+                                <select name="directxMinSelect" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用最低直接 X 组合框">
+                                  <option value="">未指定</option>
+                                  <option value="dx9"> 版本 9 </option>
+                                  <option value="dxa"> 版本 10 </option>
+                                  <option value="dxb"> 版本 11 </option>
+                                  <option value="dcb"> DirectX 12 API，硬件功能级别 11 </option>
+                                  <option value="dcc"> DirectX 12 API，硬件功能级别 12 </option>
+                                </select>
+                              </div>
+                            </td>
+                            <td>
+                              <div id="directx-rec-dropdown" class="combobox" style="width: 300px;">
+                                <select name="directxRecSelect" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用推荐的直接 X 组合框">
+                                  <option value="">未指定</option>
+                                  <option value="dx9"> 版本 9 </option>
+                                  <option value="dxa"> 版本 10 </option>
+                                  <option value="dxb"> 版本 11 </option>
+                                  <option value="dcb"> DirectX 12 API，硬件功能级别 11 </option>
+                                  <option value="dcc"> DirectX 12 API，硬件功能级别 12 </option>
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td dcl10n="hardwarereq_vram" data-l10n-key="hardwarereq_vram">视频内存</td>
+                            <td>
+                              <div id="video-ram-min-dropdown" class="combobox" style="width: 150px;">
+                                <select name="VideoRamMinSelect" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用推荐的视频内存组合框">
+                                  <option value="">未指定</option>
+                                  <option value="v01"> 1 GB </option>
+                                  <option value="v02"> 2 GB </option>
+                                  <option value="v04"> 4 GB </option>
+                                  <option value="v06"> 6 GB </option>
+                                </select>
+                              </div>
+                            </td>
+                            <td>
+                              <div id="video-ram-rec-dropdown" class="combobox" style="width: 150px;">
+                                <select name="VideoRamRecSelect" class="form-control ng-untouched ng-pristine ng-valid" aria-label="应用推荐的视频内存组合框">
+                                  <option value="">未指定</option>
+                                  <option value="v01"> 1 GB </option>
+                                  <option value="v02"> 2 GB </option>
+                                  <option value="v04"> 4 GB </option>
+                                  <option value="v06"> 6 GB </option>
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td dcl10n="hardwarereq_processor" data-l10n-key="hardwarereq_processor">处理器</td>
+                            <td>
+                              <input for="min-processor" type="text" maxlength="2048" style="width: 35%;" aria-label="应用最小处理器速度">
+                            </td>
+                            <td>
+                              <input for="rec-processor" type="text" maxlength="2048" style="width: 35%;" aria-label="应用推荐的处理器">
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td dcl10n="hardwarereq_graphics" data-l10n-key="hardwarereq_graphics">图形</td>
+                            <td>
+                              <input for="min-graphics" type="text" maxlength="2048" style="width: 35%;" aria-label="应用最小图形">
+                            </td>
+                            <td>
+                              <input for="rec-graphics" type="text" maxlength="2048" style="width: 35%;" aria-label="应用推荐的图形">
+                            </td>
+                          </tr>
+
+                        </tbody>
+                      </table>
+                    </system-requirements>
+                  </div>
+                </section>
+
+                <div class="spacer-sm-top btn-group">
+                  <button type="submit" name="save_button" class="btn btn-primary">
+                    <span data-l10n-key="appsubmission_savebutton">保存</span>
+                  </button>
+                </div>
+
+              </app-non-jaguar-apps-properties>
+            </app-non-jaguar-properties>
+          </main>
+        </page-main-content>
+
+      </div>
+    </ng-component>
+  </div>
+
+  <div class="loading-overlay" style="opacity: 0;">
+    <webcore-progress>
+      <div class="progress indeterminate">
+        <div role="progressbar" class="progress-bar indeterminate indeterminate-bar" aria-label="Progress bar">
+          <div class="indeterminate-indicators">
+            <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+          </div>
+        </div>
+      </div>
+    </webcore-progress>
+  </div>
+</div>

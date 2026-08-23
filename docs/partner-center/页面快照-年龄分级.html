@@ -1,0 +1,197 @@
+<div id="ageratingsweb">
+  <div>
+    <div id="contentWrapper" class="container">
+      <div class="row">
+        <div id="pageMainContent" class="col-xs-18 col-xs-offset-6">
+          <router-outlet></router-outlet>
+          <app-detail>
+
+            <div class="optimal-width spacer-sm-top">
+              <div>
+
+                <section class="section remove-header-rule">
+                  <header class="page-title-header">
+                    <h1 dcl10n="AppSubmission_AppProperty_AgeRatingsTitle" class="page-title" data-l10n-key="AppSubmission_AppProperty_AgeRatingsTitle">年龄分级</h1>
+                  </header>
+
+                  <div class="section-body">
+                    <p>
+                      <span dcl10n="AppSubmission_AppProperty_AgeRatingIntroduction" data-l10n-key="AppSubmission_AppProperty_AgeRatingIntroduction">要在 Microsoft Store 中发布产品，必须提供以下问题的准确答案并接收年龄分级。如果应用或游戏已有 IARC 证书 ID 或全球分级 ID (GRID)，则必须在此处输入该 ID。</span>
+                      <a href="http://go.microsoft.com/fwlink/?LinkId=528666" target="_blank" dcl10n="AppSubmission_AppProperty_AgeRatingLearnMore" data-l10n-key="AppSubmission_AppProperty_AgeRatingLearnMore">了解有关内容分级的详细信息。</a>
+                    </p>
+
+                    <div hidden="">
+                      <p>
+                        <span dcl10n="AppSubmission_AppProperty_PhysicalDistribution_Introduction" data-l10n-key="AppSubmission_AppProperty_PhysicalDistribution_Introduction">如果此游戏将在任何区域通过物理介质分发，你必须先填写调查表，然后上传从每个地区分级委员会处获取的分级证书。</span>
+                        <a href="https://developer.microsoft.com/en-us/games/xbox/partner/windows-advanced-age-ratings" target="_blank" dcl10n="AppSubmission_LearnMore" aria-label="详细了解物理分布。" data-l10n-key="AppSubmission_LearnMore">详细了解物理分布。</a>
+                      </p>
+                    </div>
+
+                    <div class="radio">
+                      <label>
+                        <input type="radio" name="inputMode" value="questionnaire" class="ng-untouched ng-pristine ng-valid">
+                        <span dcl10n="AppSubmission_AgeRating_DownloadOnlyMessage" class="text-body" data-l10n-key="AppSubmission_AgeRating_DownloadOnlyMessage">我已准备好填写 International Age Rating Coalition (IARC)调查表。</span>
+                      </label>
+                    </div>
+
+                    <div class="radio">
+                      <label>
+                        <input type="radio" name="inputMode" value="import" class="ng-untouched ng-pristine ng-valid">
+                        <span dcl10n="AppSubmission_AgeRating_ImportRatingCheckMessage" class="text-body" data-l10n-key="AppSubmission_AgeRating_ImportRatingCheckMessage">我已在其他地方填写了此应用的调查表，并具有 IARC 证书 ID 或全球分级 ID。</span>
+                      </label>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="section" hidden="">
+                  <import-ratings>
+                    <header class="section-header">
+                      <h2 dcl10n="AppSubmission_AgeRating_RatingImportSectionHeading" class="section-title" data-l10n-key="AppSubmission_AgeRating_RatingImportSectionHeading">导入分级</h2>
+                    </header>
+                    <div class="section-body">
+                      <form novalidate="" name="importForm" class="ng-untouched ng-pristine ng-valid">
+                        <div class="form-group">
+                          <he-text-field required="" class="he-text-field he-uses-arrow-keys he-focusable" text-field="" value="" debounce="0" label="要导入你的分级信息，请输入你收到的 IARC 分级 ID 或全球分级 ID (GRID)。" type="text" invalid=""></he-text-field>
+                        </div>
+                        <div class="btn-group spacer-12-top">
+                          <button type="submit" dcl10n="AppSubmission_AgeRating_IARCLookupRatingSearchBtn" class="btn btn-default" data-l10n-key="AppSubmission_AgeRating_IARCLookupRatingSearchBtn">搜索</button>
+                        </div>
+                      </form>
+                    </div>
+                  </import-ratings>
+                </section>
+
+                <section class="section">
+                  <questionnaire>
+                    <header class="section-header">
+                      <h2 dcl10n="AppSubmission_AgeRating_RatingQuestionnaireSectionHeading" class="section-title" data-l10n-key="AppSubmission_AgeRating_RatingQuestionnaireSectionHeading">分级调查表</h2>
+                    </header>
+                    <div class="section-body">
+                      <p>回答下列一组问题，以获取产品的年龄和内容评级信息。评级由 International Age Rating Coalition (IARC)管理。我们将与 IARC 共享你的发布者显示名称和电子邮件地址以用于通信。有关详细信息，请参阅 IARC 的<a href="https://go.microsoft.com/fwlink/?linkid=837701" target="_blank">使用条款</a>。产品发布之后，你将收到 IARC 发送的确认产品分级的电子邮件。</p>
+
+                      <div id="questionnaire" class="spacer-24-top">
+                        <aside></aside>
+                        <div class="spacer-48-bottom">
+                          <div class="row root">
+                            <div>
+                              <div class="col-xs-24">
+                                <form novalidate="" class="ng-untouched ng-pristine ng-valid">
+                                  <div>
+                                    <h3 id="title-text" class="inline-block spacer-20-bottom">应用类型</h3>
+                                  </div>
+                                  <div>
+                                    <div>
+                                      <div class="question-text">
+                                        <span id="question#1109" data-questionid="1109">以下哪个选项最准确地描述了你的应用? 请注意，在回答有关你应用的问题时，不得考虑广告内容。</span>
+                                      </div>
+                                      <div role="radiogroup" aria-labelledby="question#1109">
+
+                                        <div class="radio">
+                                          <div>
+                                            <label name="question#1109">
+                                              <input role="radio" type="radio" title="游戏" name="question#1109" value="1827" aria-labelledby="title-text title#1827 text#1827">
+                                              <span class="text-body">
+                                                <span id="'title#' + response.id" class="response-titleText">游戏</span>
+                                                <p id="'text#' + response.id" class="response-text">应用是游戏或博彩应用。例子包括: 《糖果传奇》、《神庙逃亡》、《马里奥赛车》、《模拟人生》、《愤怒的小鸟》、赌场游戏、互动视觉小说、管理游戏或每日范特西体育。</p>
+                                              </span>
+                                              <button type="button" class="btn-link remove-all-spacing help-link win-icon win-icon-Info"
+                                                      name="详细了解:  应用是游戏或博彩应用。例子包括: 《糖果传奇》、《神庙逃亡》、《马里奥赛车》、《模拟人生》、《愤怒的小鸟》、赌场游戏、互动视觉小说、管理游戏或每日范特西体育。"
+                                                      title="详细了解:  应用是游戏或博彩应用。例子包括: 《糖果传奇》、《神庙逃亡》、《马里奥赛车》、《模拟人生》、《愤怒的小鸟》、赌场游戏、互动视觉小说、管理游戏或每日范特西体育。"
+                                                      hidden="" aria-label="详细了解:  应用是游戏或博彩应用。例子包括: 《糖果传奇》、《神庙逃亡》、《马里奥赛车》、《模拟人生》、《愤怒的小鸟》、赌场游戏、互动视觉小说、管理游戏或每日范特西体育。">  </button>
+                                            </label>
+                                          </div>
+                                        </div>
+
+                                        <div class="radio">
+                                          <div>
+                                            <label name="question#1109">
+                                              <input role="radio" type="radio" title="社交或通信" name="question#1109" value="2555" aria-labelledby="title-text title#2555 text#2555">
+                                              <span class="text-body">
+                                                <span id="'title#' + response.id" class="response-titleText">社交或通信</span>
+                                                <p id="'text#' + response.id" class="response-text">此应用的主要用途是结识新朋友或与人交流。示例包括，Facebook、Twitter、Skype 和 SMS。</p>
+                                              </span>
+                                              <button type="button" class="btn-link remove-all-spacing help-link win-icon win-icon-Info"
+                                                      name="详细了解:  此应用的主要用途是结识新朋友或与人交流。示例包括，Facebook、Twitter、Skype 和 SMS。"
+                                                      title="详细了解:  此应用的主要用途是结识新朋友或与人交流。示例包括，Facebook、Twitter、Skype 和 SMS。"
+                                                      hidden="" aria-label="详细了解:  此应用的主要用途是结识新朋友或与人交流。示例包括，Facebook、Twitter、Skype 和 SMS。">  </button>
+                                            </label>
+                                          </div>
+                                        </div>
+
+                                        <div class="radio">
+                                          <div>
+                                            <label name="question#1109">
+                                              <input role="radio" type="radio" title="其他所有应用类型" name="question#1109" value="2558" aria-labelledby="title-text title#2558 text#2558">
+                                              <span class="text-body">
+                                                <span id="'title#' + response.id" class="response-titleText">其他所有应用类型</span>
+                                                <p id="'text#' + response.id" class="response-text">任何非游戏、社交网络应用或通信应用的应用。示例包括娱乐产品、消费商店、新闻应用、生活方式应用、流服务、实用工具、工具、表情符号集、健身应用、杂志和自定义。</p>
+                                              </span>
+                                              <button type="button" class="btn-link remove-all-spacing help-link win-icon win-icon-Info"
+                                                      name="详细了解:  任何非游戏、社交网络应用或通信应用的应用。示例包括娱乐产品、消费商店、新闻应用、生活方式应用、流服务、实用工具、工具、表情符号集、健身应用、杂志和自定义。"
+                                                      title="详细了解:  任何非游戏、社交网络应用或通信应用的应用。示例包括娱乐产品、消费商店、新闻应用、生活方式应用、流服务、实用工具、工具、表情符号集、健身应用、杂志和自定义。"
+                                                      hidden="" aria-label="详细了解:  任何非游戏、社交网络应用或通信应用的应用。示例包括娱乐产品、消费商店、新闻应用、生活方式应用、流服务、实用工具、工具、表情符号集、健身应用、杂志和自定义。">  </button>
+                                            </label>
+                                          </div>
+                                        </div>
+
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div class="followup-questions container-fluid"></div>
+                                  <div class="followup-questions container-fluid"></div>
+                                  <div class="followup-questions container-fluid"></div>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </questionnaire>
+                </section>
+
+                <section class="section">
+                  <radio-question>
+                    <div class="spacer-20-top">
+                      <h4 class="inline-block spacer-20-bottom iarc-category"></h4>
+                    </div>
+                    <form novalidate="" name="questionForm" class="ng-untouched ng-pristine ng-valid">
+                      <p id="questionTitle" class="remove-bottom-margin">Will this product use ratings obtained directly from a ratings board, and/or will it be distributed on physical media in any region?</p>
+                      <div id="radioGroup" class="radio-group-horizontal">
+                        <div class="radio">
+                          <label>
+                            <input id="yesVal" type="radio" class="ng-untouched ng-pristine ng-valid">
+                            <span id="radioResponse1" class="text-body" data-l10n-key="Yes">是</span>
+                          </label>
+                        </div>
+                        <div class="radio">
+                          <label>
+                            <input id="noVal" type="radio" class="ng-untouched ng-pristine ng-valid">
+                            <span id="radioResponse2" class="text-body" data-l10n-key="No">否</span>
+                          </label>
+                        </div>
+                      </div>
+                    </form>
+                  </radio-question>
+                </section>
+
+                <div class="btn-group">
+                  <he-button appearance="primary" class="detail-btn he-button he-focusable" button="" data-l10n-key="AppSubmission_AgeRating_SaveDraftButton" type="button">保存草稿</he-button>
+                  <he-button appearance="secondary" dcl10n="AppSubmission_AgeRating_CancelButton" class="detail-btn he-button he-focusable" button="" data-l10n-key="AppSubmission_AgeRating_CancelButton" type="button">取消</he-button>
+                </div>
+
+              </div>
+
+              <div class="alert-band" hidden=""></div>
+            </div>
+
+          </app-detail>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" style="display: none;">
+    <he-progress-ring indeterminate="" style="--ring-size: 96px;" class="he-progress-ring" progress-ring="" value="0">&gt;</he-progress-ring>
+  </div>
+</div>

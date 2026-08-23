@@ -1,0 +1,1540 @@
+<div id="pageMainContent" class="col-xs-18 he-theme-light">
+
+  <!-- <style> 设计系统 CSS 变量块已省略（he-theme-light / he-theme-dark 配色与排版 token，非页面结构） -->
+
+  <ng-view>
+    <title>定价和可用性 | TestProjectABCDEFG99871 | 合作伙伴中心</title>
+
+    <div id="import-branch-popup" class="modal fade" tabindex="-1" ng-keydown="$event && $event.which === 27 && ctrl.ClosePopup('import-branch-popup')">
+      <div class="modal-dialog">
+        <div class="modal-content" trapfocus="">
+          <div class="modal-header">
+            <h3 class="modal-title text-subtitle" l10n="AppSubmission_BranchImportModal">导入</h3>
+          </div>
+          <div class="modal-body form-group">
+            <label class="form-label" id="importFormLabel" l10n="AppSubmission_BranchImportModal_ImportFrom">从以下位置导入</label>
+            <div>
+              <fieldset>
+                <select ng-model="importBranch" aria-labelledby="importFormLabel" ng-change="ctrl.importBranchOverview()" class="ng-untouched ng-valid ng-empty ng-dirty ng-valid-parse">
+                  <option value="" disabled="" aria-labelledby="importFormLabel" selected="selected">进行选择</option>
+                </select>
+              </fieldset>
+            </div>
+            <div></div>
+          </div>
+          <div class="modal-footer">
+            <div class="btn-group">
+              <button class="btn btn-primary" type="button" ng-disabled="!ctrl.selectedBranchForImport()" ng-click="ctrl.ImportBranch()" l10n="AppSubmission_Ok" disabled="disabled">确定</button>
+              <button class="btn" type="button" ng-click="ctrl.ClosePopup('import-branch-popup')" l10n="AppSubmission_Cancel">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="create-branch-popup" class="modal fade" tabindex="-1" ng-keydown="$event && $event.which === 27 && ClosePopup('create-branch-popup')">
+      <div class="modal-dialog">
+        <div class="modal-content" trapfocus="">
+          <div class="modal-header">
+            <h1 class="modal-title text-subtitle" l10n="AppSubmission_BranchModal_Create">新的定价和可用性分支</h1>
+          </div>
+          <div class="modal-body form-group">
+            <label class="form-label" l10n="AppSubmission_BranchModal_Name">名称</label>
+            <div class="input-counter" data-toggle="input-counter">
+              <input type="text" class="form-control ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" aria-label="NewBranchName" maxlength="255" rows="5" ng-model="newBranchName">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <div class="btn-group">
+              <button class="btn btn-primary" type="button" ng-click="ctrl.CreateBranch()" l10n="AppSubmission_Ok">确定</button>
+              <button class="btn" type="button" ng-click="ctrl.ClosePopup('create-branch-popup')" l10n="AppSubmission_Cancel">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="rename-branch-popup" class="modal fade" tabindex="-1" ng-keydown="$event && $event.which === 27 && ctrl.ClosePopup('rename-branch-popup')">
+      <div class="modal-dialog">
+        <div class="modal-content" trapfocus="">
+          <div class="modal-header">
+            <h1 class="modal-title text-subtitle" l10n="AppSubmission_BranchModal_Rename">请输入你希望用于此分支的新名称。</h1>
+          </div>
+          <div class="modal-body form-group">
+            <label class="form-label" l10n="AppSubmission_BranchModal_Name">名称</label>
+            <div class="input-counter" data-toggle="input-counter">
+              <input type="text" class="form-control ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" aria-label="UpdateBranchName" maxlength="255" rows="5" ng-model="newBranchName">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <div class="btn-group">
+              <button class="btn btn-primary" type="button" ng-click="ctrl.RenameBranch()" l10n="AppSubmission_Ok">确定</button>
+              <button class="btn" type="button" ng-click="ctrl.ClosePopup('rename-branch-popup')" l10n="AppSubmission_Cancel">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="delete-branch-popup" class="modal fade" tabindex="-1" ng-keydown="$event && $event.which === 27 && ctrl.ClosePopup('delete-branch-popup')">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h1 class="modal-title text-subtitle" ng-if="!ctrl.CertInProgress" l10n="AppSubmission_BranchModal_Delete" l10n-arg="ctrl.Branch">是否确定要删除此分支({0})?</h1>
+          </div>
+          <div class="modal-body form-group">
+            <label class="form-label" ng-if="!ctrl.CertInProgress" l10n="AppSubmission_BranchModal_Delete_Sub">此操作将会删除它的所有数据，包括认证报告和历史记录。</label>
+          </div>
+          <div class="modal-footer">
+            <div class="btn-group" ng-if="!ctrl.CertInProgress" trapfocus="">
+              <button class="btn btn-primary" type="button" ng-click="ctrl.DeleteBranch()" l10n="AppSubmission_Continue">继续</button>
+              <button class="btn" type="button" ng-click="ctrl.ClosePopup('delete-branch-popup')" l10n="AppSubmission_Cancel">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div ng-if="!ctrl.AccessDenied && !ctrl.JaguarMigrationLocked" ng-show="(!ctrl.IsLoading || ctrl.HasLoadOnce) && ctrl.IsLoadingSuccess" class="">
+
+      <header class="page-title-header has-header-action">
+        <div class="title-outer">
+          <div class="title-inner" ng-if="!ctrl.ShowJaguarUIControl">
+            <h1 class="page-title text-maxlines-1" l10n="AppSubmission_Pricing_And_Availability_Heading">定价和可用性</h1>
+          </div>
+        </div>
+
+        <div>
+          <p class="reduced-string-length" ng-show="!ctrl.IsJaguar()">
+            <span id="Backpublish_General_Label" l10n="Backpublish_General_Win11">本页的一些功能和设置将只适用于 Windows 10/11 (包括 Xbox)客户。</span>
+            <a target="_blank" tabindex="0" id="LearnMoreGeneralBackpublishingLink" class="link" l10n="Availability_LearnMore_PricingAndAvailability" href="http://go.microsoft.com/fwlink/?LinkId=845964">详细了解定价和可用性</a>
+          </p>
+          <div ng-hide="ctrl.IsDealsLoadingSuccess() && ctrl.Data.IsPriceOptionsLoadingSuccess" class="alert-band ng-hide">
+            <div style="width: 68%;" class="alert with-icon alert-warning" role="alert">
+              <span class="alert-icon"><i class="win-icon win-icon-Warning"></i></span>
+              <div class="alert-title" l10n="Error_GeneralPageTitle">我们在加载此页面时遇到问题。</div>
+              <div class="row">
+                <div class="col-md-20">
+                  <p l10n="Error_PartialSectionWarning">在所有部分可用之前，你无法进行更改。请刷新页面或在几分钟后重试。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div ng-show="ctrl.IsJaguar()" class="win-color-bg-20 ng-hide" aria-live="assertive">
+          <div class="row jaguar-page-status">
+            <div class="col-xs-24" ng-if="!ctrl.CertStatusComplete()">
+              <span style="font-weight:bold" l10n="AppSubmission_Text_Status">状态:</span>
+              <span l10n="AppSubmission_Text_Incomplete">未完成</span>
+              <div class="win-icon-composite win-icon-size-sm" aria-hidden="true">
+                <span class="win-icon win-icon-TaskStateCircleFull win-icon-size-sm win-color-fg-yellow"></span>
+                <span class="win-icon win-icon-TaskStateInComplete win-icon-size-sm win-color-fg-primary color-alt"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="section" ng-if="ctrl.IsIncomplete()">
+        <div class="input-bottom-comment reduced-string-length" ng-repeat="err in ctrl.PageErrors">
+          <span class="alert alert-error has-icon">
+            <span class="icon-dc-StatusErrorFull alert-icon"></span>
+            <span class="alert-string">没有为可购买的产品创建 PriceSchedule。</span>
+          </span>
+        </div>
+        <div class="input-bottom-comment reduced-string-length" ng-repeat="err in ctrl.PageErrors">
+          <span class="alert alert-error has-icon">
+            <span class="icon-dc-StatusErrorFull alert-icon"></span>
+            <span class="alert-string">必须为此产品配置价格。</span>
+          </span>
+        </div>
+      </section>
+
+      <sales-markets>
+        <section class="section has-header-action" ng-if="sm.ShouldShow()">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title text-maxlines-1" l10n="AppSubmission_Availability_SalesMarkets" id="salesMarketsHeader">市场</h2>
+                </div>
+              </div>
+            </div>
+            <div class="header-action" ng-if="sm.Data.RolloutChinaOffshoreMarketEnabled">
+              <a target="_blank" tabindex="0" href="http://go.microsoft.com/fwlink/?LinkId=528664" class="expandLink collapsed btn-link" style="padding: 0; line-height: normal;" aria-labelledby="LearnMoreMarkets" id="learnMoreMarketsLink">
+                <span l10n="LearnMore" id="learnMoreMarketsShow">了解详细信息</span>
+              </a>
+            </div>
+          </header>
+
+          <div class="section-body">
+            <div class="radio-group" ng-if="sm.Data.RolloutChinaOffshoreMarketEnabled">
+              <div class="radio">
+                <label style="display: inline-block;">
+                  <input type="radio" name="marketSelection" ng-model="sm.Data.IsChinaOffshoreEnabled" ng-value="true" ng-change="sm.ChinaOffshoreEnabledChange(true)" ng-disabled="!sm.IsPageEditable()" class="ng-pristine ng-untouched ng-valid ng-not-empty" value="true">
+                  <span l10n="AppSubmission_Availability_AvailableInMarkets_AllWorldwide">全球所有市场</span>
+                </label>
+                <span class="recommended-badge" l10n="Recommended">推荐</span>
+                <div ng-if="sm.Data.IsChinaOffshoreEnabled === true" style="margin-left: 24px; margin-top: 8px;">
+                  <button class="expandLink collapsed btn-link" style="padding: 0; line-height: normal;" tabindex="0" ng-click="sm.ShowOptions()" ng-keypress="sm.ShowOptions($event)">
+                    <span l10n="AppSubmission_ShowOption">显示选项</span>
+                  </button>
+                </div>
+              </div>
+              <div class="radio" style="margin-top: 12px;">
+                <label>
+                  <input type="radio" name="marketSelection" ng-model="sm.Data.IsChinaOffshoreEnabled" ng-value="false" ng-change="sm.ChinaOffshoreEnabledChange(false)" ng-disabled="!sm.IsPageEditable()" class="ng-pristine ng-untouched ng-valid ng-not-empty" value="false">
+                  <span l10n="AppSubmission_Availability_AvailableInMarkets_RestrictToSpecificMarkets">限定特定市场</span>
+                </label>
+              </div>
+            </div>
+
+            <div id="market-selector-salesMarket" class="modal center-top-md language-list-modal" data-keyboard="false" data-backdrop="static" tabindex="-1"
+                 ng-keydown="$event && $event.which === 27 && Cancel()" visible="sm.IsMarketSelectorVisible" markets="sm.Data.Markets" test-id="'salesMarket'"
+                 show-enabled-only="false" read-only="!sm.IsPageEditable()" on-close="sm.OnSalesMarketsChanged" product-type="sm.Data.ProductType"
+                 rollout-china-offshore-market-enabled="sm.Data.RolloutChinaOffshoreMarketEnabled" is-china-onshore-enabled="sm.Data.IsChinaOnshoreEnabled"
+                 is-china-offshore-enabled="sm.Data.IsChinaOffshoreEnabled">
+              <div class="modal-dialog">
+                <div class="modal-content" trapfocus="">
+                  <div>
+                    <div class="modal-header">
+                      <h3 class="modal-title text-subtitle spacer-20-bottom" l10n="AppSubmission_Availability_MarketSelection">市场选择</h3>
+                    </div>
+                    <div class="modal-body">
+                      <div class="row search-row">
+                        <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8">
+                          <div class="search-container">
+                            <div class="form-group form-searchbox remove-top-margin">
+                              <form class="js-nro ng-pristine ng-valid">
+                                <input class="form-control js-nro ng-pristine ng-valid ng-untouched ng-empty" uitestid="marketSearchBox" aria-label="MarketSearchBox" type="text" placeholder="搜索" autocomplete="off" ng-model="query.$">
+                                <button class="clear-icon js-nro generate-tag" type="reset" data-bi-slot="1" data-bi-id="Reset-Button" data-bi-name="Reset" aria-label="ResetMarketSearchBox" ng-click="ClearQuery()"><span class="win-icon win-icon-Clear"></span></button>
+                                <span class="search-icon generate-tag" data-bi-slot="2" data-bi-id="Search-Button" data-bi-name="Search">
+                                  <i class="win-icon win-icon-Search"></i>
+                                </span>
+                              </form>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8" ng-show="ProductType !== 'OfficeAddin'">
+                          <select class="form-control search-height full-width ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedPlatform" aria-label="CurrentSelectedPlatform" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | platformFilter:RolloutChinaOffshoreMarketEnabled"><option value="?" selected="selected"></option></select>
+                        </div>
+                        <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8 ng-hide" ng-show="false">
+                          <div class="combobox">
+                            <select class="form-control search-height ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedContinent" aria-label="CurrentSelectedContinent" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | continentFilter"><option value="?" selected="selected"></option></select>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="spacer-20-top">
+                          <button ng-click="!ReadOnly && SelectAll(true)" ng-keypress="!ReadOnly && SelectAll(true, $event)" uitestid="MarketSelectorSelectAllLink-salesMarket" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="3" data-bi-id="SeeAll-Link" data-bi-name="SeeAll">
+                            <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_SelectAll">全选</span>
+                            (<span>0</span>)
+                          </button>
+                          <button ng-click="!ReadOnly && SelectAll(false)" ng-keypress="!ReadOnly && SelectAll(false, $event)" uitestid="MarketSelectorUnSelectAllLink-salesMarket" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="4" data-bi-id="UnselectAll-Link" data-bi-name="UnselectAll">
+                            <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_UnselectAll">取消全选</span>
+                          </button>
+                        </div>
+                        <div class="language-list-container-short spacer-16-top" style="min-height: 100px" ng-if="!ShowEnabledOnly"></div>
+                      </div>
+                      <div class="form-group-addon form-group-addon-adjacent spacer-20-top ng-hide" ng-show="ShowEnabledOnly">
+                        <label l10n="Market_Selection_FriendlyName">市场组名</label>
+                        <input class="add-on ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" type="text" ng-model="SelectedGroup.FriendlyName" ng-keydown="$event && $event.which === 13 && $event.preventDefault()" ng-disabled="ReadOnly" ng-maxlength="36" maxlength="36" placeholder="示例: 第一轮" aria-label="marketGroupName">
+                      </div>
+                    </div>
+                    <div class="btn-group" ng-click="FocusOn('form-group-countryBtn-')">
+                      <button uitestid="MarketSelectorOkButton-salesMarket" class="btn btn-primary btn-default btn-std-width generate-tag" type="button" ng-click="Create()" ng-disabled="ReadOnly || !CanSave()" data-bi-slot="5" data-bi-id="Create-Button" data-bi-name="Create" disabled="disabled">
+                        <div ng-if="!ShowEnabledOnly || (SelectedGroup && SelectedGroup.Markets.length &gt; 0)">
+                          <span l10n="AppSubmission_Ok">确定</span>
+                        </div>
+                      </button>
+                      <button uitestid="MarketSelectorCancelButton-salesMarket" class="btn btn-std-width generate-tag market-selector-cancel" type="button" ng-click="Cancel();" data-bi-slot="6" data-bi-id="Cancel-Button" data-bi-name="Cancel" l10n="AppSubmission_Cancel">取消</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="alert alert-warning has-icon ng-hide" ng-show="sm.ShowOpenXblChinaWarning()">
+              <span class="icon-dc-IncidentTriangle alert-icon"></span>
+              <span class="alert-string" l10n="AppSubmission_Availability_OpenXblChinaWarning">Xbox Creators Program 在中国不可用。若要让你的游戏在中国的 Xbox 可用，必须加入 ID@Xbox 计划。</span>
+            </div>
+
+            <div class="checkbox reduced-string-length">
+              <label>
+                <input class="form-control ng-pristine ng-untouched ng-valid ng-not-empty" type="checkbox" ng-disabled="!sm.IsPageEditable()" ng-model="sm.Data.EnableFutureMarkets" aria-labelledby="enableFutureMarkets" ng-change="sm.EnableFutureMarketsChange()">
+                <span ng-if="sm.Data.ProductType !== 'OfficeAddin'" id="enableFutureMarkets" l10n="AppSubmission_Availability_EnableFutureMarkets">让我的产品将来在任何市场中均可按基价并在公开上市日提供。</span>
+                <a ng-if="sm.Data.ProductType !== 'OfficeAddin'" target="_blank" tabindex="0" class="content-link" l10n="SalesMarkets_LearnMore_FutureMarkets" aria-describedby="enableFutureMarkets" id="learnMoreFutureMarketsLink" href="http://go.microsoft.com/fwlink/?LinkId=528664">详细了解未来市场</a>
+              </label>
+            </div>
+          </div>
+        </section>
+      </sales-markets>
+
+      <visibility>
+        <section class="section has-header-action" ng-show="vm.ShouldShow()">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title text-maxlines-1" l10n="AppSubmission_Availability_Visibility" id="visibilityHeader">可见</h2>
+                </div>
+              </div>
+            </div>
+            <div class="header-action" uitestid="ShowVisibilityLink">
+              <button class="expandLink collapsed btn-link" style="padding: 0; line-height: normal;" tabindex="0" ng-click="vm.ToggleShowOptions()" ng-keypress="vm.ToggleShowOptions($event)">
+                <span ng-show="!vm.ShowOptions" l10n="AppSubmission_ShowOption" id="visibilityShowBtn" aria-labelledby="visibilityHeader + visibilityShowBtn" class="ng-hide">显示选项</span>
+                <span ng-show="vm.ShowOptions" l10n="AppSubmission_HideOption" id="visibilityHideBtn" aria-labelledby="visibilityHeader + visibilityHideBtn">隐藏选项</span>
+              </button>
+            </div>
+          </header>
+
+          <div class="section-body">
+            <div id="visibility-summary" ng-show="!vm.ShowOptions" class="ng-hide">
+              <div ng-if="vm.Visibility.ProductType !== 'AddOn'">
+                <p id="distributionIntro" class="reduced-string-length">
+                  <span class="comments ng-hide" ng-show="vm.Visibility.DistributionOption === 'LineOfBusiness'" l10n="AppSubmission_Availability_LOB_Label">你的应用将仅提供给所选企业。</span>
+                  <span class="comments ng-hide" ng-show="vm.Visibility.DistributionMode === 'Beta' && vm.Visibility.DistributionOption === 'Retail' && vm.Visibility.Audience !== 'PrivateBeta'" l10n="AppSubmission_Pricing_DistributionAndVisibility_Label_Beta_Win11">你的应用已对浏览或搜索 Microsoft Store 的客户隐藏。只有指定用户才能在 Windows Phone 8.x 设备上下载此应用。可以使用促销代码在 Windows 10/11 设备上下载此应用。</span>
+                  <span class="comments" ng-show="vm.Visibility.DistributionMode === 'Public' && vm.Visibility.DistributionOption === 'Retail' && vm.Visibility.Audience !== 'PrivateBeta'" l10n="AppSubmission_Availability_Label_Public">你的产品在 Microsoft Store 中可用。</span>
+                  <span class="comments ng-hide" ng-show="vm.Visibility.DistributionMode === 'Hidden' && vm.Visibility.DistributionOption === 'Retail' && vm.Visibility.Audience !== 'PrivateBeta'" l10n="AppSubmission_Pricing_DistributionAndVisibility_Label_Hidden">你的产品已隐藏，客户在浏览或搜索 Microsoft Store 时将无法看到它。</span>
+                  <span class="comments ng-hide" ng-show="vm.Visibility.DistributionMode === 'NotSelling' && vm.Visibility.DistributionOption === 'Retail' && vm.Visibility.Audience !== 'PrivateBeta'" l10n="AppSubmission_Availability_Label_StopSelling_Win11">你的产品无法购买，只有拥有促销充值码的 Windows 10/11 客户才可以购买。</span>
+                  <span class="comments ng-hide" ng-show="vm.Visibility.DistributionMode === 'Public' && vm.Visibility.DistributionOption === 'Retail' && vm.Visibility.Audience === 'PrivateBeta'" l10n="AppSubmission_Availability_PrivateBeta_Public">仅特定受众可购买你的产品。</span>
+                  <span class="comments ng-hide" ng-show="vm.Visibility.DistributionMode === 'Hidden' && vm.Visibility.DistributionOption === 'Retail' && vm.Visibility.Audience === 'PrivateBeta'" l10n="AppSubmission_Availability_PrivateBeta_Hidden_Win11">仅私人受众中的人员可以通过 Windows 10/11 上的直接链接获取产品。</span>
+                  <span class="comments ng-hide" ng-show="vm.Visibility.DistributionMode === 'NotSelling' && vm.Visibility.DistributionOption === 'Retail' && vm.Visibility.Audience === 'PrivateBeta'" l10n="AppSubmission_Availability_PrivateBeta_StopSelling_Win11">你的产品对 Microsoft Store 中的大多数客户隐藏且不支持购买，但特定受众可使用 Windows 10/11 上的直接链接进行查看并使用促销代码进行购买。</span>
+                  <a target="_blank" tabindex="0" id="LOBLearnMoreBtn" class="link" l10n="AppSubmission_LearnMore" aria-labelledby="LOBLearnMoreBtn + availabilityAudienceHeader" href="http://go.microsoft.com/fwlink/?LinkId=851450">了解详细信息</a>
+                </p>
+              </div>
+            </div>
+
+            <div ng-show="vm.ShowOptions">
+              <div id="modal-LimitedDistributionSchedules-warning" class="modal fade" ng-keydown="$event && $event.which === 27 && vm.EnableLimitedDistributionConfirm(false)" tabindex="-1">
+                <div class="modal-dialog">
+                  <div class="modal-content" trapfocus="">
+                    <div>
+                      <div class="modal-header">
+                        <h4 class="modal-title text-subtitle" l10n="AppSubmission_LimitedDistributionSchedules_Warning">由于此产品仅供私人受众使用，因此你在"计划"部分指定的任何日期都将被删除。</h4>
+                      </div>
+                      <div class="modal-footer">
+                        <div class="btn-group">
+                          <button class="btn btn-primary" data-dismiss="modal" data-target="#modal-LimitedDistributionSchedules-warning" ng-click="vm.EnableLimitedDistributionConfirm(true)" l10n="AppSubmission_Ok">确定</button>
+                          <button class="btn" data-dismiss="modal" data-target="#modal-LimitedDistributionSchedules-warning" ng-click="vm.EnableLimitedDistributionConfirm(false)" l10n="AppSubmission_Delete_Cancel">取消</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="distribution-selection" class="form-group ng-hide" ng-show="vm.ShowOptions && vm.Visibility.ProductType === 'App' && vm.HasEnterpriseAssocation()">
+              <label for="distributionOption" class="form-label">
+                <span l10n="AppSubmission_Availability_VisibleInStore">使此产品可用并在 Microsoft Store 中可发现。</span>
+              </label>
+              <select id="distributionOption" class="form-control ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="vm.Visibility.DistributionOption" ng-options="option.Value as option.Text for option in vm.DistributionOptions" ng-change="vm.OnDistributionOptionChanged()" ng-disabled="!vm.Visibility.IsEditable">
+                <option label="零售分发" value="string:Retail" selected="selected">零售分发</option>
+                <option label="业务线(LOB)分发" value="string:LineOfBusiness">业务线(LOB)分发</option>
+              </select>
+            </div>
+
+            <div id="visibility-audience" ng-show="vm.Visibility.DistributionOption === 'Retail' && vm.ShowOptions" class="">
+              <h3 class="section-subtitle inline-block" id="availabilityAudienceHeader" l10n="AppSubmission_Availability_Audience">受众</h3>
+              <div class="inline-block" ng-if="!vm.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled" style="margin-left: 1em">
+                <a target="_blank" tabindex="0" class="link" l10n="Visibility_LearnMore_Audience" href="http://go.microsoft.com/fwlink/?LinkId=851450">详细了解受众</a>
+              </div>
+
+              <fieldset role="radiogroup" ng-if="!vm.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled">
+                <div class="radio reduced-string-length">
+                  <label for="radioDistribution_PublicAudience" uitestid="radioDistribution_PublicAudience">
+                    <input role="radio" id="radioDistribution_PublicAudience" type="radio" ng-change="vm.VisibilityChange()" ng-model="vm.Visibility.Audience" value="Public" ng-disabled="!vm.Visibility.IsEditable" aria-label="Visibility Audience public audience" class="ng-pristine ng-untouched ng-valid ng-not-empty" name="214">
+                    <span l10n="AppSubmission_Availability_Audience_Public">开放受众</span>
+                  </label>
+                </div>
+                <div class="radio reduced-string-length">
+                  <label for="radioDistribution_PrivateBetaAudience" uitestid="radioDistribution_PrivateBetaAudience" ng-click="!vm.Visibility.IsEditable || !vm.CanHavePrivateBeta() || vm.EnableLimitedDistribution($event)">
+                    <input role="radio" id="radioDistribution_PrivateBetaAudience" type="radio" ng-change="vm.VisibilityChange()" ng-model="vm.Visibility.Audience" value="PrivateBeta" ng-disabled="!vm.Visibility.IsEditable || !vm.CanHavePrivateBeta()" aria-label="Visibility Audience private audience" class="ng-pristine ng-untouched ng-valid ng-not-empty" name="216">
+                    <span l10n="AppSubmission_Availability_Audience_PrivateBeta" ng-if="vm.CanHavePrivateBeta() || !vm.Visibility.IsEditable">特定受众</span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="radio-indentation reduced-string-length ng-hide" ng-show="vm.Visibility.Audience === 'PrivateBeta'">
+                <p>
+                  <span l10n="Product_Submission_Pricing_Limited_Distribution_Link">当面向特定受众进行配置时，Microsoft Store 一览仅对下方指定的组中的用户可见。之后你可以将此项更改为使产品对所有人可见。指定组中的用户将能够在以下位置下载该产品:</span>
+                  <a tabindex="0" href="https://apps.microsoft.com/detail/restricted/9P91R044KH9G">https://apps.microsoft.com/detail/restricted/9P91R044KH9G</a>
+                </p>
+                <div role="alert" class="alert alert-warning has-icon spacer-8-bottom" id="noGroupSelectedWarning" ng-if="vm.SelectedGroups().length === 0">
+                  <span class="icon-dc-IncidentTriangle alert-icon"></span>
+                  <span class="alert-string" l10n="AppSubmission_Pricing_DistributionAndVisibility_PreRelease_Warning">除非选择一个或多个组，否则任何客户都无法获取此产品。</span>
+                </div>
+                <div ng-hide="vm.IsFlightGroupsLoadingSuccess()" class="alert-band ng-hide">
+                  <div style="width: 62.5%;" class="alert alert-danger" role="alert">
+                    <div class="alert-title" l10n="Error_SectionTitle">我们在加载此部分时遇到问题。</div>
+                    <div class="row">
+                      <div class="col-md-20">
+                        <p l10n="Error_GeneralPageSubtitle">请刷新页面或在几分钟后重试。</p>
+                        <p>
+                          <span l10n="Error_CorrelationIdSubtitle">错误相关 ID:</span>
+                          <span></span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <progress-bar ng-show="vm.IsFlightGroupsLoading()" ng-version="11.2.14" class="ng-hide">
+                  <div class="progress indeterminate">
+                    <div role="progressbar" aria-label="ProgressBar" class="progress-bar indeterminate indeterminate-bar">
+                      <div class="indeterminate-indicators">
+                        <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+                        <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+                        <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+                        <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+                        <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </progress-bar>
+                <div ng-show="!vm.IsFlightGroupsLoading() && vm.IsFlightGroupsLoadingSuccess()"></div>
+                <div class="spacer-20-bottom">
+                  <a tabindex="0" href="javascript: void(0)" ng-click="vm.GoToNewGroupPage()" id="createNewGroupLink" uitestid="createNewGroupLink" l10n="Application_Flight_Before_Text_Create_Group">创建新组</a>
+                  <br>
+                  <a tabindex="0" href="javascript: void(0)" ng-click="vm.GoToGroupsPage()" l10n="Flight_View_Manage_Exisiting_Groups">查看和管理现有组</a>
+                </div>
+                <div class="form-inline">
+                  <div class="checkbox">
+                    <label ng-click="vm.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled && vm.EndPrivateAudienceRestriction($event)" ng-keypress="vm.EndPrivateAudienceRestriction($event)">
+                      <input id="endRestrictionDateCheckbox" type="checkbox" ng-disabled="!vm.Visibility.IsEditable" ng-model="vm.Visibility.IsPrivateBetaExpirationEnabled" ng-change="vm.VisibilityChange()" class="ng-pristine ng-untouched ng-valid ng-empty">
+                      <span ng-if="!vm.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled" id="expirationDateLabel" l10n="PrivateBeta_ExpirationDate_Label">将此产品发布于</span>
+                    </label>
+                  </div>
+                  <div class="form-control" style="margin-left: 9em">
+                    <he-date-picker id="publicdatepicker" label="日期" he-availability-date-time="" on-update="vm.HandleUpdatePublicDatePicker(newDate)" ng-disabled="!vm.Visibility.IsEditable || !vm.Visibility.IsPrivateBetaExpirationEnabled" class="he-date-picker" disabled="" placement="bottom-start" value="2026-08-23"></he-date-picker>
+                    <select class="date-part form-control ng-pristine ng-untouched ng-valid ng-not-empty" id="ExpirationTime" aria-label="ExpirationTime" ng-model="vm.Visibility.PrivateBetaExpirationDate.Hour" ng-options="option.Value as option.Text for option in vm.HourOptions()" ng-disabled="!vm.Visibility.IsEditable || !vm.Visibility.IsPrivateBetaExpirationEnabled" ng-change="vm.VisibilityChange()" disabled="disabled">
+                      <option label="午夜" value="string:0" selected="selected">午夜</option>
+                      <option label="01:00" value="string:1">01:00</option>
+                      <option label="02:00" value="string:2">02:00</option>
+                      <option label="03:00" value="string:3">03:00</option>
+                      <option label="04:00" value="string:4">04:00</option>
+                      <option label="05:00" value="string:5">05:00</option>
+                      <option label="06:00" value="string:6">06:00</option>
+                      <option label="07:00" value="string:7">07:00</option>
+                      <option label="08:00" value="string:8">08:00</option>
+                      <option label="09:00" value="string:9">09:00</option>
+                      <option label="10:00" value="string:10">10:00</option>
+                      <option label="11:00" value="string:11">11:00</option>
+                      <option label="12:00" value="string:12">12:00</option>
+                      <option label="13:00" value="string:13">13:00</option>
+                      <option label="14:00" value="string:14">14:00</option>
+                      <option label="15:00" value="string:15">15:00</option>
+                      <option label="16:00" value="string:16">16:00</option>
+                      <option label="17:00" value="string:17">17:00</option>
+                      <option label="18:00" value="string:18">18:00</option>
+                      <option label="19:00" value="string:19">19:00</option>
+                      <option label="20:00" value="string:20">20:00</option>
+                      <option label="21:00" value="string:21">21:00</option>
+                      <option label="22:00" value="string:22">22:00</option>
+                      <option label="23:00" value="string:23">23:00</option>
+                    </select>
+                    <span ng-if="!vm.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled" l10n="UTCString">UTC</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="visibility-selection" ng-show="vm.ShouldShowVisibilitySection()" class="">
+              <h3 class="section-subtitle" id="availabilityDiscoverability" l10n="AppSubmission_Availability_Discoverability">可发现性</h3>
+              <div class="content-margin-top reduced-string-length ng-hide" ng-show="vm.Visibility.Audience === 'PrivateBeta'">
+                <p>
+                  <span l10n="AppSubmission_Availability_Visibility_PrivateBeta">由于你的产品仅面向特定受众，下方选项将仅适用于该特定受众。</span>
+                </p>
+              </div>
+              <div ng-if="vm.Visibility.ProductType !== 'AddOn'">
+                <div role="alert" class="alert alert-warning has-icon hidden" id="customAvailabilityVisibilityWarning">
+                  <span class="icon-dc-IncidentTriangle alert-icon"></span>
+                  <span class="alert-string" l10n="AppSubmission_Pricing_MarketsAndCustomPrices_Availability_VisibilityWarning">使用此选项，即使在你选择的公开上市日期之后，客户也不会在 Microsoft Store 中找到该应用。</span>
+                </div>
+                <div id="retailDistributionOption" role="radiogroup" aria-labelledby="availabilityDiscoverability">
+                  <div class="radio-wrapper content-margin-top">
+                    <input id="radioVisibility_Public" type="radio" ng-change="vm.VisibilityChange()" name="discoverbility" ng-model="vm.Visibility.DistributionMode" value="Public" ng-disabled="!vm.Visibility.IsEditable" aria-label="Visibility Discoverability Make this product available and discoverable in the Microsoft Store." class="ng-pristine ng-untouched ng-valid ng-not-empty">
+                    <label for="radioVisibility_Public">
+                      <span l10n="AppSubmission_Availability_VisibleInStore">使此产品可用并在 Microsoft Store 中可发现。</span>
+                    </label>
+                  </div>
+                  <div>
+                    <div class="radio-wrapper content-margin-top">
+                      <input id="radioVisibility_Hidden" type="radio" ng-click="vm.HandleRadioButtonHiddenClick()" name="discoverbility" ng-value="false" ng-checked="vm.IsHidden()" ng-disabled="!vm.Visibility.IsEditable" aria-label="Visibility Discoverability Make this product available but not discoverable in the Microsoft Store, and:" value="false">
+                      <label for="radioVisibility_Hidden" uitestid="radioVisibility_Hidden">
+                        <span l10n="AppSubmission_Availability_HiddenInStore">使此产品可用，但在 Microsoft Store 中不可发现，并且:</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div id="retailDistributionOptionHidden" role="radiogroup" aria-labelledby="availabilityDiscoverability">
+                  <div class="radio-wrapper content-indent content-margin-top">
+                    <input id="radioDistribution_Hidden" type="radio" ng-change="vm.VisibilityChange()" ng-model="vm.Visibility.DistributionMode" name="discoverbilityHidden" value="Hidden" ng-disabled="!vm.IsHidden() || !vm.Visibility.IsEditable" aria-label="Discoverability Direct link only: Any customer with a direct link to the product's listing can download it, except on Windows 8.x." class="ng-pristine ng-untouched ng-valid ng-not-empty" disabled="disabled">
+                    <label for="radioDistribution_Hidden">
+                      <span ng-disabled="!vm.IsHidden()" l10n="AppSubmission_Availability_DeeplinkOnly" disabled="disabled">仅限直接链接: 具有指向该产品列表的直接链接的所有客户都可以下载它，使用 Windows 8.x 的客户除外。</span>
+                    </label>
+                  </div>
+                  <div class="radio-wrapper content-indent content-margin-top ng-hide" ng-show="vm.CanHaveBeta()">
+                    <input id="radioDistribution_Beta" type="radio" ng-change="vm.VisibilityChange()" ng-model="vm.Visibility.DistributionMode" name="discoverbilityHidden" value="Beta" ng-disabled="!vm.IsHidden() || !vm.Visibility.IsEditable" aria-label="Discoverability Individuals on Windows Phone 8.x only: Only people you specify below can download this product on a Windows Phone 8.x device. Anyone with a direct link can still see the product's listing, and a promotional code may be used to download the product on Windows 10/11 devices." class="ng-pristine ng-untouched ng-valid ng-not-empty" disabled="disabled">
+                    <label for="radioDistribution_Beta">
+                      <span ng-disabled="!vm.IsHidden()" l10n="AppSubmission_Availability_Beta_Win11" disabled="disabled">仅限使用 Windows Phone 8.x 的个人: 仅下方所指定的人员才可以在 Windows Phone 8.x 设备上下载此产品。具有直接链接的任何人仍可以看到该产品列表，促销充值码可用于在 Windows 10/11 设备上下载该产品。</span>
+                    </label>
+                    <div class="selection control clearfix full-width ng-hide" ng-show="vm.Visibility.DistributionMode === 'Beta'">
+                      <textarea id="betaListId" rows="4" class="form-control full-width ng-pristine ng-untouched ng-valid ng-empty" ng-model="vm.Visibility.BetaAccounts" ng-change="vm.VisibilityChange()" ng-disabled="!vm.Visibility.IsEditable || vm.Visibility.DistributionMode !== 'Beta'" disabled="disabled"></textarea>
+                    </div>
+                  </div>
+                  <div class="radio-wrapper content-indent content-margin-top">
+                    <input id="radioDistribution_StopSelling" type="radio" ng-change="vm.VisibilityChange()" ng-model="vm.Visibility.DistributionMode" value="NotSelling" name="discoverbilityHidden" ng-disabled="!vm.IsHidden() || !vm.Visibility.IsEditable" aria-label="Discoverability Stop acquisition: Any customer with a direct link can see the product's Microsoft Store listing, but they can only download it if they owned the product before, or have promotional code and are using a Windows 10/11 device." class="ng-pristine ng-untouched ng-valid ng-not-empty" disabled="disabled">
+                    <label for="radioDistribution_StopSelling">
+                      <span ng-disabled="!vm.IsHidden()" l10n="AppSubmission_Availability_StopAcquisition_Win11" disabled="disabled">停止购买: 具有直接链接的任何客户均可查看产品的 Microsoft Store 一览，但仅在已购买产品或者具有促销代码，并且使用的是 Windows 10/11 设备时才能下载它。</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div role="alert" id="betaToPublicWarningId" class="alert alert-warning has-icon ng-hide" ng-show="vm.Visibility.IsBeta && (vm.Visibility.DistributionMode === 'Public' || vm.Visibility.DistributionMode === 'Hidden')">
+              <span class="icon-dc-IncidentTriangle alert-icon"></span>
+              <span class="alert-string" l10n="AppSubmission_Pricing_DistributionAndVisibility_BetaToPublicWarning">如果你保存此更改，将再也无法仅向电子邮件地址所指定的用户组提供此应用。</span>
+            </div>
+          </div>
+
+          <div id="advanced-discoverability" ng-show="vm.IsAdvancedDiscoverabiityEnabled()" class="ng-hide">
+            <h3 class="section-subtitle inline-block" id="advancedDiscoverabilityHeader" l10n="AppSubmission_Availability_AdvancedDiscoverability">高级可发现性</h3>
+            <div class="inline-block" style="margin-left: 1em">
+              <a target="_blank" tabindex="0" id="learnMoreDiscoverabilityLink" class="link" l10n="AppSubmission_LearnMore" aria-labelledby="learnMoreDiscoverabilityLink + advancedDiscoverabilityHeader" href="http://go.microsoft.com/fwlink/?LinkId=2094198">了解详细信息</a>
+            </div>
+            <div class="checkbox">
+              <label>
+                <input type="checkbox" ng-disabled="!vm.Visibility.IsEditable" ng-model="vm.Visibility.TurnoffAvailabilitiesBeforeReleaseOrDiscoverableDate" ng-change="vm.VisibilityChange()" class="ng-pristine ng-untouched ng-valid ng-empty">
+                <span l10n="AppSubmission_Availability_Visibility_HiddenToken">在第一个计划日期之前禁用在商店中列出(无促销代码，无深层链接)</span>
+              </label>
+            </div>
+          </div>
+        </section>
+      </visibility>
+
+      <visibilityv2>
+        <section class="section has-header-action ng-hide" ng-show="ctrl.ShouldShow()">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title text-maxlines-1" l10n="AppSubmission_Availability_Visibility">可见</h2>
+                </div>
+              </div>
+            </div>
+            <div class="header-action">
+              <button class="expandLink collapsed btn-link" style="padding: 0;" tabindex="0" ng-click="ctrl.ToggleShowOptions()" ng-keypress="ctrl.ToggleShowOptions($event)">
+                <span ng-show="!ctrl.ShowOptions" l10n="AppSubmission_ShowOption" class="ng-hide">显示选项</span>
+                <span ng-show="ctrl.ShowOptions" l10n="AppSubmission_HideOption">隐藏选项</span>
+              </button>
+            </div>
+          </header>
+          <div class="section-body">
+            <div id="visibilityv2-summary" ng-show="!ctrl.ShowOptions" class="ng-hide">
+              <div>
+                <p id="distributionIntrov2" class="reduced-string-length">
+                  <span class="comments" ng-show="ctrl.Visibility.HasPDP && ctrl.Visibility.IsDiscoverable && ctrl.Visibility.CanBePurchased" l10n="AddOnDiscoverableAndPurchasable">此加载项在 Microsoft Store 中可发现，且可以购买。</span>
+                  <span class="comments ng-hide" ng-show="ctrl.Visibility.HasPDP && ctrl.Visibility.IsDiscoverable && !ctrl.Visibility.CanBePurchased" l10n="AddOnDiscoverableAndNotPurchasable">此加载项在 Microsoft Store 中可发现，但不可购买(使用促销代码除外)。</span>
+                  <span class="comments ng-hide" ng-show="ctrl.Visibility.HasPDP && !ctrl.Visibility.IsDiscoverable && ctrl.Visibility.CanBePurchased" l10n="AddOnNotDiscoverableAndPurchasable">此加载项在 Microsoft Store 中不可发现，但可以购买。</span>
+                  <span class="comments ng-hide" ng-show="ctrl.Visibility.HasPDP && !ctrl.Visibility.IsDiscoverable && !ctrl.Visibility.CanBePurchased" l10n="AddOnNotDiscoverableAndNotPurchasable">此加载项在 Microsoft Store 中不可发现，且不可购买(使用促销代码除外)。</span>
+                  <span class="comments ng-hide" ng-show="!ctrl.Visibility.HasPDP && ctrl.Visibility.CanBePurchased" l10n="AddOnNoPdpAndPurchasable">此加载项可以购买。</span>
+                  <span class="comments ng-hide" ng-show="!ctrl.Visibility.HasPDP && !ctrl.Visibility.CanBePurchased" l10n="AddOnNoPdpAndNotPurchasable">此加载项不可购买(使用促销代码除外)。</span>
+                  <a target="_blank" tabindex="0" class="content-link" l10n="AppSubmission_LearnMore" href="http://go.microsoft.com/fwlink/?LinkId=528745">了解详细信息</a>
+                </p>
+              </div>
+            </div>
+            <div ng-show="ctrl.ShowOptions">
+              <div id="modal-LimitedDistributionSchedules-warning-v2" class="modal fade" ng-keydown="$event && $event.which === 27 && ctrl.EnableLimitedDistributionConfirm(false)" tabindex="-1">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div>
+                      <div class="modal-header">
+                        <h4 class="modal-title text-subtitle" l10n="AppSubmission_LimitedDistributionSchedules_Warning">由于此产品仅供私人受众使用，因此你在"计划"部分指定的任何日期都将被删除。</h4>
+                      </div>
+                      <div class="modal-footer">
+                        <div class="btn-group">
+                          <button class="btn btn-primary" data-dismiss="modal" data-target="#modal-LimitedDistributionSchedules-warning" ng-click="ctrl.EnableLimitedDistributionConfirm(true)" l10n="AppSubmission_Ok">确定</button>
+                          <button class="btn" data-dismiss="modal" data-target="#modal-LimitedDistributionSchedules-warning" ng-click="ctrl.EnableLimitedDistributionConfirm(false)" l10n="AppSubmission_Delete_Cancel">取消</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="visibilityv2-Audience" ng-show="ctrl.ShowOptions">
+              <h3 class="section-subtitle inline-block" l10n="AppSubmission_Availability_Audience">受众</h3>
+              <div class="inline-block" ng-if="!ctrl.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled" style="margin-left: 1em"><a target="_blank" tabindex="0" class="content-link" l10n="AppSubmission_LearnMore" href="http://go.microsoft.com/fwlink/?LinkId=2008790">了解详细信息</a></div>
+
+              <div class="radio reduced-string-length" ng-if="!ctrl.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled">
+                <label for="radioDistribution_PublicAudience_v2">
+                  <input id="radioDistribution_PublicAudience_v2" type="radio" ng-change="ctrl.VisibilityChange()" ng-model="ctrl.Visibility.Audience" value="Public" ng-disabled="!ctrl.Visibility.IsEditable" aria-label="Visibility Audience public audience" class="ng-pristine ng-untouched ng-valid ng-not-empty" name="235">
+                  <span l10n="AppSubmission_Availability_Audience_Public">开放受众</span>
+                </label>
+              </div>
+
+              <div class="radio reduced-string-length" ng-if="!ctrl.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled">
+                <label for="radioDistribution_PrivateBetaAudience_v2" ng-click="!ctrl.Visibility.IsEditable || !ctrl.Visibility.CanHavePrivateBeta || ctrl.EnableLimitedDistribution($event)">
+                  <input id="radioDistribution_PrivateBetaAudience_v2" type="radio" ng-model="ctrl.Visibility.Audience" value="PrivateBeta" ng-disabled="!ctrl.Visibility.IsEditable || !ctrl.Visibility.CanHavePrivateBeta" aria-label="Visibility Audience private audience" class="ng-pristine ng-untouched ng-valid ng-not-empty" name="238">
+                  <span l10n="AppSubmission_Availability_Audience_PrivateBeta" ng-if="ctrl.Visibility.CanHavePrivateBeta || !ctrl.Visibility.IsEditable">特定受众</span>
+                </label>
+              </div>
+
+              <div class="radio-indentation reduced-string-length ng-hide" ng-show="ctrl.Visibility.Audience === 'PrivateBeta'">
+                <p>
+                  <span ng-show="ctrl.Visibility.IsManagedPublisher" l10n="Product_Submission_Pricing_Limited_Distribution_Link" class="ng-hide">当面向特定受众进行配置时，Microsoft Store 一览仅对下方指定的组中的用户可见。之后你可以将此项更改为使产品对所有人可见。指定组中的用户将能够在以下位置下载该产品:</span>
+                  <span ng-show="!ctrl.Visibility.IsManagedPublisher" l10n="Product_Submission_Pricing_Limited_Distribution_Link_UnManaged">为专用受众配置时，只有指定组中的人员才能在以下位置下载产品:</span>
+                  <a tabindex="0" target="_blank" href="https://apps.microsoft.com/detail/restricted/9P91R044KH9G">https://apps.microsoft.com/detail/restricted/9P91R044KH9G</a>
+                </p>
+                <div role="alert" class="alert alert-warning has-icon spacer-8-bottom" id="noGroupSelectedWarningV2" ng-if="ctrl.SelectedGroups().length === 0">
+                  <span class="icon-dc-IncidentTriangle alert-icon"></span>
+                  <span class="alert-string" l10n="AppSubmission_Pricing_DistributionAndVisibility_PreRelease_Warning">除非选择一个或多个组，否则任何客户都无法获取此产品。</span>
+                </div>
+                <div ng-hide="ctrl.IsFlightGroupsLoadingSuccess()" class="alert-band ng-hide">
+                  <div style="width: 62.5%;" class="alert alert-danger" role="alert">
+                    <div class="alert-title" l10n="Error_SectionTitle">我们在加载此部分时遇到问题。</div>
+                    <div class="row">
+                      <div class="col-md-20">
+                        <p l10n="Error_GeneralPageSubtitle">请刷新页面或在几分钟后重试。</p>
+                        <p>
+                          <span l10n="Error_CorrelationIdSubtitle">错误相关 ID:</span>
+                          <span></span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <progress-bar ng-show="ctrl.IsFlightGroupsLoading()" ng-version="11.2.14" class="ng-hide">
+                  <div class="progress indeterminate">
+                    <div role="progressbar" aria-label="ProgressBar" class="progress-bar indeterminate indeterminate-bar">
+                      <div class="indeterminate-indicators">
+                        <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+                        <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+                        <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+                        <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+                        <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </progress-bar>
+                <div ng-show="!ctrl.IsFlightGroupsLoading() && ctrl.IsFlightGroupsLoadingSuccess()"></div>
+                <div class="spacer-20-bottom">
+                  <a tabindex="0" href="javascript: void(0)" ng-click="ctrl.GoToNewGroupPage()" id="createNewGroupLinkV2" l10n="Application_Flight_Before_Text_Create_Group">创建新组</a>
+                  <br>
+                  <a tabindex="0" href="javascript: void(0)" ng-click="ctrl.GoToGroupsPage()" l10n="Flight_View_Manage_Exisiting_Groups">查看和管理现有组</a>
+                </div>
+                <div class="radio-indentation reduced-string-length">
+                  <div class="checkbox form-inline row">
+                    <div class="checkbox">
+                      <label ng-click="ctrl.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled && ctrl.EndPrivateAudienceRestriction($event)">
+                        <input id="endRestrictionDateCheckboxV2" type="checkbox" ng-change="ctrl.VisibilityChange()" ng-disabled="!ctrl.Visibility.IsEditable" ng-model="ctrl.Visibility.IsPrivateBetaExpirationEnabled" class="ng-pristine ng-untouched ng-valid ng-empty">
+                        <span ng-if="!ctrl.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled" l10n="PrivateBeta_ExpirationDate_Label">将此产品发布于</span>
+                      </label>
+                    </div>
+                    <div class="form-control" style="margin-left: 9em">
+                      <he-date-picker id="publicdatepickerv2" he-availability-date-time="" on-update="ctrl.HandleUpdatePublicDatePicker(newDate)" ng-disabled="!ctrl.Visibility.IsEditable || !ctrl.Visibility.IsPrivateBetaExpirationEnabled" class="he-date-picker" disabled="" placement="bottom-start" value="2026-08-23"></he-date-picker>
+                      <select class="date-part form-control ng-pristine ng-untouched ng-valid ng-not-empty" id="ExpirationTime2" aria-labelledby="ExpirationTime" ng-model="ctrl.Visibility.PrivateBetaExpirationDate.Hour" ng-options="option.Value as option.Text for option in ctrl.HourOptions()" ng-disabled="!ctrl.Visibility.IsEditable || !ctrl.Visibility.IsPrivateBetaExpirationEnabled" ng-change="ctrl.VisibilityChange()" disabled="disabled">
+                        <option label="午夜" value="string:0" selected="selected">午夜</option>
+                        <option label="01:00" value="string:1">01:00</option>
+                        <option label="02:00" value="string:2">02:00</option>
+                        <option label="03:00" value="string:3">03:00</option>
+                        <option label="04:00" value="string:4">04:00</option>
+                        <option label="05:00" value="string:5">05:00</option>
+                        <option label="06:00" value="string:6">06:00</option>
+                        <option label="07:00" value="string:7">07:00</option>
+                        <option label="08:00" value="string:8">08:00</option>
+                        <option label="09:00" value="string:9">09:00</option>
+                        <option label="10:00" value="string:10">10:00</option>
+                        <option label="11:00" value="string:11">11:00</option>
+                        <option label="12:00" value="string:12">12:00</option>
+                        <option label="13:00" value="string:13">13:00</option>
+                        <option label="14:00" value="string:14">14:00</option>
+                        <option label="15:00" value="string:15">15:00</option>
+                        <option label="16:00" value="string:16">16:00</option>
+                        <option label="17:00" value="string:17">17:00</option>
+                        <option label="18:00" value="string:18">18:00</option>
+                        <option label="19:00" value="string:19">19:00</option>
+                        <option label="20:00" value="string:20">20:00</option>
+                        <option label="21:00" value="string:21">21:00</option>
+                        <option label="22:00" value="string:22">22:00</option>
+                        <option label="23:00" value="string:23">23:00</option>
+                      </select>
+                      <span ng-if="!ctrl.Visibility.IsPrivateAudienceAdvanceSchedulesEnabled" l10n="UTCString">UTC</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="raido reduced-string-length" ng-show="ctrl.Visibility.Audience === 'Public'">
+                <p>
+                  <span ng-show="ctrl.Visibility.HasPDP" ng-bind-html="ctrl.AddOnHasPdp()">此加载项具有对应的 Microsoft Store 一览。你可以在<a tabindex="0" href="/zh-cn/dashboard/products/9P91R044KH9G/setup">设置页面</a>上更改此项。</span>
+                  <span ng-show="!ctrl.Visibility.HasPDP && ctrl.Visibility.IsManagedPublisher" ng-bind-html="ctrl.AddOnHasNoPdp()" class="ng-hide">此加载项没有对应的 Microsoft Store 一览。你可以在<a tabindex="0" href="/zh-cn/dashboard/products/9P91R044KH9G/setup">设置页面</a>上更改此项。</span>
+                  <span ng-show="!ctrl.Visibility.HasPDP && !ctrl.Visibility.IsManagedPublisher" ng-bind-html="ctrl.AddOnHasNoPdpUnManaged()" class="ng-hide">此加载项不具有对应的 Microsoft Store 一览。</span>
+                  <a tabindex="0" l10n="AppSubmission_LearnMore" href="http://go.microsoft.com/fwlink/?LinkId=2009003">了解详细信息</a>
+                </p>
+                <div class="checkbox" ng-if="ctrl.Visibility.HasPDP">
+                  <div class="checkbox">
+                    <label>
+                      <input type="checkbox" ng-disabled="!ctrl.Visibility.IsEditable" ng-model="ctrl.Visibility.HasCurate" ng-change="ctrl.VisibilityChange()" class="ng-pristine ng-untouched ng-valid ng-not-empty">
+                      <span l10n="CanBeCurated">可包含在精选列表中</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="visibilityv2-selection" ng-show="ctrl.ShowOptions">
+              <h3 class="section-subtitle" l10n="AppSubmission_Availability_Discoverability">可发现性</h3>
+              <div class="content-margin-top reduced-string-length ng-hide" ng-show="ctrl.Visibility.Audience === 'PrivateBeta'">
+                <p>
+                  <span l10n="AppSubmission_Availability_Visibility_PrivateBeta">由于你的产品仅面向特定受众，下方选项将仅适用于该特定受众。</span>
+                </p>
+              </div>
+              <div role="radiogroup">
+                <div class="content-margin-top reduced-string-length ng-hide" ng-show="!ctrl.Visibility.HasPDP">
+                  <p>
+                    <span l10n="AddOnNotDiscoverableWithNoPdp">因为此加载项没有 Microsoft Store 一览，所以它在 Microsoft Store 中不可发现。</span>
+                    <span><a target="_blank" tabindex="0" class="link" l10n="AppSubmission_LearnMore" href="http://go.microsoft.com/fwlink/?LinkId=2008858">了解详细信息</a></span>
+                  </p>
+                </div>
+                <div ng-show="ctrl.Visibility.HasPDP">
+                  <div class="radio">
+                    <label for="radioDistribution_Discoverable">
+                      <input id="radioDistribution_Discoverable" type="radio" ng-change="ctrl.VisibilityChange()" ng-model="ctrl.Visibility.IsDiscoverable" ng-value="true" ng-disabled="!ctrl.Visibility.IsEditable" class="ng-pristine ng-untouched ng-valid ng-not-empty" name="82" value="true">
+                      <span l10n="AddOnDiscoverableWithPdp">通过搜索和浏览在 Microsoft Store 中可发现</span>
+                    </label>
+                  </div>
+                  <div class="radio">
+                    <label for="radioDistribution_NonDiscoverable">
+                      <input id="radioDistribution_NonDiscoverable" type="radio" ng-change="ctrl.VisibilityChange()" ng-model="ctrl.Visibility.IsDiscoverable" ng-value="false" ng-disabled="!ctrl.Visibility.IsEditable" class="ng-pristine ng-untouched ng-valid ng-not-empty" name="84" value="false">
+                      <span l10n="AddOnNotDiscoverableWithPdp">只能通过直接链接获取。</span>
+                      <span><a target="_blank" tabindex="0" class="link" l10n="AppSubmission_LearnMore" href="http://go.microsoft.com/fwlink/?LinkId=2008791">了解详细信息</a></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <h3 class="section-subtitle" l10n="Purchasability">可购买性</h3>
+              <div class="checkbox reduced-string-length">
+                <label>
+                  <input class="form-control ng-pristine ng-untouched ng-valid ng-not-empty" type="checkbox" ng-change="ctrl.VisibilityChange()" ng-disabled="!ctrl.Visibility.IsEditable" ng-model="ctrl.Visibility.CanBePurchased">
+                  <span class="reduced-string-length" l10n="AddOnPurchasableWithPdp" ng-if="ctrl.Visibility.HasPDP">可以购买(在父产品内购买和通过对应的 Microsoft Store 一览购买)。</span>
+                  <a target="_blank" tabindex="0" ng-if="ctrl.Visibility.HasPDP" class="link" l10n="AppSubmission_LearnMore" href="http://go.microsoft.com/fwlink/?LinkId=2009004">了解详细信息</a>
+                </label>
+              </div>
+              <div role="alert" class="alert alert-warning has-icon ng-hide" id="radioDistribution_StopSelling_NotSellingWarningV2" ng-show="!ctrl.Visibility.CanBePurchased">
+                <span class="icon-dc-IncidentTriangle alert-icon"></span>
+                <span class="alert-string" l10n="IAP_Submission_Stop_Selling_Warning">警告: 如果你的应用在 Windows 8.1 或更早版本上可用，该加载项将仍然可供这些客户购买。</span>
+                <span><a target="_blank" tabindex="0" class="link" l10n="AppSubmission_LearnMore" href="http://go.microsoft.com/fwlink/?LinkId=615069">了解详细信息</a></span>
+              </div>
+            </div>
+
+            <div id="advanced-discoverabilityv2" ng-show="ctrl.IsAdvancedDiscoverabiityEnabled()" class="ng-hide">
+              <h3 class="section-subtitle inline-block" l10n="AppSubmission_Availability_AdvancedDiscoverability">高级可发现性</h3>
+              <div class="inline-block" style="margin-left: 1em"><a target="_blank" tabindex="0" class="link" l10n="AppSubmission_LearnMore" href="http://go.microsoft.com/fwlink/?LinkId=2094198">了解详细信息</a></div>
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" ng-change="ctrl.VisibilityChange()" ng-disabled="!ctrl.Visibility.IsEditable" ng-model="ctrl.Visibility.TurnoffAvailabilitiesBeforeReleaseOrDiscoverableDate" class="ng-pristine ng-untouched ng-valid ng-empty">
+                  <span l10n="AppSubmission_Availability_Visibility_HiddenToken">在第一个计划日期之前禁用在商店中列出(无促销代码，无深层链接)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+      </visibilityv2>
+
+      <dates mark-page-dirty="ctrl.MarkPageDirty()">
+        <section class="section has-header-action" ng-show="datesCtrl.ShouldShow()">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title" id="availabilityDatesHeader" l10n="AppSubmission_Availability_Dates">计划</h2>
+                </div>
+              </div>
+            </div>
+            <button class="header-action btn-link" style="padding: 0;" ng-show="datesCtrl.CanHaveSchedules()" ng-click="datesCtrl.ToggleShowOptions()" ng-keypress="datesCtrl.ToggleShowOptions($event)">
+              <span ng-show="datesCtrl.ShouldShowOptions()" id="scheduleHideBtn" l10n="AppSubmission_HideOption" aria-labelledby="availabilityDatesHeader + scheduleHideBtn" class="">隐藏选项</span>
+              <span ng-show="!datesCtrl.ShouldShowOptions()" id="scheduleShowBtn" l10n="AppSubmission_ShowOption" aria-labelledby="availabilityDatesHeader + scheduleShowBtn" class="ng-hide">显示选项</span>
+            </button>
+          </header>
+
+          <div class="section-body">
+            <div>
+              <div ng-show="datesCtrl.ShouldShowOptions()" class="">
+                <p class="reduced-string-length">
+                  <span id="availabilityDatesTextHeader" l10n="AppSubmission_Availability_DatesText">表示此产品的时间表。这些日期确定了可以在 Microsoft Store 中看到、获取和下载此产品的时间。请提前更改时间表，让合作伙伴中心有时间处理和发布你提交的内容。请注意，公众可以在首个可发现日期之前通过"网络抓取" (或数据抓取) 技术访问产品信息。如果不打算在首个可发现日期之前让公众查看产品信息，请确保已将可见性设置为特定受众，或选择在希望产品可发现的首个日期之前禁用商店展示。</span>
+                  <a target="_blank" tabindex="0" class="content-link" data-bi-slot="2" data-bi-name="LearnMore" id="learnMoreDatesTextLink" l10n="Dates_LearnMore_ScheduleDates" href="http://go.microsoft.com/fwlink/?LinkId=820601">详细了解计划日期</a>
+                </p>
+                <p class="reduced-string-length">
+                  <span ng-bind-html="datesCtrl.BackpublishScheduleText()" id="availabilityScheduleTextHeader">重要说明: 你在"<b>计划</b>"部分中指定的日期只适用于 Windows 10/11 (包括 Xbox)上的客户。</span>
+                  <a target="_blank" tabindex="0" class="content-link" id="learnMoreScheduleTextLink" l10n="Dates_LearnMore_ScheduleDates" href="http://go.microsoft.com/fwlink/?LinkId=845965">详细了解计划日期</a>
+                </p>
+              </div>
+              <div ng-show="!datesCtrl.ShouldShowOptions()" class="ng-hide">
+                <p class="reduced-string-length">
+                  <span ng-show="datesCtrl.AreDefaultDates()" l10n="AppSubmission_Availability_DefaultDates">将尽快给客户提供此产品。</span>
+                  <span ng-show="!datesCtrl.AreDefaultDates()" l10n="AppSubmission_Availability_SelectedDates" class="ng-hide">本产品将在你选择的日期可用。</span>
+                  <a target="_blank" tabindex="0" id="learnMoreScheduleBtn" class="content-link" data-bi-slot="2" data-bi-name="LearnMore" l10n="AppSubmission_LearnMore" aria-labelledby="learnMoreScheduleBtn + availabilityDatesHeader" href="http://go.microsoft.com/fwlink/?LinkId=820601">了解详细信息</a>
+                </p>
+              </div>
+            </div>
+
+            <div ng-repeat="group in datesCtrl.Groups">
+              <div ng-show="datesCtrl.ShouldShowOptions()">
+                <div class="form-inline row">
+                  <label class="col-md-4 form-group" id="base-schedule">
+                    <span ng-show="group.IsDefault && datesCtrl.ShouldShowOptions()" l10n="AppSubmission_Availability_Schedule">基准计划</span>
+                    <span ng-show="group.IsDefault && !datesCtrl.ShouldShowOptions()" l10n="AppSubmission_Availability_Available" class="ng-hide">发布</span>
+                    <button tabindex="0" class="btn-link ng-hide" ng-show="!group.IsDefault" ng-click="datesCtrl.EditGroup(group)" ng-keypress="datesCtrl.EditGroup(group, $event)"></button>
+                  </label>
+                  <div class="col-md-20 availability-date-schedule">
+                    <label class="col-md-6 form-group" ng-show="datesCtrl.ShouldShowOptions()" l10n="AppSubmission_Availability_Available" id="releaseId">发布</label>
+                    <div class="form-group">
+                      <select uitestid="AvailableSelector-0" class="form-control default-selector ng-pristine ng-untouched ng-valid ng-not-empty" aria-labelledby="base-schedule + releaseId" ng-disabled="!datesCtrl.CanHaveSchedules() || !datesCtrl.IsEditable() || group.Release.IsInProgress" ng-model="group.Release.Start.SelectedOption" ng-options="option.Value as option.Text for option in datesCtrl.ReleaseStartOptions()" ng-change="datesCtrl.OnReleaseStartChange(group)">
+                        <option label="尽快" value="string:asap" selected="selected">尽快</option>
+                        <option label="在" value="string:custom">在</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <availability-date-time [test-id]="datesCtrl.GenerateTestId('Available', $index)" [disabled]="!datesCtrl.CanHaveSchedules() || !datesCtrl.IsEditable() || group.Release.IsInProgress" [model]="group.Release.Start" [hours]="datesCtrl.HourOptions()" [timezones]="datesCtrl.TimeZoneOptions()" [min-date]="datesCtrl.MinReleaseStart(group)" [product-type]="datesCtrl.ProductType()" (on-update)="datesCtrl.DatesChange()" (on-time-change)="datesCtrl.DatesChange()" (on-timezone-change)="datesCtrl.DatesChange()" ng-version="11.2.14"></availability-date-time>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-inline row availability-date-schedule" ng-if="datesCtrl.ShouldShowStopSelling(group)">
+                  <label class="col-md-4 form-group"></label>
+                  <div class="col-md-20">
+                    <label class="col-md-6 form-group" l10n="AppSubmission_Availability_StopSelling" id="stopSellingId">停止购置</label>
+                    <div class="form-group">
+                      <select uitestid="StopSellingSelector-0" class="form-control default-selector ng-pristine ng-untouched ng-valid ng-not-empty" aria-labelledby="stopSellingId" ng-model="group.Release.End.SelectedOption" ng-options="option.Value as option.Text for option in datesCtrl.ReleaseEndOptions(group)" ng-disabled="!datesCtrl.IsEditable() || group.Release.IsExpired" ng-change="datesCtrl.OnReleaseEndChange(group)">
+                        <option label="永不" value="string:auto-fill" selected="selected">永不</option>
+                        <option label="在" value="string:custom">在</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <availability-date-time [test-id]="datesCtrl.GenerateTestId('StopSelling',$index)" [disabled]="!datesCtrl.CanHaveSchedules() || !datesCtrl.IsEditable() || group.Release.IsExpired" [model]="group.Release.End" [hours]="datesCtrl.HourOptions()" [timezones]="datesCtrl.TimeZoneOptions()" [min-date]="datesCtrl.MinReleaseEnd(group)" (on-update)="datesCtrl.DatesChange()" (on-time-change)="datesCtrl.DatesChange()" (on-timezone-change)="datesCtrl.DatesChange()" ng-version="11.2.14"></availability-date-time>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group"></div>
+              </div>
+            </div>
+
+            <div id="market-selector-dates" class="modal center-top-md language-list-modal" data-keyboard="false" data-backdrop="static" tabindex="-1"
+                 ng-keydown="$event && $event.which === 27 && Cancel()" visible="datesCtrl.IsMarketSelectorVisible" markets="datesCtrl.AvailableMarkets"
+                 test-id="'dates'" on-close="datesCtrl.OnMarketSelectorClose" show-enabled-only="true" selected-group="datesCtrl.CurrentEditingGroup"
+                 read-only="!datesCtrl.CanHaveSchedules() || !datesCtrl.IsEditable()">
+              <div class="modal-dialog">
+                <div class="modal-content" trapfocus="">
+                  <div>
+                    <div class="modal-header">
+                      <h3 class="modal-title text-subtitle spacer-20-bottom" l10n="AppSubmission_Availability_MarketSelection">市场选择</h3>
+                    </div>
+                    <div class="modal-body">
+                      <div class="row search-row">
+                        <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8">
+                          <div class="search-container">
+                            <div class="form-group form-searchbox remove-top-margin">
+                              <form class="js-nro ng-pristine ng-valid">
+                                <input class="form-control js-nro ng-pristine ng-valid ng-untouched ng-empty" uitestid="marketSearchBox" aria-label="MarketSearchBox" type="text" placeholder="搜索" autocomplete="off" ng-model="query.$">
+                                <button class="clear-icon js-nro generate-tag" type="reset" data-bi-slot="1" data-bi-id="Reset-Button" data-bi-name="Reset" aria-label="ResetMarketSearchBox" ng-click="ClearQuery()"><span class="win-icon win-icon-Clear"></span></button>
+                                <span class="search-icon generate-tag" data-bi-slot="2" data-bi-id="Search-Button" data-bi-name="Search">
+                                  <i class="win-icon win-icon-Search"></i>
+                                </span>
+                              </form>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8" ng-show="ProductType !== 'OfficeAddin'">
+                          <select class="form-control search-height full-width ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedPlatform" aria-label="CurrentSelectedPlatform" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | platformFilter:RolloutChinaOffshoreMarketEnabled"><option value="?" selected="selected"></option></select>
+                        </div>
+                        <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8 ng-hide" ng-show="false">
+                          <div class="combobox">
+                            <select class="form-control search-height ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedContinent" aria-label="CurrentSelectedContinent" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | continentFilter"><option value="?" selected="selected"></option></select>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="spacer-20-top">
+                          <button ng-click="!ReadOnly && SelectAll(true)" ng-keypress="!ReadOnly && SelectAll(true, $event)" uitestid="MarketSelectorSelectAllLink-dates" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="3" data-bi-id="SeeAll-Link" data-bi-name="SeeAll">
+                            <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_SelectAll">全选</span>
+                            (<span>0</span>)
+                          </button>
+                          <button ng-click="!ReadOnly && SelectAll(false)" ng-keypress="!ReadOnly && SelectAll(false, $event)" uitestid="MarketSelectorUnSelectAllLink-dates" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="4" data-bi-id="UnselectAll-Link" data-bi-name="UnselectAll">
+                            <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_UnselectAll">取消全选</span>
+                          </button>
+                        </div>
+                        <div class="language-list-container-short spacer-16-top" style="min-height: 100px" ng-if="ShowEnabledOnly"></div>
+                      </div>
+                      <div class="form-group-addon form-group-addon-adjacent spacer-20-top" ng-show="ShowEnabledOnly">
+                        <label l10n="Market_Selection_FriendlyName">市场组名</label>
+                        <input class="add-on ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" type="text" ng-model="SelectedGroup.FriendlyName" ng-keydown="$event && $event.which === 13 && $event.preventDefault()" ng-disabled="ReadOnly" ng-maxlength="36" maxlength="36" placeholder="示例: 第一轮" aria-label="marketGroupName">
+                      </div>
+                    </div>
+                    <div class="btn-group" ng-click="FocusOn('form-group-countryBtn-')">
+                      <button uitestid="MarketSelectorOkButton-dates" class="btn btn-primary btn-default btn-std-width generate-tag" type="button" ng-click="Create()" ng-disabled="ReadOnly || !CanSave()" data-bi-slot="5" data-bi-id="Create-Button" data-bi-name="Create" disabled="disabled">
+                        <div ng-if="ShowEnabledOnly && (!SelectedGroup || SelectedGroup.Markets.length == 0)">
+                          <span l10n="AppSubmission_Availability_Create">创建</span>
+                        </div>
+                      </button>
+                      <button uitestid="MarketSelectorCancelButton-dates" class="btn btn-std-width generate-tag market-selector-cancel" type="button" ng-click="Cancel();" data-bi-slot="6" data-bi-id="Cancel-Button" data-bi-name="Cancel" l10n="AppSubmission_Cancel">取消</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="btn-group" ng-show="datesCtrl.ShouldShowOptions()">
+              <button type="button" class="btn-primary" ng-hide="datesCtrl.HiddenInStore()" ng-click="datesCtrl.NewGroup()" ng-disabled="!datesCtrl.IsEditable()" l10n="AppSubmission_Availability_AddMarketOverride">针对特定市场进行自定义</button>
+            </div>
+          </div>
+        </section>
+      </dates>
+
+      <display mark-page-dirty="ctrl.MarkPageDirty()">
+        <section class="section has-header-action ng-hide" ng-if="display.SubType == null || display.SubType !== 'Subscription'" ng-show="display.ShouldShow()" data-bi-area="Display-Section">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title text-maxlines-1" id="MarketReleaseDateHeader" l10n="AppSubmission_Availability_MarketReleaseDate">显示发布日期</h2>
+                </div>
+              </div>
+            </div>
+            <div class="header-action">
+              <button uitestid="ShowDisplayLink" class="expandLink collapsed btn-link" style="padding: 0; line-height: normal;" tabindex="0" ng-click="display.ToggleShowOptions()" ng-keypress="display.ToggleShowOptions($event)">
+                <span ng-show="!display.ShowOptions" id="MarketReleaseDateShowBtn" l10n="AppSubmission_ShowOption" aria-labelledby="MarketReleaseDateHeader + MarketReleaseDateShowBtn">显示选项</span>
+                <span ng-show="display.ShowOptions" id="MarketReleaseDateHideBtn" l10n="AppSubmission_HideOption" aria-labelledby="MarketReleaseDateHeader + MarketReleaseDateHideBtn" class="ng-hide">隐藏选项</span>
+              </button>
+            </div>
+          </header>
+          <div class="section-body">
+            <p class="reduced-string-length" ng-show="!display.ShowOptions">
+              <span class="comments" id="MarketReleaseDateIntroHeader" l10n="AppSubmission_Availability_MarketReleaseDateIntro">指示此产品是否在"Microsoft Store 一览"中显示自定义市场营销发布日期。</span>
+              <a target="_blank" tabindex="0" class="content-link" id="learnMoreIntroLink" l10n="AppSubmission_LearnMore" aria-labelledby="learnMoreIntroLink + MarketReleaseDateIntroHeader" href="http://go.microsoft.com/fwlink/?LinkId=820601">了解详细信息</a>
+            </p>
+            <div ng-show="display.ShowOptions" class="ng-hide">
+              <div class="checkbox reduced-string-length">
+                <label>
+                  <input class="form-control" type="checkbox" ng-disabled="!display.IsPageEditable()" ng-checked="display.IsCustomReleaseDateEnable()" ng-click="display.OnIsCustomReleaseDateEnableClicked()">
+                  <span class="reduced-string-length" id="MarketReleaseDateDescriptionHeader" l10n="AppSubmission_Availability_MarketReleaseDateDescription">在"Microsoft Store 一览"页面中显示发布日期，这不同于已配置时间表。</span>
+                  <a target="_blank" tabindex="0" class="content-link" id="learnMoreDescriptionLink" l10n="AppSubmission_LearnMore" aria-labelledby="learnMoreDescriptionLink + MarketReleaseDateDescriptionHeader" href="http://go.microsoft.com/fwlink/?LinkId=820601">了解详细信息</a>
+                </label>
+              </div>
+            </div>
+            <div id="idDisplay" ng-show="display.ShowOptions && display.IsCustomReleaseDateEnable()" class="ng-hide">
+              <div class="sr-only" [id]="removeMessageTxt"></div>
+              <div id="market-selector-display" class="modal center-top-md language-list-modal" data-keyboard="false" data-backdrop="static" tabindex="-1"
+                   ng-keydown="$event && $event.which === 27 && Cancel()" visible="display.IsMarketSelectorVisible" markets="display.AvailableMarkets"
+                   test-id="'display'" on-close="display.AddOrUpdateGroup" show-enabled-only="true" selected-group="display.CurrentEditingGroup"
+                   read-only="!display.IsPageEditable()">
+                <div class="modal-dialog">
+                  <div class="modal-content" trapfocus="">
+                    <div>
+                      <div class="modal-header">
+                        <h3 class="modal-title text-subtitle spacer-20-bottom" l10n="AppSubmission_Availability_MarketSelection">市场选择</h3>
+                      </div>
+                      <div class="modal-body">
+                        <div class="row search-row">
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8">
+                            <div class="search-container">
+                              <div class="form-group form-searchbox remove-top-margin">
+                                <form class="js-nro ng-pristine ng-valid">
+                                  <input class="form-control js-nro ng-pristine ng-valid ng-untouched ng-empty" uitestid="marketSearchBox" aria-label="MarketSearchBox" type="text" placeholder="搜索" autocomplete="off" ng-model="query.$">
+                                  <button class="clear-icon js-nro generate-tag" type="reset" data-bi-slot="1" data-bi-id="Reset-Button" data-bi-name="Reset" aria-label="ResetMarketSearchBox" ng-click="ClearQuery()"><span class="win-icon win-icon-Clear"></span></button>
+                                  <span class="search-icon generate-tag" data-bi-slot="2" data-bi-id="Search-Button" data-bi-name="Search">
+                                    <i class="win-icon win-icon-Search"></i>
+                                  </span>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8" ng-show="ProductType !== 'OfficeAddin'">
+                            <select class="form-control search-height full-width ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedPlatform" aria-label="CurrentSelectedPlatform" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | platformFilter:RolloutChinaOffshoreMarketEnabled"><option value="?" selected="selected"></option></select>
+                          </div>
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8 ng-hide" ng-show="false">
+                            <div class="combobox">
+                              <select class="form-control search-height ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedContinent" aria-label="CurrentSelectedContinent" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | continentFilter"><option value="?" selected="selected"></option></select>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="spacer-20-top">
+                            <button ng-click="!ReadOnly && SelectAll(true)" ng-keypress="!ReadOnly && SelectAll(true, $event)" uitestid="MarketSelectorSelectAllLink-display" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="3" data-bi-id="SeeAll-Link" data-bi-name="SeeAll">
+                              <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_SelectAll">全选</span>
+                              (<span>0</span>)
+                            </button>
+                            <button ng-click="!ReadOnly && SelectAll(false)" ng-keypress="!ReadOnly && SelectAll(false, $event)" uitestid="MarketSelectorUnSelectAllLink-display" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="4" data-bi-id="UnselectAll-Link" data-bi-name="UnselectAll">
+                              <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_UnselectAll">取消全选</span>
+                            </button>
+                          </div>
+                          <div class="language-list-container-short spacer-16-top" style="min-height: 100px" ng-if="ShowEnabledOnly"></div>
+                        </div>
+                        <div class="form-group-addon form-group-addon-adjacent spacer-20-top" ng-show="ShowEnabledOnly">
+                          <label l10n="Market_Selection_FriendlyName">市场组名</label>
+                          <input class="add-on ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" type="text" ng-model="SelectedGroup.FriendlyName" ng-keydown="$event && $event.which === 13 && $event.preventDefault()" ng-disabled="ReadOnly" ng-maxlength="36" maxlength="36" placeholder="示例: 第一轮" aria-label="marketGroupName">
+                        </div>
+                      </div>
+                      <div class="btn-group" ng-click="FocusOn('form-group-countryBtn-')">
+                        <button uitestid="MarketSelectorOkButton-display" class="btn btn-primary btn-default btn-std-width generate-tag" type="button" ng-click="Create()" ng-disabled="ReadOnly || !CanSave()" data-bi-slot="5" data-bi-id="Create-Button" data-bi-name="Create" disabled="disabled">
+                          <div ng-if="ShowEnabledOnly && (!SelectedGroup || SelectedGroup.Markets.length == 0)">
+                            <span l10n="AppSubmission_Availability_Create">创建</span>
+                          </div>
+                        </button>
+                        <button uitestid="MarketSelectorCancelButton-display" class="btn btn-std-width generate-tag market-selector-cancel" type="button" ng-click="Cancel();" data-bi-slot="6" data-bi-id="Cancel-Button" data-bi-name="Cancel" l10n="AppSubmission_Cancel">取消</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="btn-group">
+                <button type="button" class="btn-primary" ng-click="display.NewGroup()" ng-disabled="!display.IsPageEditable() || !display.IsCustomReleaseDateEnable()" l10n="AppSubmission_Availability_AddMarketOverride" disabled="disabled">针对特定市场进行自定义</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </display>
+
+      <market-groups ng-if="ctrl.Data.PricingV3 && ctrl.stringsLoaded && ctrl.ShouldShowPricingSection()"
+                     [bigid]="ctrl.Data.BigId" [instanceid]="ctrl.Data.InstanceId" [iseditable]="ctrl.Data.IsEditable"
+                     [pricing]="ctrl.Data.PricingV3" [markets]="ctrl.Data.Markets" [saving]="ctrl.IsSaving"
+                     [allowwholesalepricing]="ctrl.Data.IsResellerPricing" [allowplatformselection]="ctrl.Data.IsResellerPricing"
+                     [links]="ctrl.Links" [rolloutchinaoffshoremarketenabled]="ctrl.Data.RolloutChinaOffshoreMarketEnabled"
+                     [(is-paid)]="ctrl.Data.IsPaid" (validation-status-change)="ctrl.UpdatePricingV3ValidationStatus($event)"
+                     (mark-page-dirty)="ctrl.MarkPageDirty()" ng-version="11.2.14">
+        <section class="section">
+          <header class="section-header">
+            <div class="header-title">
+              <he-text appearance="heading-4" id="availabilityPricingHeader" class="section-title he-text">定价</he-text>
+            </div>
+            <div class="header-action">
+              <he-button tabindex="0" appearance="link" style="padding: 0;" class="he-button" type="button">
+                <span id="pricingHideBtn" aria-labelledby="availabilityPricingHeader + pricingHideBtn">隐藏选项</span>
+              </he-button>
+            </div>
+          </header>
+          <div>
+            <he-text appearance="paragraph" class="he-text">
+              配置 MSRP，查看此产品的相应批发价。Microsoft 保留未经通知即更改零售价的权利。 选择产品的基本价格。该价格将会转换为产品所在市场的相应价格段。
+              <span>Microsoft 定期调整转换率以反映最新的市场状况。<a href="http://go.microsoft.com/fwlink/?LinkId=2209357" target="_blank">详细了解定期价格调整</a>。在新费率生效日期后，在编辑价格时，市场组将应用新费率。</span>
+              你还可以通过选择价格段或以市场当地货币输入自由格式的价格来覆盖特定市场的基本价格。每当进行任何价格更新时，请查看每个市场组的所有定价信息，包括自动展开的定价信息。
+              <span><a href="http://go.microsoft.com/fwlink/?LinkId=852487" target="_blank">详细了解定价</a>。</span>
+            </he-text>
+
+            <he-message-bar open="" no-close-button="" appearance="info" class="he-message-bar">
+              <span>从 12 月 15 日开始，Microsoft 将暂时禁用保加利亚付费产品的销售，以从保加利亚列弗过渡到欧元。自 1 月 5 日起，产品将自动重新发布，定价为欧元，预计在两个月内完全可用。若要使你的产品更早可用，可以从 12 月 16 日开始手动重新发布它们。<a href="https://aka.ms/bulgarian-currency-change" target="_blank">了解更多信息</a>。</span>
+            </he-message-bar>
+            <he-message-bar open="" no-close-button="" appearance="info" class="he-message-bar">
+              新的币种转换表从 2025 年 9 月 21 日开始分阶段推出，并将继续到 11 月底。请在配置价格和发布时查看定价换算，以确认某个市场的价格与预期的最终用户价格一致。
+            </he-message-bar>
+
+            <he-text appearance="heading-4" class="he-text">市场组</he-text>
+
+            <div class="market-group-command-bar">
+              <he-button appearance="command" class="bottom-align he-button" type="button">
+                <he-icon slot="start" name="add" class="he-icon"></he-icon> 创建新市场组
+              </he-button>
+              <div class="market-prices-date-picker">
+                <he-button appearance="command" class="bottom-align he-button" type="button" disabled="">
+                  <he-icon slot="start" name="viewlist" class="he-icon"></he-icon> 查看截至该时间的所有市场价格:
+                </he-button>
+                <he-date-picker class="he-date-picker" placement="bottom-start"></he-date-picker>
+              </div>
+              <span class="search-btn-combo bottom-align">
+                <he-search-box placeholder="Search markets" uitestid="marketGroupSearchBox" class="he-search-box" type="text"></he-search-box>
+                <he-button appearance="primary" class="he-button" type="button"> 搜索 </he-button>
+              </span>
+            </div>
+
+            <div class="market-group-container">
+              <market-group>
+                <he-card class="he-card">
+                  <div slot="heading" class="heading">
+                    <div class="card-command-bar">
+                      <span class="card-title-and-subtitle">
+                        <he-button appearance="link" class="friendly-name he-button" type="button" disabled=""> Default </he-button>
+                        <he-text appearance="small" class="he-text">240 个市场</he-text>
+                      </span>
+                      <he-command-bar actions-position="end" class="he-command-bar">
+                        <schedule-row-command-bar>
+                          <he-command-bar actions-position="end" class="he-command-bar">
+                            <he-button appearance="command" class="he-button" type="button">
+                              <he-icon slot="start" name="money" class="he-icon"></he-icon> 查看每个市场的价格
+                            </he-button>
+                            <he-button appearance="command" class="he-button" type="button">
+                              <he-icon slot="start" name="calendar" class="he-icon"></he-icon> 计划价格更改
+                            </he-button>
+                          </he-command-bar>
+                        </schedule-row-command-bar>
+                      </he-command-bar>
+                    </div>
+                  </div>
+                  <div>
+                    <he-text appearance="label" class="he-text">基本价格</he-text>
+                    <div class="price-config">
+                      <he-select autocomplete="both" class="he-select"></he-select>
+                      <suggested-price>
+                        <div class="price-config">
+                          <price-tier-selection pricetierkey="Retail">
+                            <he-select autocomplete="both" placeholder="Select" class="he-select" value="" disabled="" freeform="">
+                              <span slot="start"></span>
+                              <he-option class="he-option" role="option" tabindex="-1" aria-selected="true" aria-disabled="false"></he-option>
+                            </he-select>
+                          </price-tier-selection>
+                        </div>
+                      </suggested-price>
+                    </div>
+                  </div>
+                  <span slot="footer" class="footer">
+                    <he-button appearance="command" class="he-button" type="button">
+                      <he-icon slot="start" name="calendar" class="he-icon"></he-icon> 计划价格更改
+                    </he-button>
+                  </span>
+                </he-card>
+              </market-group>
+            </div>
+
+            <he-button appearance="command" class="spacer-sm-bottom he-button" type="button">
+              <he-icon slot="start" name="add" class="he-icon"></he-icon> 创建新市场组
+            </he-button>
+
+            <market-selector-v2>
+              <he-fly-in-panel class="he-fly-in-panel"></he-fly-in-panel>
+            </market-selector-v2>
+
+            <price-table>
+              <he-dialog class="he-dialog">
+                <p>选择要在转换市场定价时进行优化的平台。这应该是你的主要平台。如果在两者上平等分发，请选择主机。</p>
+                <he-button href="#" appearance="link" target="_blank" external="" class="he-button" type="button"> 了解详细信息 </he-button>
+                <he-radio-group name="platform" class="he-radio-group">
+                  <he-radio value="Xbox" class="he-radio" role="radio" tabindex="0" aria-disabled="false" aria-checked="false">控制台</he-radio>
+                  <he-radio value="PC" class="he-radio" role="radio" tabindex="-1" aria-disabled="false" aria-checked="false">电脑</he-radio>
+                </he-radio-group>
+                <he-button slot="footer" appearance="primary" class="he-button" type="button">优化定价</he-button>
+                <he-button slot="footer" appearance="secondary" class="he-button" type="button">取消</he-button>
+              </he-dialog>
+            </price-table>
+
+            <price-per-market>
+              <he-fly-in-panel class="fly-in-overview he-fly-in-panel" style="--size: var(--he-panel-size-large);">
+                <div slot="heading" class="heading">
+                  <he-text appearance="heading-3" class="he-text"></he-text>
+                </div>
+                <he-tabs class="he-tabs" size="small" orientation="horizontal"></he-tabs>
+              </he-fly-in-panel>
+            </price-per-market>
+          </div>
+        </section>
+      </market-groups>
+
+      <trial mark-page-dirty="ctrl.MarkPageDirty()">
+        <section class="section has-header-action" ng-show="trial.ShouldShow()">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title" id="availabilityFreeTrial" l10n="AppSubmission_Availability_Trial">免费试用</h2>
+                </div>
+              </div>
+            </div>
+            <button class="header-action btn-link" style="padding: 0;" tabindex="0" ng-click="trial.ToggleShowOptions()" ng-keypress="trial.ToggleShowOptions($event)">
+              <span ng-show="trial.ShouldShowOptions()" id="freeTrialHideBtn" l10n="AppSubmission_HideOption" aria-labelledby="availabilityFreeTrial + freeTrialHideBtn" class="ng-hide">隐藏选项</span>
+              <span ng-show="!trial.ShouldShowOptions()" id="freeTrialShowBtn" l10n="AppSubmission_ShowOption" aria-labelledby="availabilityFreeTrial + freeTrialShowBtn">显示选项</span>
+            </button>
+          </header>
+          <div class="section-body">
+            <div ng-show="!trial.ShouldShowOptions()">
+              <p class="reduced-string-length">
+                <span ng-if="trial.Data.TrialType === 'NoTrial'" l10n="AppSubmission_Availability_Trial_NoTrialSummary">未配置免费试用。</span>
+                <a target="_blank" tabindex="0" class="content-link" id="learnMoreFreeTrialLink" l10n="Trial_LearnMore_FreeTrial" href="http://go.microsoft.com/fwlink/?LinkId=823238">详细了解免费试用</a>
+              </p>
+            </div>
+            <div ng-show="trial.ShouldShowOptions()" class="ng-hide">
+              <p class="reduced-string-length">
+                <span id="availabilityTrailText" l10n="AppSubmission_Availability_TrialText">如果你希望向客户提供免费试用版，请选择持续时间，或者为试用版选择"无限制"，即永远不会到期(还要将代码添加到产品，限制试用版中的功能)。</span>
+                <a target="_blank" tabindex="0" class="content-link" id="learnMoreTrailTextlink" l10n="AppSubmission_LearnMore" aria-labelledby="learnMoreTrailTextlink + availabilityTrailText" href="http://go.microsoft.com/fwlink/?LinkId=823238">了解详细信息</a>
+              </p>
+              <div style="margin-bottom: 0.5em;">
+                <select style="min-width: 13em;" ng-model="trial.Data.TrialType" aria-label="TrialType" ng-options="option.Value as option.Text for option in trial.TrialTypes()" ng-disabled="!trial.IsEditable()" ng-change="trial.MarkAsDirty()" class="ng-pristine ng-untouched ng-valid ng-not-empty">
+                  <option label="无免费试用" value="string:NoTrial" selected="selected">无免费试用</option>
+                  <option label="时间限制" value="string:TimedAccess">时间限制</option>
+                  <option label="无限制" value="string:Unlimited">无限制</option>
+                </select>
+              </div>
+
+              <div id="market-selector-trial" class="modal center-top-md language-list-modal" data-keyboard="false" data-backdrop="static" tabindex="-1"
+                   ng-keydown="$event && $event.which === 27 && Cancel()" visible="trial.IsMarketSelectorVisible" markets="trial.TrialableMarkets"
+                   test-id="'trial'" on-close="trial.OnMarketSelectorClose" show-enabled-only="true" selected-group="trial.CurrentEditingGroup"
+                   read-only="!trial.IsEditable()">
+                <div class="modal-dialog">
+                  <div class="modal-content" trapfocus="">
+                    <div>
+                      <div class="modal-header">
+                        <h3 class="modal-title text-subtitle spacer-20-bottom" l10n="AppSubmission_Availability_MarketSelection">市场选择</h3>
+                      </div>
+                      <div class="modal-body">
+                        <div class="row search-row">
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8">
+                            <div class="search-container">
+                              <div class="form-group form-searchbox remove-top-margin">
+                                <form class="js-nro ng-pristine ng-valid">
+                                  <input class="form-control js-nro ng-pristine ng-valid ng-untouched ng-empty" uitestid="marketSearchBox" aria-label="MarketSearchBox" type="text" placeholder="搜索" autocomplete="off" ng-model="query.$">
+                                  <button class="clear-icon js-nro generate-tag" type="reset" data-bi-slot="1" data-bi-id="Reset-Button" data-bi-name="Reset" aria-label="ResetMarketSearchBox" ng-click="ClearQuery()"><span class="win-icon win-icon-Clear"></span></button>
+                                  <span class="search-icon generate-tag" data-bi-slot="2" data-bi-id="Search-Button" data-bi-name="Search">
+                                    <i class="win-icon win-icon-Search"></i>
+                                  </span>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8" ng-show="ProductType !== 'OfficeAddin'">
+                            <select class="form-control search-height full-width ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedPlatform" aria-label="CurrentSelectedPlatform" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | platformFilter:RolloutChinaOffshoreMarketEnabled"><option value="?" selected="selected"></option></select>
+                          </div>
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8 ng-hide" ng-show="false">
+                            <div class="combobox">
+                              <select class="form-control search-height ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedContinent" aria-label="CurrentSelectedContinent" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | continentFilter"><option value="?" selected="selected"></option></select>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="spacer-20-top">
+                            <button ng-click="!ReadOnly && SelectAll(true)" ng-keypress="!ReadOnly && SelectAll(true, $event)" uitestid="MarketSelectorSelectAllLink-trial" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="3" data-bi-id="SeeAll-Link" data-bi-name="SeeAll">
+                              <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_SelectAll">全选</span>
+                              (<span>0</span>)
+                            </button>
+                            <button ng-click="!ReadOnly && SelectAll(false)" ng-keypress="!ReadOnly && SelectAll(false, $event)" uitestid="MarketSelectorUnSelectAllLink-trial" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="4" data-bi-id="UnselectAll-Link" data-bi-name="UnselectAll">
+                              <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_UnselectAll">取消全选</span>
+                            </button>
+                          </div>
+                          <div class="language-list-container-short spacer-16-top" style="min-height: 100px" ng-if="ShowEnabledOnly"></div>
+                        </div>
+                        <div class="form-group-addon form-group-addon-adjacent spacer-20-top" ng-show="ShowEnabledOnly">
+                          <label l10n="Market_Selection_FriendlyName">市场组名</label>
+                          <input class="add-on ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" type="text" ng-model="SelectedGroup.FriendlyName" ng-keydown="$event && $event.which === 13 && $event.preventDefault()" ng-disabled="ReadOnly" ng-maxlength="36" maxlength="36" placeholder="示例: 第一轮" aria-label="marketGroupName">
+                        </div>
+                      </div>
+                      <div class="btn-group" ng-click="FocusOn('form-group-countryBtn-')">
+                        <button uitestid="MarketSelectorOkButton-trial" class="btn btn-primary btn-default btn-std-width generate-tag" type="button" ng-click="Create()" ng-disabled="ReadOnly || !CanSave()" data-bi-slot="5" data-bi-id="Create-Button" data-bi-name="Create" disabled="disabled">
+                          <div ng-if="ShowEnabledOnly && (!SelectedGroup || SelectedGroup.Markets.length == 0)">
+                            <span l10n="AppSubmission_Availability_Create">创建</span>
+                          </div>
+                        </button>
+                        <button uitestid="MarketSelectorCancelButton-trial" class="btn btn-std-width generate-tag market-selector-cancel" type="button" ng-click="Cancel();" data-bi-slot="6" data-bi-id="Cancel-Button" data-bi-name="Cancel" l10n="AppSubmission_Cancel">取消</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="spacer-12-top ng-hide" ng-show="trial.HasUsageTrial()">
+                <span l10n="AppSubmission_Availability_UsageTrialWarning_Win11">仅 Windows 10/11 和 Xbox 支持有限使用试用版。</span>
+              </div>
+
+              <div class="btn-group ng-hide" ng-show="trial.ShouldShowOptions() && trial.Data.TrialType !== 'NoTrial'">
+                <button type="button" class="btn-primary" ng-click="trial.NewGroup()" ng-disabled="!trial.IsEditable()" l10n="AppSubmission_Availability_AddMarketOverride">针对特定市场进行自定义</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </trial>
+
+      <deals mark-page-dirty="ctrl.MarkPageDirty()">
+        <section class="section has-header-action" ng-init="deals.DealsOptions()" ng-show="deals.ShouldShow()" data-bi-area="Promotion-Section">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title text-maxlines-1" id="availabilityPromotion" l10n="AppSubmission_Availability_Promotion">销售定价</h2>
+                </div>
+              </div>
+            </div>
+            <div class="header-action">
+              <button uitestid="ShowDealsLink" class="expandLink collapsed btn-link" style="padding: 0; line-height: normal;" tabindex="0" ng-click="deals.ToggleShowOptions()" ng-keypress="deals.ToggleShowOptions($event)" data-bi-slot="1" data-bi-id="Promotion-ShowOptions-Link" data-bi-name="ShowOptions">
+                <span ng-show="deals.ShowOptions" id="promotionHideBtn" l10n="AppSubmission_HideOption" aria-labelledby="availabilityPromotion + promotionHideBtn" class="ng-hide">隐藏选项</span>
+                <span ng-show="!deals.ShowOptions" id="promotionShowBtn" l10n="AppSubmission_ShowOption" aria-labelledby="availabilityPromotion + promotionShowBtn">显示选项</span>
+              </button>
+            </div>
+          </header>
+          <div class="section-body">
+            <div ng-hide="deals.IsDealsLoadingSuccess()" class="alert-band ng-hide">
+              <div style="width: 62.5%;" class="alert alert-danger" role="alert">
+                <div class="alert-title" l10n="Error_SectionTitle">我们在加载此部分时遇到问题。</div>
+                <div class="row">
+                  <div class="col-md-20">
+                    <p l10n="Error_GeneralPageSubtitle">请刷新页面或在几分钟后重试。</p>
+                    <p>
+                      <span l10n="Error_CorrelationIdSubtitle">错误相关 ID:</span>
+                      <span></span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="reduced-string-length" ng-show="!deals.ShowOptions && deals.IsDealsLoadingSuccess()">
+              <span class="comments" ng-show="deals.DataSvc.DealsConfiguredMarkets === 0" l10n="AppSubmission_Availability_NoPromotion">没有配置销售定价。</span>
+              <span class="comments ng-hide" ng-show="deals.DataSvc.DealsConfiguredMarkets &gt; 0" l10n="AppSubmission_Availability_DealsConfiguredInMarkets">为以下产品配置的销售定价</span>
+              <span class="comments ng-hide" ng-show="deals.DataSvc.DealsConfiguredMarkets &gt; 0">0</span>
+              <span class="comments ng-hide" ng-show="deals.DataSvc.DealsConfiguredMarkets &gt; 0" l10n="AppSubmission_Availability_AvailableInMarkets_Markets">个市场。</span>
+              <a target="_blank" tabindex="0" class="content-link" data-bi-slot="2" data-bi-id="Promotion-LearnMore-Link" data-bi-name="LearnMore" id="learnMorePromotionLink" l10n="Deals_LearnMore_Promotions" href="http://go.microsoft.com/fwlink/?LinkId=823239">详细了解促销</a>
+            </p>
+            <progress-bar ng-show="deals.ShowOptions && deals.IsDealsLoading()" ng-version="11.2.14" class="ng-hide">
+              <div class="progress indeterminate">
+                <div role="progressbar" aria-label="ProgressBar" class="progress-bar indeterminate indeterminate-bar">
+                  <div class="indeterminate-indicators">
+                    <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+                    <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+                    <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+                    <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+                    <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+                  </div>
+                </div>
+              </div>
+            </progress-bar>
+            <p class="spacer-20-top">
+              <span class="comments" l10n="AppSubmission_Availability_SalePricingLowest">法国销售定价: 根据消费者法，在法国显示的基准价格必须是过去 30 天内收取的最低价格。</span>
+            </p>
+          </div>
+        </section>
+      </deals>
+
+      <entitlements mark-page-dirty="ctrl.MarkPageDirty()">
+        <section class="section has-header-action ng-hide" ng-if="entitlements.SubType == null || entitlements.SubType !== 'Subscription'" ng-show="entitlements.ShouldShow()" data-bi-area="Entitlements-Section">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title text-maxlines-1" id="freeToUseHeader" l10n="AppSubmission_Availability_SatisfyingEntitlement">随意使用</h2>
+                </div>
+              </div>
+            </div>
+            <div class="header-action">
+              <button uitestid="ShowDealsLink" class="expandLink collapsed btn-link" style="padding: 0; line-height: normal;" tabindex="0" ng-click="entitlements.ToggleShowOptions()" ng-show="entitlements.IsDealsLoadingSuccess()" ng-keypress="entitlements.ToggleShowOptions($event)" data-bi-slot="1" data-bi-id="Entitlements-ShowOptions-Link" data-bi-name="ShowOptions">
+                <span ng-show="!entitlements.ShowOptions" id="freeToUseShowBtn" l10n="AppSubmission_ShowOption" aria-labelledby="freeToUseHeader + freeToUseShowBtn">显示选项</span>
+                <span ng-show="entitlements.ShowOptions" id="freeToUseHideBtn" l10n="AppSubmission_HideOption" aria-labelledby="freeToUseHeader + freeToUseHideBtn" class="ng-hide">隐藏选项</span>
+              </button>
+            </div>
+            <progress-bar ng-show="entitlements.ShowOptions && entitlements.IsDealsLoading()" ng-version="11.2.14" class="ng-hide">
+              <div class="progress indeterminate">
+                <div role="progressbar" aria-label="ProgressBar" class="progress-bar indeterminate indeterminate-bar">
+                  <div class="indeterminate-indicators">
+                    <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+                    <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+                    <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+                    <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+                    <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+                  </div>
+                </div>
+              </div>
+            </progress-bar>
+          </header>
+          <div class="section-body">
+            <div ng-hide="entitlements.IsDealsLoadingSuccess()" class="alert-band ng-hide">
+              <div style="width: 62.5%;" class="alert alert-danger" role="alert">
+                <div class="alert-title" l10n="Error_SectionTitle">我们在加载此部分时遇到问题。</div>
+                <div class="row">
+                  <div class="col-md-20">
+                    <p l10n="Error_GeneralPageSubtitle">请刷新页面或在几分钟后重试。</p>
+                    <p>
+                      <span l10n="Error_CorrelationIdSubtitle">错误相关 ID:</span>
+                      <span></span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="reduced-string-length" ng-show="!entitlements.ShowOptions && entitlements.IsDealsLoadingSuccess()">
+              <span class="comments" ng-show="entitlements.Count() === 0" l10n="AppSubmission_Availability_NoEntitlement">未配置免费优惠。</span>
+              <span class="comments ng-hide" ng-show="entitlements.Count() &gt; 0">已配置免费优惠:  0</span>
+              <a target="_blank" tabindex="0" class="content-link" data-bi-slot="2" data-bi-id="Promotion-LearnMore-Link" data-bi-name="LearnMore" id="learnMoreEntitlementsLink" l10n="Entitlements_LearnMore_FreeOffers" href="http://go.microsoft.com/fwlink/?LinkId=873101">详细了解免费产品/服务</a>
+            </p>
+            <div id="idEntitlements" ng-show="entitlements.ShowOptions && !entitlements.IsDealsLoading()" class="ng-hide">
+              <p class="reduced-string-length">
+                <span id="freeToUserDescription" l10n="AppSubmission_Availability_FreeToUseDescription">让某些客户免费使用本产品。</span>
+                <a target="_blank" tabindex="0" class="content-link" data-bi-slot="2" data-bi-id="Promotion-LearnMore-Link" data-bi-name="LearnMore" id="learnMoreFreeToUserLink" l10n="AppSubmission_LearnMore" aria-labelledby="learnMoreFreeToUserLink + freeToUserDescription" href="http://go.microsoft.com/fwlink/?LinkId=873101">了解详细信息</a>
+              </p>
+
+              <div id="market-selector-entitlements" class="modal center-top-md language-list-modal" data-keyboard="false" data-backdrop="static" tabindex="-1"
+                   ng-keydown="$event && $event.which === 27 && Cancel()" visible="entitlements.IsMarketSelectorVisible" markets="entitlements.DealableMarkets"
+                   test-id="'entitlements'" on-close="entitlements.AddOrUpdateGroup" show-enabled-only="true" selected-group="entitlements.CurrentEditingGroup"
+                   read-only="entitlements.CurrentEditingGroup && entitlements.ShouldDisableScheduleInProgress(entitlements.CurrentEditingGroup.Schedule)">
+                <div class="modal-dialog">
+                  <div class="modal-content" trapfocus="">
+                    <div>
+                      <div class="modal-header">
+                        <h3 class="modal-title text-subtitle spacer-20-bottom" l10n="AppSubmission_Availability_MarketSelection">市场选择</h3>
+                      </div>
+                      <div class="modal-body">
+                        <div class="row search-row">
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8">
+                            <div class="search-container">
+                              <div class="form-group form-searchbox remove-top-margin">
+                                <form class="js-nro ng-pristine ng-valid">
+                                  <input class="form-control js-nro ng-pristine ng-valid ng-untouched ng-empty" uitestid="marketSearchBox" aria-label="MarketSearchBox" type="text" placeholder="搜索" autocomplete="off" ng-model="query.$">
+                                  <button class="clear-icon js-nro generate-tag" type="reset" data-bi-slot="1" data-bi-id="Reset-Button" data-bi-name="Reset" aria-label="ResetMarketSearchBox" ng-click="ClearQuery()"><span class="win-icon win-icon-Clear"></span></button>
+                                  <span class="search-icon generate-tag" data-bi-slot="2" data-bi-id="Search-Button" data-bi-name="Search">
+                                    <i class="win-icon win-icon-Search"></i>
+                                  </span>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8" ng-show="ProductType !== 'OfficeAddin'">
+                            <select class="form-control search-height full-width ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedPlatform" aria-label="CurrentSelectedPlatform" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | platformFilter:RolloutChinaOffshoreMarketEnabled"><option value="?" selected="selected"></option></select>
+                          </div>
+                          <div class="col-xs-22 col-sm-12 col-md-11 col-lg-8 ng-hide" ng-show="false">
+                            <div class="combobox">
+                              <select class="form-control search-height ng-pristine ng-untouched ng-valid ng-not-empty" ng-model="CurrentSelectedContinent" aria-label="CurrentSelectedContinent" ng-disabled="ReadOnly" ng-options="option.Name as option.Name for option in Markets | marketFilter:ShowEnabledOnly | filter:query | continentFilter"><option value="?" selected="selected"></option></select>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="spacer-20-top">
+                            <button ng-click="!ReadOnly && SelectAll(true)" ng-keypress="!ReadOnly && SelectAll(true, $event)" uitestid="MarketSelectorSelectAllLink-entitlements" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="3" data-bi-id="SeeAll-Link" data-bi-name="SeeAll">
+                              <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_SelectAll">全选</span>
+                              (<span>0</span>)
+                            </button>
+                            <button ng-click="!ReadOnly && SelectAll(false)" ng-keypress="!ReadOnly && SelectAll(false, $event)" uitestid="MarketSelectorUnSelectAllLink-entitlements" class="market-list-item generate-tag btn-link" ng-disabled="ReadOnly" tabindex="0" data-bi-slot="4" data-bi-id="UnselectAll-Link" data-bi-name="UnselectAll">
+                              <span l10n="AppSubmission_Pricing_MarketsAndCustomPrices_UnselectAll">取消全选</span>
+                            </button>
+                          </div>
+                          <div class="language-list-container-short spacer-16-top" style="min-height: 100px" ng-if="ShowEnabledOnly"></div>
+                        </div>
+                        <div class="form-group-addon form-group-addon-adjacent spacer-20-top" ng-show="ShowEnabledOnly">
+                          <label l10n="Market_Selection_FriendlyName">市场组名</label>
+                          <input class="add-on ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" type="text" ng-model="SelectedGroup.FriendlyName" ng-keydown="$event && $event.which === 13 && $event.preventDefault()" ng-disabled="ReadOnly" ng-maxlength="36" maxlength="36" placeholder="示例: 第一轮" aria-label="marketGroupName">
+                        </div>
+                      </div>
+                      <div class="btn-group" ng-click="FocusOn('form-group-countryBtn-')">
+                        <button uitestid="MarketSelectorOkButton-entitlements" class="btn btn-primary btn-default btn-std-width generate-tag" type="button" ng-click="Create()" ng-disabled="ReadOnly || !CanSave()" data-bi-slot="5" data-bi-id="Create-Button" data-bi-name="Create" disabled="disabled">
+                          <div ng-if="ShowEnabledOnly && (!SelectedGroup || SelectedGroup.Markets.length == 0)">
+                            <span l10n="AppSubmission_Availability_Create">创建</span>
+                          </div>
+                        </button>
+                        <button uitestid="MarketSelectorCancelButton-entitlements" class="btn btn-std-width generate-tag market-selector-cancel" type="button" ng-click="Cancel();" data-bi-slot="6" data-bi-id="Cancel-Button" data-bi-name="Cancel" l10n="AppSubmission_Cancel">取消</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="btn-group">
+                <button uitestid="NewEntitlementButton" type="button" class="btn-primary" ng-click="entitlements.NewGroup()" ng-disabled="entitlements.ShouldDisable()" data-bi-slot="5" data-bi-id="Entitlements-AddNewPromotion-Button" data-bi-name="AddNewEntitlement" l10n="AppSubmission_Availability_NewFreeOffer">新的免费产品/服务</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </entitlements>
+
+      <licensing mark-page-dirty="ctrl.MarkPageDirty()">
+        <section ng-if="licensing.Data.ProductType === 'App' && licensing.Data.HasEnterpriseAccess" class="section has-header-action" ng-show="licensing.ShouldShow()">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title" id="licensingOptionsHeader" l10n="AppSubmission_Pricing_LicensingOptions">组织许可</h2>
+                </div>
+              </div>
+            </div>
+            <div class="header-action">
+              <button class="expandLink collapsed btn-link" style="padding: 0; line-height: normal;" tabindex="0" ng-click="licensing.ToggleShowOptions()" ng-keypress="licensing.ToggleShowOptions($event)">
+                <span ng-show="!licensing.ShowOptions" id="LicensingOptionsShowBtn" l10n="AppSubmission_ShowOption" aria-labelledby="licensingOptionsHeader + LicensingOptionsShowBtn">显示选项</span>
+                <span ng-show="licensing.ShowOptions" id="LicensingOptionsHideBtn" l10n="AppSubmission_HideOption" aria-labelledby="licensingOptionsHeader + LicensingOptionsHideBtn" class="ng-hide">隐藏选项</span>
+              </button>
+            </div>
+          </header>
+          <div class="section-body">
+            <div ng-show="!licensing.ShowOptions">
+              <p class="reduced-string-length" id="licensingIntro">
+                <span class="comments" ng-show="licensing.Data.SupportEnterpriseOnline && !licensing.Data.SupportEnterpriseOffline" l10n-html="AppSubmission_Pricing_LicensingOptions_Status_Defalut">你允许组织批量购置此产品，但<b>不允许</b>组织托管(脱机)的许可。</span>
+                <span class="comments ng-hide" ng-show="licensing.Data.SupportEnterpriseOnline && licensing.Data.SupportEnterpriseOffline" l10n="AppSubmission_Pricing_LicensingOptions_Status_All">你允许组织批量购置此产品，并允许组织托管(脱机)的许可。</span>
+                <span class="comments ng-hide" ng-show="!licensing.Data.SupportEnterpriseOnline" l10n-html="AppSubmission_Pricing_LicensingOptions_Status_None">你<b>不允许</b>组织批量购置此产品。</span>
+              </p>
+              <span l10n="AppSubmission_Availability_PricingCommercialText1">在某些市场，对同一个价格段而言，在适用于企业的 Microsoft Store 和适用于教育的 Microsoft Store 中显示的某款产品的价格与向零售客户显示的价格可能有所不同(</span><a uitestid="ViewCommercialPriceTiers" target="_blank" tabindex="0" href="/zh-cn/dashboard/products/9P91R044KH9G/submissions/1152921505701720046/availability/tiers?category=commercial" class="link" l10n="AppSubmission_Availability_PricingText2Alt">查看转换表</a><span l10n="AppSubmission_Availability_PricingText3Alt">)。</span>
+            </div>
+
+            <div id="idLicensingOptions" ng-show="licensing.ShowOptions" class="ng-hide">
+              <p class="reduced-string-length" l10n="AppSubmission_Pricing_LicensingOptions_Message">通过下面的选项可以允许组织批量购置你的产品。请注意，更改将仅影响新的购置; 已经拥有你的产品的用户将可以继续使用。</p>
+              <span l10n="AppSubmission_Availability_PricingCommercialText1">在某些市场，对同一个价格段而言，在适用于企业的 Microsoft Store 和适用于教育的 Microsoft Store 中显示的某款产品的价格与向零售客户显示的价格可能有所不同(</span><a uitestid="ViewCommercialPriceTiers" target="_blank" tabindex="0" href="/zh-cn/dashboard/products/9P91R044KH9G/submissions/1152921505701720046/availability/tiers?category=commercial" class="link" l10n="AppSubmission_Availability_PricingText2Alt">查看转换表</a><span l10n="AppSubmission_Availability_PricingText3Alt">)。</span>
+
+              <div id="licensingOnline" class="checkbox reduced-string-length">
+                <label class="text-base">
+                  <input type="checkbox" id="enterpriseonline_checkbox" ng-model="licensing.Data.SupportEnterpriseOnline" ng-change="licensing.LicensingChange()" class="form-control ng-pristine ng-untouched ng-valid ng-not-empty" ng-disabled="!licensing.IsEnterpriseOnlineEditable() || licensing.IsPaid()">
+                  <span id="licensingOnlineTitle" ng-show="licensing.Data.DistributionOption === 'Retail'" l10n="AppSubmission_Pricing_LicensingOptions_SeatManaged">通过 Microsoft Store 托管(联机)的许可和分发向组织提供产品</span>
+                  <span id="licensingOnlineForLOBTitle" ng-show="licensing.Data.DistributionOption !== 'Retail'" l10n="AppSubmission_Pricing_LicensingOptions_SeatManaged_For_LOB" class="ng-hide">Microsoft Store 托管(联机)的批量许可和分发</span>
+                </label>
+                <div id="licensingOnlineMessage" class="pseudo-label">
+                  <span l10n="AppSubmission_Pricing_LicensingOptions_SeatManaged_Message">选中此框可允许组织批量购买你的产品。产品许可证将会通过 Microsoft Store 的联机许可系统进行管理。</span><br>
+                  <a target="_blank" tabindex="0" href="http://go.microsoft.com/fwlink/?LinkId=532918" class="link" id="learnMoreLicensingOnline" l10n="AppSubmission_Pricing_LicensingOptions_LearnMore_Online" aria-labelledby="learnMoreLicensingOnline + licensingOnlineMessage">了解详细信息</a>
+                </div>
+              </div>
+              <div id="licensingOffline" class="checkbox reduced-string-length">
+                <label class="text-base">
+                  <input type="checkbox" id="enterpriseoffline_checkbox" ng-model="licensing.Data.SupportEnterpriseOffline" ng-change="licensing.LicensingChange()" class="form-control ng-pristine ng-untouched ng-valid ng-empty" ng-disabled="!licensing.IsEnterpriseOfflineEditable() || licensing.IsPaid()">
+                  <span id="licensingOfflineTitle" ng-show="licensing.Data.DistributionOption === 'Retail' && !licensing.Data.EnterpriseOfflineUsingWinget" l10n="AppSubmission_Pricing_LicensingOptions_OfflineLicensing">允许组织使用组织托管(脱机)的许可和分配</span>
+                  <span id="licensingOfflineTitle" ng-show="licensing.Data.DistributionOption === 'Retail' && licensing.Data.EnterpriseOfflineUsingWinget" l10n="AppSubmission_Pricing_LicensingOptions_OfflineLicensing_For_Winget" class="ng-hide">允许具有 Windows 程序包管理器(Winget)的组织进行组织管理的(脱机)许可和分发。</span>
+                  <span id="licensingofflineforlobtitle" ng-show="licensing.Data.DistributionOption !== 'Retail'" l10n="AppSubmission_Pricing_LicensingOptions_OfflineLicensing_For_LOB" class="ng-hide">组织托管(脱机)的许可和分配</span>
+                </label>
+                <div id="licensingOfflineMessage" class="pseudo-label">
+                  <span ng-show="!licensing.Data.EnterpriseOfflineUsingWinget" l10n="AppSubmission_Pricing_LicensingOptions_OfflineLicensing_Message">选中此框可允许组织批量购买你的产品。然后，他们可以下载你的软件包和许可证，利用许可证将软件包安装到设备中，而无需访问 Microsoft Store 的联机许可系统。请注意，.xap 软件包不支持此选项。</span>
+                  <span ng-show="licensing.Data.EnterpriseOfflineUsingWinget" l10n="AppSubmission_Pricing_LicensingOptions_OfflineLicensing_Message_For_Winget" class="ng-hide">选中此框可允许组织批量购买你的产品。然后，他们可以下载你的软件包和许可证，利用许可证将软件包安装到设备中，而无需访问 Microsoft Store 的联机许可系统。</span>
+                  <br>
+                  <a target="_blank" tabindex="0" href="http://go.microsoft.com/fwlink/?LinkId=532919" class="link" id="learnMorelicensingOffline" l10n="AppSubmission_Pricing_LicensingOptions_LearnMore_Offline" aria-labelledby="learnMorelicensingOffline + licensingOfflineMessage">了解详细信息</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </licensing>
+
+      <revenue mark-page-dirty="ctrl.MarkPageDirty()">
+        <section class="section has-header-action ng-hide" ng-show="revenue.ShouldShow()">
+          <header class="section-header">
+            <div class="header-titles">
+              <div class="titles-outer">
+                <div class="titles-inner">
+                  <h2 class="section-title" l10n="Submission_RevenueSku_Heading">收入 SKU 信息</h2>
+                </div>
+              </div>
+            </div>
+          </header>
+          <div class="section-body">
+            <div>
+              <div class="form-group" ng-if="revenue.ShouldShowLegacyRevenueSku()">
+                <div class="labels" l10n="Submission_LegacyRevenueSku">Windows 8.x 收入 SKU</div>
+                <input class="spacer-16-top ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" type="text" ng-model="revenue.Data.LegacyRevenueSku" ng-change="revenue.RevenueChange()" ng-disabled="!revenue.IsPageEditable()" ng-maxlength="15" maxlength="15">
+                <span class="alert alert-error input-bottom-comment spacer-16-top ng-hide" ng-show="!revenue.IsRevenueSkuValid(revenue.Data.LegacyRevenueSku)" l10n="SKU_Invalid_Input_Error_Text">SKU 必须为 15 个字符或更少，并且仅可包含数字、大写字母和连字符。</span>
+              </div>
+              <div class="form-group" ng-if="revenue.ShouldShowThresholdRevenueSku()">
+                <div class="labels" l10n="Submission_ThresholdRevenueSku_Win11">Windows 10/11 收入 SKU</div>
+                <input class="spacer-16-top ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength" type="text" ng-model="revenue.Data.ThresholdRevenueSku" ng-change="revenue.RevenueChange()" ng-disabled="!revenue.IsPageEditable()" ng-maxlength="15" maxlength="15">
+                <span class="alert alert-error input-bottom-comment spacer-16-top ng-hide" ng-show="!revenue.IsRevenueSkuValid(revenue.Data.ThresholdRevenueSku)" l10n="SKU_Invalid_Input_Error_Text">SKU 必须为 15 个字符或更少，并且仅可包含数字、大写字母和连字符。</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </revenue>
+
+      <div class="page-bottom-buttons">
+        <div class="btn-group">
+          <input type="submit" id="saveButtonPricing" uitestid="saveButtonPricing" class="btn btn-primary" ng-disabled="ctrl.IsButtonDisabled()" ng-click="ctrl.Save()" l10n-value="AppSubmission_SaveButton" value="保存草稿" disabled="disabled">
+          <a class="btn btn-primary ng-hide" ng-show="ctrl.IsJaguar()" href="/zh-cn/dashboard/products/9P91R044KH9G/submit" l10n="AppSubmission_PublishButton">审阅并发布</a>
+          <progress-ring class="progress-ring ng-hide" ng-show="ctrl.IsSaving" ng-version="11.2.14">
+            <div class="loader loader-small">
+              <div class="circle"></div>
+              <div class="circle"></div>
+              <div class="circle"></div>
+              <div class="circle"></div>
+              <div class="circle"></div>
+            </div>
+          </progress-ring>
+        </div>
+      </div>
+    </div>
+  </ng-view>
+</div>

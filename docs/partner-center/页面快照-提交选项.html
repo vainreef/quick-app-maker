@@ -1,0 +1,217 @@
+<div id="productWeb">
+  <div>
+    <router-outlet></router-outlet>
+    <ng-component>
+      <div class="flex-display">
+        <mix-focus-nav>
+          <he-task-menu role="navigation" class="he-task-menu" task-menu="" item-type="page" view="default">
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">应用程序概述</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              提交 1
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">定价和可用性</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">属性</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">年龄分级</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Store 一览</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item" selected="">提交选项</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">加载项</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品页面试验
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">试验详细信息</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品管理
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品标识</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理应用名称</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">WNS/MPNS</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              服务
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 服务</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 预览体验计划</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">地图</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品收集和购买</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理员同意</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              补充信息
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">其他测试信息</he-task-item>
+            </he-task-item>
+
+          </he-task-menu>
+        </mix-focus-nav>
+
+        <page-main-content style="padding: 0px 2em;">
+          <main role="main" id="3ppmaincontent">
+            <router-outlet></router-outlet>
+            <div options="">
+              <div>
+
+                <header class="page-title-header">
+                  <mix-command-bar>
+                    <command-bar>
+                      <div class="command-bar-container" style="top: 0px;">
+                        <div class="title-and-commands">
+                          <div class="content-start">
+                            <div class="title">
+                              <h1 class="text-subheader"> TestProjectABCDEFG99871 <span style="font-weight: normal;"> | 提交选项</span></h1>
+                            </div>
+                          </div>
+                          <div class="content-end"></div>
+                        </div>
+                        <div></div>
+                      </div>
+                    </command-bar>
+                  </mix-command-bar>
+                </header>
+
+                <section data-bi-area="PublishDate-Section" class="section">
+                  <header class="section-header">
+                    <h2 dcl10n="publishingHoldSectionTitle" class="section-title text-maxlines-1" data-l10n-key="publishingHoldSectionTitle">发布暂缓选项</h2>
+                  </header>
+                  <div class="section-body">
+                    <p>
+                      <span dcl10n="optionsSubtext" data-l10n-key="optionsSubtext">默认情况下，你的提交将于通过认证后进入发布流程。如果是首次发布产品，可以在"计划"部分设置精确的发布日期。或者，你可以在此处说明，除非你在提交的认证状态页面选择"立即发布"，否则将不发布提交。你也可以将发布流程暂缓至某个特定的日期。</span>&nbsp;
+                      <a href="http://go.microsoft.com/fwlink/?LinkId=838689" target="_blank" dcl10n="learnMoreText" rel="noopener noreferrer" data-l10n-key="learnMoreText">了解详细信息</a>
+                    </p>
+
+                    <div class="form-group">
+                      <div>
+                        <div class="radio">
+                          <label data-bi-slot="2" data-bi-id="ChangePublishDate-PublishAsap-Label" data-bi-name="PublishAsap">
+                            <input data-val="true" data-val-required="The PublishMode field is required." id="radioReleaseDate_asap" name="PublishMode" type="radio" value="Asap" class="ng-untouched ng-pristine ng-valid">
+                            <span dcl10n="optionsPublishAsapText" data-l10n-key="optionsPublishAsapText">在此提交通过认证后立即予以发布(或者根据你在"计划"部分选择的日期予以发布)</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="radio">
+                          <label data-bi-slot="3" data-bi-id="ChangePublishDate-PublishManual-Label" data-bi-name="PublishManual">
+                            <input id="radioReleaseDate_manual" name="PublishMode" type="radio" value="Manual" class="ng-untouched ng-pristine ng-valid">
+                            <span dcl10n="optionsPublishManuallyText" data-l10n-key="optionsPublishManuallyText">除非我选择"立即发布"，否则不发布此提交</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="form-inline">
+                          <div class="input-group">
+                            <div class="radio">
+                              <label data-bi-slot="4" data-bi-id="ChangePublishDate-PublishNoSoonerThan-Label" data-bi-name="PublishNoSoonerThan">
+                                <input id="radioReleaseDate_specifc" name="PublishMode" type="radio" value="SpecificDate" class="ng-untouched ng-pristine ng-valid">
+                                <span dcl10n="optionsPublishOnSpecificDateText" data-l10n-key="optionsPublishOnSpecificDateText">开始发布此提交</span>
+                              </label>&nbsp;
+                            </div>
+                            <app-date-time-picker-component>
+                              <div class="date-picker-container">
+                                <lib-date-input>
+                                  <div class="month-calendar">
+                                    <input type="text" id="DateInput" placeholder="undefined" aria-label="开始发布此提交 2026年8月23日" class="ng-untouched ng-pristine" disabled="">
+                                  </div>
+                                </lib-date-input>
+                              </div>
+                              <div class="time-picker">
+                                <div lib-dropdown="" class="dropdown auto-width" style="max-width: 250px; min-width: 180px;">
+                                  <button lib-dropdown-button="" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" role="button" tabindex="-1" class="btn btn-dropdown no-outline disabled" style="display: flex; justify-content: space-between;">
+                                    上午11:00
+                                    <span class="caret" style="color: inherit;"></span>
+                                  </button>
+                                  <ul lib-dropdown-menu="" role="menu" class="dropdown-menu" style="max-height: 500px; min-width: 160px; overflow-y: auto;">
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="0" disabled=""> 上午12:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="1" disabled=""> 上午1:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="2" disabled=""> 上午2:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="3" disabled=""> 上午3:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="4" disabled=""> 上午4:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="5" disabled=""> 上午5:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="6" disabled=""> 上午6:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="7" disabled=""> 上午7:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="8" disabled=""> 上午8:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="9" disabled=""> 上午9:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="disabled"><button role="menuitem" value="10" disabled=""> 上午10:00 </button></li>
+                                    <li lib-dropdown-option="" role="none" class="active"><button role="menuitem" value="11"> 上午11:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="12"> 下午12:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="13"> 下午1:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="14"> 下午2:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="15"> 下午3:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="16"> 下午4:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="17"> 下午5:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="18"> 下午6:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="19"> 下午7:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="20"> 下午8:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="21"> 下午9:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="22"> 下午10:00 </button></li>
+                                    <li lib-dropdown-option="" role="none"><button role="menuitem" value="23"> 下午11:00 </button></li>
+                                  </ul>
+                                </div>
+                                <span dcl10n="UTCTimezone" class="input-group" data-l10n-key="UTCTimezone">UTC</span>
+                              </div>
+                              <div id="emptypublishdateerror" class="alert alert-warning has-icon remove-bottom-margin hidden">
+                                <span class="icon-dc-IncidentTriangle alert-icon"></span>
+                                <span dcl10n="datepickerEmptyWarning" class="alert-string win-color-fg-primary" data-l10n-key="datepickerEmptyWarning">选择日期，或保留空白以尽快发布。</span>
+                              </div>
+                              <div id="pastPublishDateWarning" class="alert alert-warning remove-bottom-margin has-icon hidden">
+                                <span class="icon-dc-IncidentTriangle alert-icon"></span>
+                                <span dcl10n="datepickerDateInPastWarning" class="alert-string win-color-fg-primary" data-l10n-key="datepickerDateInPastWarning">由于你选择的是过去的日期，因此我们将在此提交通过认证后立即发布它。</span>
+                              </div>
+                            </app-date-time-picker-component>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="section">
+                  <header class="section-header">
+                    <h2 dcl10n="notesForCertSetionTitle" class="section-title text-maxlines-1" data-l10n-key="notesForCertSetionTitle">认证说明</h2>
+                  </header>
+                  <span>在"其他测试信息"页上提供评估此提交所需的任何其他测试人员详细信息。<a href="products/9P91R044KH9G/suppinfo/additionaltestinginfo"></a>客户不会看到此信息。<a href="https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/manage-submission-options#notes-for-certification" rel="noopener noreferrer" target="_blank">了解详细信息。</a></span>
+                </section>
+
+                <section class="section">
+                  <header class="section-header">
+                    <h2 dcl10n="CustomNotifications_Audience_Header" class="section-title" data-l10n-key="CustomNotifications_Audience_Header">提交通知受众</h2>
+                  </header>
+                  <div class="spacer-16-top">
+                    <div class="title-small" data-l10n-key="CustomNotifications_Entry_Text">查看或更改可以接收此产品提交状态通知的用户。</div>
+                    <a dcl10n="CustomNotifications_Click_Action" class="title-small" data-l10n-key="CustomNotifications_Click_Action" href="/zh-cn/dashboard/products/9P91R044KH9G/notifications">点击此处</a>
+                  </div>
+                </section>
+
+                <div class="btn-group">
+                  <button type="button" dcl10n="optionsSave" class="btn btn-primary" data-l10n-key="optionsSave">保存</button>
+                </div>
+
+              </div>
+            </div>
+          </main>
+        </page-main-content>
+
+      </div>
+    </ng-component>
+  </div>
+
+  <div class="loading-overlay" style="opacity: 0;">
+    <webcore-progress>
+      <div class="progress indeterminate">
+        <div role="progressbar" class="progress-bar indeterminate indeterminate-bar" aria-label="Progress bar">
+          <div class="indeterminate-indicators">
+            <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+          </div>
+        </div>
+      </div>
+    </webcore-progress>
+  </div>
+</div>

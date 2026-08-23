@@ -1,0 +1,165 @@
+<div id="productWeb">
+  <div>
+    <router-outlet></router-outlet>
+    <ng-component>
+      <div class="flex-display">
+        <mix-focus-nav>
+          <he-task-menu role="navigation" class="he-task-menu" task-menu="" item-type="page" view="default">
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">应用程序概述</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              提交 1
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">定价和可用性</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">属性</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">年龄分级</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item" selected="">Store 一览</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">提交选项</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">加载项</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品页面试验
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">试验详细信息</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品管理
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品标识</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理应用名称</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">WNS/MPNS</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              服务
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 服务</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 预览体验计划</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">地图</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品收集和购买</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理员同意</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              补充信息
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">其他测试信息</he-task-item>
+            </he-task-item>
+
+          </he-task-menu>
+        </mix-focus-nav>
+
+        <page-main-content style="padding: 0px 2em;">
+          <main role="main" id="3ppmaincontent">
+            <router-outlet></router-outlet>
+            <submission-listing-summary>
+
+              <header class="page-title-header">
+                <h1 class="page-title" data-l10n-key="appsubmission_manage_languages_header">管理 Store 一览语言</h1>
+                <div class="page-subtitle">
+                  <p class="reduced-string-length" data-l10n-key="appsubmission_manage_languages_subtitle">
+                    Select the languages you want to support. Then, click each selected language to enter and manage its Store listing details. <a href="https://go.microsoft.com/fwlink/?LinkId=528692" target="_blank"> Learn more </a>
+                  </p>
+                </div>
+              </header>
+
+              <div>
+                <div id="manage-package-languages" class="row">
+                  <div class="col-xs-24 col-sm-24 col-md-24 col-lg-24 middle-align">
+                    <h2 class="spacer-sm-bottom">
+                      <span data-l10n-key="appsubmission_manage_languages_inpackage">软件包中支持的语言</span>
+                      <he-button appearance="link" class="spacer-md-left he-button he-focusable" button="" type="button">
+                        <span class="hide-section-button" data-l10n-key="appsubmission_manage_languages_hide">隐藏</span>
+                      </he-button>
+                    </h2>
+                    <div>
+                      <he-data-grid class="language-data-grid he-data-grid" data-grid="">
+                        <span slot="no-records">
+                          <span data-l10n-key="appsubmission_manage_languages_nosupportedlang">上传程序包后，我们将在此处显示语言。</span>
+                        </span>
+                        <div slot="data-grid-controls" class="table-commands">
+                          <lib-search class="language-search-box" name="packages-languages-search-bar">
+                            <div class="search-container search-container-spacing">
+                              <he-search-box role="search" name="search" class="he-search-box he-uses-arrow-keys he-focusable" search-box="" debounce="0" type="text" placeholder="搜索" value="" style="min-width: 200px;"></he-search-box>
+                            </div>
+                          </lib-search>
+                        </div>
+                      </he-data-grid>
+                    </div>
+                  </div>
+                  <div class="col-xs-24 col-sm-24 col-md-24 col-lg-24 middle-align"></div>
+                </div>
+
+                <div id="manage-additional-languages" class="row spacer-md-top">
+                  <div class="col-xs-24 col-sm-24 col-md-24 col-lg-24 middle-align">
+                    <h2>
+                      <span data-l10n-key="appsubmission_manage_languages_additional">其他 Store 一览语言</span>
+                      <he-button appearance="link" class="spacer-md-left he-button he-focusable" button="" type="button">
+                        <span class="hide-section-button" data-l10n-key="appsubmission_manage_languages_hide">隐藏</span>
+                      </he-button>
+                    </h2>
+                    <div>
+                      <he-button class="spacer-md-top he-button he-focusable" button="" appearance="secondary" type="button">
+                        <span data-l10n-key="appsubmission_manage_languages_modallink">管理其他语言</span>
+                      </he-button>
+                      <div class="spacer-sm-top spacer-sm-bottom">
+                        <he-icon name="warning" class="he-icon" icon=""></he-icon>
+                        <span class="spacer-xxs-left spacer-xxs-right" data-l10n-key="appsubmission_managelangauges_iconwarning">其他语言的 Store 一览使用此提交软件包中的一个图标。</span>
+                      </div>
+                      <he-data-grid class="language-data-grid he-data-grid" data-grid="">
+                        <div slot="data-grid-controls" class="table-commands">
+                          <lib-search class="language-search-box" name="additional-languages-search-bar">
+                            <div class="search-container search-container-spacing">
+                              <he-search-box role="search" name="search" class="he-search-box he-uses-arrow-keys he-focusable" search-box="" debounce="0" type="text" placeholder="搜索" value="" style="min-width: 200px;"></he-search-box>
+                            </div>
+                          </lib-search>
+                        </div>
+                      </he-data-grid>
+                    </div>
+                  </div>
+                  <div class="col-xs-24 col-sm-24 col-md-24 col-lg-24 middle-align"></div>
+                </div>
+
+                <div class="page-bottom-buttons">
+                  <div class="btn-group spacer-48-top">
+                    <he-button appearance="primary" class="he-button he-focusable" button="" type="button">
+                      <span data-l10n-key="appsubmission_savebutton">保存</span>
+                    </he-button>
+                    <he-button appearance="secondary" class="spacer-xs-left he-button he-focusable" button="" type="button">
+                      <span data-l10n-key="appsubmission_cancel">取消</span>
+                    </he-button>
+                  </div>
+                </div>
+
+                <lib-modal>
+                  <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                    <div role="dialog" aria-modal="true" class="modal-dialog wide"></div>
+                  </div>
+                </lib-modal>
+
+              </div>
+            </submission-listing-summary>
+          </main>
+        </page-main-content>
+
+      </div>
+    </ng-component>
+  </div>
+
+  <div class="loading-overlay" style="opacity: 0;">
+    <webcore-progress>
+      <div class="progress indeterminate">
+        <div role="progressbar" class="progress-bar indeterminate indeterminate-bar" aria-label="Progress bar">
+          <div class="indeterminate-indicators">
+            <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+          </div>
+        </div>
+      </div>
+    </webcore-progress>
+  </div>
+</div>

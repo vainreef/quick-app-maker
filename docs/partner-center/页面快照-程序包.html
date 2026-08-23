@@ -1,0 +1,292 @@
+<div id="productWeb">
+  <div>
+    <router-outlet></router-outlet>
+    <ng-component>
+      <div class="flex-display">
+        <mix-focus-nav>
+          <he-task-menu role="navigation" class="he-task-menu" task-menu="" item-type="page" view="default">
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">应用程序概述</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              提交 1
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">定价和可用性</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">属性</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">年龄分级</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item" selected="">程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Store 一览</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">提交选项</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">加载项</he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品页面试验
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">试验详细信息</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              产品管理
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品标识</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理应用名称</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理程序包</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">WNS/MPNS</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              服务
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 服务</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 预览体验计划</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">地图</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">产品收集和购买</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">管理员同意</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              补充信息
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">其他测试信息</he-task-item>
+            </he-task-item>
+
+          </he-task-menu>
+        </mix-focus-nav>
+
+        <page-main-content style="padding: 0px 2em;">
+          <main role="main" id="3ppmaincontent">
+            <router-outlet></router-outlet>
+            <app-package>
+              <app-lockable>
+                <div>
+                  <div>
+                    <div>
+                      <div>
+                        <app-packages>
+                          <app-lockable>
+                            <div>
+                              <div>
+
+                                <lib-modal>
+                                  <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                                    <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                                  </div>
+                                </lib-modal>
+                                <lib-modal>
+                                  <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                                    <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                                  </div>
+                                </lib-modal>
+
+                                <header data-bi-area="PageHeader" class="page-title-header has-header-action spacer-48-bottom">
+                                  <div class="title-inner">
+                                    <mix-command-bar>
+                                      <command-bar>
+                                        <div class="command-bar-container" style="top: 0px;">
+                                          <div class="title-and-commands">
+                                            <div class="content-start">
+                                              <div class="title">
+                                                <h1 class="text-subheader"> TestProjectABCDEFG99871 <span style="font-weight: normal;"> | Packages</span></h1>
+                                              </div>
+                                            </div>
+                                            <div class="content-end"></div>
+                                          </div>
+                                          <div></div>
+                                        </div>
+                                      </command-bar>
+                                    </mix-command-bar>
+                                  </div>
+
+                                  <div class="spacer-sm-top">
+                                    <he-message-bar id="arm32-deprecation-prejaguar" open="" dcl10n="arm32_deprecation_notice" data-l10n-key="arm32_deprecation_notice" class="he-message-bar" message-bar="">
+                                      Future Windows on Arm devices will no longer support AArch32, therefore we recommend updating your targeted platforms to Arm64 (AArch64), which works on all Windows on Arm devices, as soon as possible in order to ensure your customers can continue to enjoy your experience. <a href="https://learn.microsoft.com/en-us/windows/arm/overview" target="_blank" rel="noopener">Learn more</a>
+                                    </he-message-bar>
+                                  </div>
+
+                                  <p class="reduced-string-length" data-l10n-key="app_package_explanationtext">
+                                    If you are using Visual Studio, be sure you signed in with the same account associated with your developer account, as some parts of the package are specific to this account. <a href="http://go.microsoft.com/fwlink/?LinkId=528684" target="_blank" data-bi-slot="1" data-bi-id="PageHeader-LearnMore-Link" data-bi-name="LearnMore">Learn more</a>
+                                  </p>
+
+                                  <div id="delete_package_group_header" class="header-action"></div>
+                                </header>
+
+                                <div class="row">
+                                  <div class="col-xs-18">
+                                    <div libfilesdroped="">
+                                      <lib-uploader>
+                                        <div class="img-uploader" id="pkg_upload">
+                                          <div class="block-col no-reqs">
+                                            <div class="block">
+                                              <input type="file" name="fileuploader" class="fileuploader" multiple="" accept="">
+                                              <div class="description">Drag your packages here (.msix, .msixbundle, .msixupload, .appx, .appxbundle, .appxupload, .xap) or<a tabindex="0" href="#"> browse your files.</a></div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </lib-uploader>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <section data-bi-area="UploadStatus-Section">
+                                  <div class="progress-container"></div>
+                                </section>
+
+                                <div>
+                                  <section class="section">
+                                    <div class="section-header spacer-32-top">
+                                      <h2 class="section-title" data-l10n-key="device_family_sectionheading_text">Device family availability</h2>
+                                    </div>
+                                    <app-device-family>
+                                      <div id="deviceFamilyAndPackagesView">
+                                        <div class="section-body packagesNotPresent">
+                                          <p class="reduced-string-length" data-l10n-key="device_family_sectionmessage_nopackages_text">If a Windows 10/11 device family's box is unchecked, no new customers on that type of device will be able to acquire the app, though customers who already have the app will still be able to use it, and will get any updates you submit. After you upload packages, you'll see which packages will be distributed to specific Windows 10 device families (and earlier OS versions if applicable).</p>
+                                        </div>
+                                        <div class="packagesNotPresent spacer-12-top">
+                                          <app-no-device-family-selected-warning>
+                                            <span class="alert alert-warning reduced-string-length has-icon">
+                                              <span class="win-icon win-icon-Warning win-color-fg-yellow spacer-xxs-right"></span>
+                                              <span class="alert-string ng-binding" data-l10n-key="device_family_noneselected_warning">This product will not be available to customers on Windows 10/11 unless you check one or more device family boxes.</span>
+                                            </span>
+                                          </app-no-device-family-selected-warning>
+                                          <div>
+                                            <app-device-family-checkboxes>
+                                              <lib-checkbox>
+                                                <div class="checkbox">
+                                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                                    <span class="text-body">Windows 10/11 Desktop</span>
+                                                  </he-checkbox>
+                                                </div>
+                                              </lib-checkbox>
+                                            </app-device-family-checkboxes>
+                                          </div>
+                                          <div>
+                                            <app-device-family-checkboxes>
+                                              <lib-checkbox>
+                                                <div class="checkbox">
+                                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                                    <span class="text-body">Windows 10 Mobile</span>
+                                                  </he-checkbox>
+                                                </div>
+                                              </lib-checkbox>
+                                            </app-device-family-checkboxes>
+                                          </div>
+                                          <div>
+                                            <app-device-family-checkboxes>
+                                              <lib-checkbox>
+                                                <div class="checkbox">
+                                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                                    <span class="text-body">Windows 10/11 Xbox</span>
+                                                  </he-checkbox>
+                                                </div>
+                                              </lib-checkbox>
+                                            </app-device-family-checkboxes>
+                                          </div>
+                                          <div>
+                                            <app-device-family-checkboxes>
+                                              <lib-checkbox>
+                                                <div class="checkbox">
+                                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                                    <span class="text-body">Windows 10 Team</span>
+                                                  </he-checkbox>
+                                                </div>
+                                              </lib-checkbox>
+                                            </app-device-family-checkboxes>
+                                          </div>
+                                          <div>
+                                            <app-device-family-checkboxes>
+                                              <lib-checkbox>
+                                                <div class="checkbox">
+                                                  <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" value="">
+                                                    <span class="text-body">Windows 10 Mixed Reality</span>
+                                                  </he-checkbox>
+                                                </div>
+                                              </lib-checkbox>
+                                            </app-device-family-checkboxes>
+                                          </div>
+                                          <app-future-device-family-checkbox>
+                                            <lib-checkbox>
+                                              <div class="checkbox">
+                                                <he-checkbox class="he-checkbox he-focusable" checkbox="" debounce="0" label="" checked="" value="">
+                                                  <span class="text-body">Let Microsoft decide whether to make this app available to any future device families</span>
+                                                </he-checkbox>
+                                              </div>
+                                            </lib-checkbox>
+                                          </app-future-device-family-checkbox>
+                                        </div>
+                                      </div>
+                                    </app-device-family>
+                                  </section>
+                                </div>
+
+                                <div>
+                                  <app-packages-platform>
+                                    <div class="row">
+                                      <div class="col-xs-24"></div>
+                                    </div>
+                                  </app-packages-platform>
+                                </div>
+
+                                <div>
+                                  <app-package-rollout></app-package-rollout>
+                                </div>
+
+                                <div>
+                                  <app-package-managebyrelease></app-package-managebyrelease>
+                                </div>
+
+                                <div>
+                                  <app-mandatory-available-date></app-mandatory-available-date>
+                                </div>
+
+                                <div class="btn-group page-bottom-buttons">
+                                  <input type="button" class="btn btn-primary" value="Save">
+                                  <div class="working">
+                                    <lib-progress-ring hidden="">
+                                      <div class="progress ring indeterminate">
+                                        <div role="progressbar" class="indeterminate progress-bar">
+                                          <div class="indeterminate-ring indicator-1"></div>
+                                          <div class="indeterminate-ring indicator-2"></div>
+                                          <div class="indeterminate-ring indicator-3"></div>
+                                          <div class="indeterminate-ring indicator-4"></div>
+                                          <div class="indeterminate-ring indicator-5"></div>
+                                        </div>
+                                      </div>
+                                    </lib-progress-ring>
+                                  </div>
+                                </div>
+
+                                <div id="packagesLeftNavData" class="hidden">
+                                  <ul></ul>
+                                </div>
+
+                              </div>
+                            </div>
+                          </app-lockable>
+                        </app-packages>
+                      </div>
+                      <app-error></app-error>
+                    </div>
+                  </div>
+                </div>
+              </app-lockable>
+            </app-package>
+          </main>
+        </page-main-content>
+
+      </div>
+    </ng-component>
+  </div>
+
+  <div class="loading-overlay" style="opacity: 0;">
+    <webcore-progress>
+      <div class="progress indeterminate">
+        <div role="progressbar" class="progress-bar indeterminate indeterminate-bar" aria-label="Progress bar">
+          <div class="indeterminate-indicators">
+            <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+          </div>
+        </div>
+      </div>
+    </webcore-progress>
+  </div>
+</div>

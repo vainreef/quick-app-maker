@@ -1,0 +1,339 @@
+<div id="productWeb">
+  <div>
+    <router-outlet></router-outlet>
+    <workspace-container>
+      <div style="display: flex;">
+        <mix-focus-nav>
+          <he-task-menu role="navigation" class="he-task-menu" task-menu="" item-type="page" view="default">
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" selected="">
+              概述
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              吸引
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">促销代码</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              参与
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">客户组</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">定向优惠</he-task-item>
+            </he-task-item>
+
+            <he-task-item class="he-task-item he-focusable" task-item="" role="listitem">
+              Xbox 服务
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Web 服务</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">沙盒</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 测试帐户</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">信赖方</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">业务合作伙伴</he-task-item>
+              <he-task-item class="he-task-item he-focusable" task-item="" role="listitem" slot="item">Xbox 开发主机</he-task-item>
+            </he-task-item>
+
+          </he-task-menu>
+        </mix-focus-nav>
+
+        <page-main-content style="padding: 0px 2em;">
+          <main role="main" id="3ppmaincontent">
+            <router-outlet></router-outlet>
+            <workspace-dashboard>
+
+              <div class="alert-band spacer-sm-top">
+                <div role="alert" class="alert with-icon alert-info fade in">
+                  <span class="alert-icon">
+                    <i class="win-icon win-icon-Info"></i>
+                  </span>
+                  <div class="row">
+                    <div class="col-xs-24">
+                      <span data-l10n-key="AppsWorkspace_GdkGameSplit_Banner">
+                        Game publishing options have been updated. Choose GDK Game for GDK-based titles, or MSIX or PWA game for UWP and PWA games.
+                        <a href="https://go.microsoft.com/fwlink/?linkid=2361881" target="_blank">Learn more</a>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="spacer-md-top">
+                <mix-command-bar>
+                  <harmony-command-bar>
+                    <div class="harmony-command-bar">
+                      <he-page-title class="he-page-title" page-title="">
+                        应用和游戏
+                        <span slot="active-title">概述</span>
+                      </he-page-title>
+                      <he-command-bar class="he-command-bar" command-bar="" actions-position="start"></he-command-bar>
+                    </div>
+                    <div class="notifications"></div>
+                  </harmony-command-bar>
+                </mix-command-bar>
+
+                <div class="spacer-sm-top">
+                  <a target="_blank" href="insights/analytics/reports/summary">
+                    <span class="win-icon win-icon-Lightbulb"></span>&nbsp;
+                    <span dcl10n="View_Analytics_Reports" data-l10n-key="View_Analytics_Reports">查看分析报告</span>
+                  </a>
+                </div>
+
+                <div class="spacer-lg-top offers-section">
+                  <div class="spacer-xs-top offers-table-section" id="AppDev">
+                    <offers-table>
+
+                      <lib-filter-panel>
+                        <lib-panel panelsize="sm">
+                          <he-fly-in-panel class="he-fly-in-panel sm" fly-in-panel="" tabindex="-1" heading="筛选器" placement="right"></he-fly-in-panel>
+                        </lib-panel>
+                      </lib-filter-panel>
+
+                      <lib-table-command-bar class="sticky stick-to-command-bar" style="display: block;">
+                        <div class="flex-container win-color-border-20 table-command-bar-border-bottom">
+
+                          <div class="left">
+                            <div class="command-bar-item command-bar-item-highlight">
+                              <div lib-dropdown="" class="dropdown auto-width" style="max-width: 250px; min-width: 180px;">
+                                <button lib-dropdown-button=""
+                                        data-automation-id="create-new-button"
+                                        type="button"
+                                        data-toggle="dropdown"
+                                        aria-haspopup="true"
+                                        aria-expanded="false"
+                                        role="button"
+                                        tabindex="0"
+                                        class="btn btn-dropdown no-outline"
+                                        style="display: flex; justify-content: space-between;">
+                                  <span class="win-color-fg-blue win-icon win-icon-Add"></span>
+                                  <span data-l10n-key="AppsWorkspace_AppsDev_Dashboard_New_Product">新产品</span>
+                                  <span class="caret" style="color: inherit;"></span>
+                                </button>
+                                <ul lib-dropdown-menu="" role="menu" class="dropdown-menu" style="max-height: 500px; min-width: 160px; overflow-y: auto;">
+
+                                  <li lib-dropdown-option="" data-automation-id="create-new-Application" role="none">
+                                    <button role="menuitem" value="MSIX_PWA_App">
+                                      <div class="info-tooltip-container">
+                                        MSIX 或 PWA 应用
+                                        <button class="win-icon win-icon-Info buttonReset" aria-label="MSIX 或 PWA 应用 信息"></button>
+                                      </div>
+                                      <div info-tooltip="" id="info-tooltip" class="text-body tooltip" style="position: fixed; opacity: 0; z-index: -1; left: 0px; top: 0px;">
+                                        <div class="tooltip-inner">打包为 MSIX 的应用和游戏，包括通用 Windows 应用(UWP)、桌面桥应用和渐进式 Web 应用(PWA)。可用于多个 Windows 设备系列。将在 Microsoft Store 上列出并托管应用。</div>
+                                      </div>
+                                    </button>
+                                  </li>
+
+                                  <li lib-dropdown-option="" data-automation-id="create-new-win32-application" role="none">
+                                    <button role="menuitem" value="EXE_MSI_App">
+                                      <div class="info-tooltip-container">
+                                        EXE 或 MSI 应用
+                                        <button class="win-icon win-icon-Info buttonReset" aria-label="EXE 或 MSI 应用 信息"></button>
+                                      </div>
+                                      <div info-tooltip="" id="info-tooltip" class="text-body tooltip" style="position: fixed; opacity: 0; z-index: -1; left: 0px; top: 0px;">
+                                        <div class="tooltip-inner">打包为 MSI/EXE 的应用，不包括游戏。仅在 Windows 桌面上可用。</div>
+                                      </div>
+                                    </button>
+                                  </li>
+
+                                  <li lib-dropdown-option="" data-automation-id="create-new-Application" role="none">
+                                    <button role="menuitem" value="GDK_Game">
+                                      <div class="info-tooltip-container">
+                                        GDK game
+                                        <button class="win-icon win-icon-Info buttonReset" aria-label="GDK game 信息"></button>
+                                      </div>
+                                      <div info-tooltip="" id="info-tooltip" class="text-body tooltip" style="position: fixed; opacity: 0; z-index: -1; left: 0px; top: 0px;">
+                                        <div class="tooltip-inner">Win32 games packaged using GDK.</div>
+                                      </div>
+                                    </button>
+                                  </li>
+
+                                  <li lib-dropdown-option="" data-automation-id="create-new-Application" role="none">
+                                    <button role="menuitem" value="MSIX_PWA_Game">
+                                      <div class="info-tooltip-container">
+                                        MSIX 或 PWA 游戏
+                                        <button class="win-icon win-icon-Info buttonReset" aria-label="MSIX 或 PWA 游戏 信息"></button>
+                                      </div>
+                                      <div info-tooltip="" id="info-tooltip" class="text-body tooltip" style="position: fixed; opacity: 0; z-index: -1; left: 0px; top: 0px;">
+                                        <div class="tooltip-inner">Games packaged as MSIX. Available across multiple families of Windows devices. Game will be listed and hosted on the Microsoft Store.</div>
+                                      </div>
+                                    </button>
+                                  </li>
+
+                                </ul>
+                              </div>
+                            </div>
+                            <offers_he-copilot-button appearance="command" enable="true" action="default"></offers_he-copilot-button>
+                          </div>
+
+                          <div class="right">
+                            <lib-table-command-bar-button>
+                              <div class="command-bar-item command-bar-item-highlight">
+                                <button type="button" class="hide-focus" title="显示/隐藏产品">
+                                  <span class="win-color-fg-blue win-icon win-icon-View"></span>
+                                  <span>显示/隐藏产品</span>
+                                </button>
+                              </div>
+                            </lib-table-command-bar-button>
+
+                            <lib-table-command-bar-button>
+                              <div class="command-bar-item command-bar-item-highlight">
+                                <button type="button" class="hide-focus" title="筛选器">
+                                  <span class="win-color-fg-blue win-icon win-icon-Filter"></span>
+                                  <span>筛选器</span>
+                                </button>
+                              </div>
+                            </lib-table-command-bar-button>
+
+                            <lib-search name="search-bar">
+                              <div class="search-container search-container-spacing">
+                                <he-search-box role="search"
+                                               name="search"
+                                               class="he-search-box he-uses-arrow-keys he-focusable"
+                                               search-box=""
+                                               debounce="0"
+                                               type="text"
+                                               placeholder="搜索"
+                                               value=""
+                                               style="min-width: 250px;"></he-search-box>
+                              </div>
+                            </lib-search>
+                          </div>
+
+                        </div>
+                        <div></div>
+                      </lib-table-command-bar>
+
+                      <infinite-scroll-table reloadtitlekey="MarketplaceWorkspace_Offers_Reload_Offers">
+                        <inner-offers-table>
+                          <table cdk-table="" matsort="" class="cdk-table mat-sort table stick-to-table-command-bar" role="table">
+                            <thead role="rowgroup">
+                              <tr role="row" cdk-header-row="" class="cdk-header-row">
+
+                                <th role="columnheader" cdk-header-cell="" mat-sort-header=""
+                                    class="mat-sort-header cdk-header-cell cdk-column-displayName"
+                                    title="名称" aria-sort="ascending">
+                                  <div role="button" class="mat-sort-header-container mat-focus-indicator mat-sort-header-sorted" tabindex="0">
+                                    <div class="mat-sort-header-content">
+                                      <span data-l10n-key="AppName_Header_Name">名称</span>
+                                    </div>
+                                    <div class="mat-sort-header-arrow" style="transform: translateY(0px); opacity: 1;">
+                                      <div class="mat-sort-header-stem"></div>
+                                      <div class="mat-sort-header-indicator" style="transform: translateY(0px);">
+                                        <div class="mat-sort-header-pointer-left" style="transform: rotate(-45deg);"></div>
+                                        <div class="mat-sort-header-pointer-right" style="transform: rotate(45deg);"></div>
+                                        <div class="mat-sort-header-pointer-middle"></div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </th>
+
+                                <th role="columnheader" cdk-header-cell="" mat-sort-header=""
+                                    class="mat-sort-header cdk-header-cell cdk-column-productDocumentType mat-sort-header-disabled"
+                                    title="类型" aria-sort="none">
+                                  <div role="button" class="mat-sort-header-container mat-focus-indicator">
+                                    <div class="mat-sort-header-content">
+                                      <span data-l10n-key="AppsWorkspace_AppsDev_Dashboard_Product_List_Header_Type">类型</span>
+                                    </div>
+                                  </div>
+                                </th>
+
+                                <th role="columnheader" cdk-header-cell="" dcl10n="Included_Addons"
+                                    class="cdk-header-cell cdk-column-includedAddOns"
+                                    title="已包含" data-l10n-key="Included_Addons">已包含</th>
+
+                                <th role="columnheader" cdk-header-cell="" dcl10n="Markets"
+                                    class="cdk-header-cell cdk-column-markets"
+                                    title="市场" data-l10n-key="Markets">市场</th>
+
+                                <th role="columnheader" cdk-header-cell="" dcl10n="BasePrice"
+                                    class="cdk-header-cell cdk-column-basePrice"
+                                    title="基本价格" data-l10n-key="BasePrice">基本价格</th>
+
+                                <th role="columnheader" cdk-header-cell="" mat-sort-header=""
+                                    class="mat-sort-header cdk-header-cell cdk-column-storeProductSubmissionState mat-sort-header-disabled"
+                                    title="状态" aria-sort="none">
+                                  <div role="button" class="mat-sort-header-container mat-focus-indicator">
+                                    <div class="mat-sort-header-content">
+                                      <span dcl10n="AppName_Header_Status" data-l10n-key="AppName_Header_Status">状态</span>
+                                    </div>
+                                  </div>
+                                </th>
+
+                                <th role="columnheader" cdk-header-cell="" class="cdk-header-cell cdk-column-collapse"></th>
+
+                              </tr>
+                            </thead>
+                            <tbody role="rowgroup">
+                              <tr role="row" cdk-row="" class="cdk-row">
+
+                                <td cdk-cell="" class="cdk-cell cdk-column-displayName" role="cell" title="TestProjectABCDEFG99871">
+                                  <product-link>
+                                    <a href="/zh-cn/dashboard/products/9P91R044KH9G/overview">TestProjectABCDEFG99871</a>
+                                  </product-link>
+                                </td>
+
+                                <td cdk-cell="" class="cdk-cell cdk-column-productDocumentType" role="cell" title="MSIX 或 PWA 应用" data-l10n-key="MSIX_PWA_App">MSIX 或 PWA 应用</td>
+
+                                <td cdk-cell="" class="cdk-cell cdk-column-includedAddOns" role="cell">
+                                  <a dcl10n="Included_Addons_Count" title="0 个加载项" data-l10n-key="Included_Addons_Count" href="/zh-cn/dashboard/products/9P91R044KH9G/addons">0 个加载项</a>
+                                </td>
+
+                                <td cdk-cell="" class="cdk-cell cdk-column-markets" role="cell">
+                                  <a title="242" href="/zh-cn/dashboard/products/9P91R044KH9G/submissions/1152921505701720046/availability"> 242 </a>
+                                </td>
+
+                                <td cdk-cell="" class="cdk-cell cdk-column-basePrice" role="cell">
+                                  <p title="--"> -- </p>
+                                </td>
+
+                                <td cdk-cell="" class="cdk-cell cdk-column-storeProductSubmissionState" role="cell">
+                                  <span title="未提交" data-l10n-key="Submission_Status_InProgress">未提交</span>
+                                </td>
+
+                                <td cdk-cell="" class="cdk-cell table-collapse-btn cdk-column-collapse" role="cell"></td>
+
+                              </tr>
+                            </tbody>
+                            <tfoot role="rowgroup" class="cdk-table-sticky" style="display: none; bottom: 0px; z-index: 10; position: sticky;"></tfoot>
+                          </table>
+                        </inner-offers-table>
+                      </infinite-scroll-table>
+
+                      <div>
+                        <div data-l10n-key="ProgramDashboard_Product_List_ElementCount">正在显示 1 个结果。</div>
+                      </div>
+
+                    </offers-table>
+                  </div>
+                </div>
+              </div>
+
+              <xbox-survey>
+                <lib-modal id="xboxSurveyModal" name="xboxSurveyModal">
+                  <div tabindex="-1" class="modal fade fix-position" style="display: none; opacity: 0;">
+                    <div role="dialog" aria-modal="true" class="modal-dialog"></div>
+                  </div>
+                </lib-modal>
+              </xbox-survey>
+
+            </workspace-dashboard>
+          </main>
+        </page-main-content>
+
+      </div>
+    </workspace-container>
+  </div>
+
+  <div class="loading-overlay" style="opacity: 0;">
+    <webcore-progress>
+      <div class="progress indeterminate">
+        <div role="progressbar" class="progress-bar indeterminate indeterminate-bar" aria-label="Progress bar">
+          <div class="indeterminate-indicators">
+            <div class="indeterminate-indicator indicator-1"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-2"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-3"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-4"><div class="dot"></div></div>
+            <div class="indeterminate-indicator indicator-5"><div class="dot"></div></div>
+          </div>
+        </div>
+      </div>
+    </webcore-progress>
+  </div>
+</div>
