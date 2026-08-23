@@ -264,17 +264,38 @@ Agent 根据当前 App 增加针对性测试。
 3. **用户反馈迭代循环**：
    - 接收用户体验反馈 → 更新 README（用户需要/调整） → 极简修改代码 → 本地构建与升级重装（递增 manifest Version） → 再次请用户体验。
 
-## 9. Prepare for Microsoft Store (仅在用户充分满意且主动要求时)
+## 9. Microsoft Partner Center onboarding and operation guide
 
-当且仅当用户明确表达“非常满意、没有要改的了”或者主动询问“如何上架 / 如何发给别人”时，Agent 才引导进入商店发布准备：
+当且仅当用户对本地应用充分满意，明确表达“想发布到微软商店 / 想分享给其他人”时，Agent 启动开发者中心引导模块：
 
-- 核对 App manifest 与 Store 资料一致。
-- 确认 Display Name、Publisher、版本和包身份。
-- 准备图标、截图、描述和年龄评级说明。
-- 反映 App 使用的数据、网络和系统能力声明。
-- 由用户确认 `APP_ID`、市场、价格、可见性并完成最终提交。
+- **详细操作指引**：查阅 [partner-center-guide.md](references/partner-center-guide.md)。
+- **引导用户完成注册**：指导用户前往 [Partner Center](https://partner.microsoft.com/dashboard/registration/developer) 注册个人/公司开发者账号（一次性费用，支持国内双币信用卡）。
+- **获取正式包身份并回填**：
+  1. 引导用户在 Partner Center 中点击「新建应用」并预留产品名称；
+  2. 提取 3 项核心参数：`Package Identity Name`、`Publisher ID`、`PublisherDisplayName`；
+  3. Agent 将真实包身份回填至 `Package.appxmanifest`。
+- **一键准备商店物料**：
+  1. 定制渲染专属高品质应用 Logo（44x44, 150x150, 310x150, StoreLogo 等各尺寸 PNG）；
+  2. 生成 1920x1080 应用真实运行截图；
+  3. 编写中英文产品摘要、亮点列表、搜索关键字与纯本地离线隐私政策声明；
+  4. 指引用户快速完成 IARC 全年龄分级问卷。
 
-## 10. Technical run report
+## 10. Package and publish for Microsoft Store
+
+物料与包身份就绪后，执行商店正式发布流程：
+
+1. **构建商店发布包**：
+   ```powershell
+   dotnet publish -c Release -r win-x64 -o ./publish
+   winapp package ./publish --self-contained --executable <AppName>.exe -o ./store-package
+   ```
+2. **清理权限声明**：移除 manifest 中模板自带的未用特权（如 `systemAIModels`），确保与应用真实功能一致。
+3. **提交与审核**：
+   - 指引用户在 Partner Center 提交页面上传 `.msix` / `.msixupload` 安装包；
+   - 确认定价（免费/全球）与各项资料完整勾选后，由用户点击「提交到应用商店」；
+   - 记录预估审核时间（通常 24 ~ 72 小时）。
+
+## 11. Technical run report
 
 每个 App 在 `build/run-report.md` 记录：
 
@@ -288,7 +309,7 @@ Agent 根据当前 App 增加针对性测试。
 - 新发现的 Windows 坑点及复现条件。
 - Store 人工确认项。
 
-## 11. Record findings locally（Agent 只记录，不 push）
+## 12. Record findings locally（Agent 只记录，不 push）
 
 **Agent 不做任何 git 写操作**（add/commit/push 全部禁止，需要凭据会弹窗打断用户，且仓库是只读 skill）。
 
@@ -311,6 +332,7 @@ Agent 根据当前 App 增加针对性测试。
 ## References
 
 - [discovery-interview.md](references/discovery-interview.md)：渐进式需求访谈建议。
+- [partner-center-guide.md](references/partner-center-guide.md)：微软开发者中心（Partner Center）注册、包身份获取与商店提审全流程指引。
 - [toolchain/README.md](references/toolchain/README.md)：工具版本与命令资料的职责。
 - [toolchain/v1/commands.md](references/toolchain/v1/commands.md)：当前 Windows 命令和实测记录。
 - [capabilities/registry.md](capabilities/registry.md)：可选能力建议与历史经验。
