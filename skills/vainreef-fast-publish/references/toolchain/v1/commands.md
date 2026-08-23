@@ -190,8 +190,9 @@ Get-Process -Name <AppName>,dotnet -ErrorAction SilentlyContinue | Stop-Process 
 
 - 脚本先写入 `.ps1` 文件再 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File` 执行
 - 长文件内容（XAML/C# 源码）拆分写入或分段 edit
+- **排障与测试严禁使用 PowerShell `-replace` 动态改写文件**：`-replace` 在处理包含引号、换行和空格的 XAML/C# 文本时极易静默匹配失败并返回原文件，会给 Agent 造成“改了代码但没效果”的假象，进而浪费几十个回合盲目试错（第六轮踩坑 40 回合）。修改代码和排障测试必须使用工具或整文件完整覆盖写入。
 
-### 4. 模型可能看不了图片——不要依赖截图验证
+### 4. 模型可能看不了图片——不要依赖截图验证，必须用 `winapp ui`
 
 DeepSeek V4 Flash 等模型无视觉能力：read 工具读图返回 "Image read successfully" 但模型无法解读内容。截图验证是死路。**改用 `winapp ui` 做 UI 自动化验证**（已实测可用）：
 
@@ -202,7 +203,11 @@ winapp ui invoke "<selector>" -a <AppName>       # 点按钮
 winapp ui set-value "<selector>" "文本" -a <AppName>  # 填输入框
 ```
 
-UI 自动化交互（点添加 → 填名字 → 点保存）已验证可完整驱动 WinUI 3 应用，是"无法点击 UI"问题的标准解。
+**UI 自动化 3 大实测防坑细则（违反必报错）：**
+
+1. **防输入框占位符歧义（matched 2 elements）**：若 TextBox 设置了 `PlaceholderText="想说的话"`，`winapp ui set-value "想说的话"` 会同时命中占位符和输入框导致歧义报错。**标准解法**：在 XAML 中为输入框加上 `x:Name="WordsBox"`，在测试时用唯一 UID（如 `txt-wordsbox-4b0e`）进行赋值。
+2. **防列表操作按钮歧义（matched N elements）**：列表包含多张卡片时，每张卡片都有“删掉/编辑”按钮，纯文本匹配会命中多个。**标准解法**：先用 `winapp ui search` 获取目标卡片专属的唯一 UID（如 `btn-4b2b`）触发；确认弹窗中的操作按钮则触发 `PrimaryButton`。
+3. **UI 变动后旧 UID 强制失效刷新（RuntimeId hash doesn't match）**：一旦执行了添加、保存、删除等改变界面的操作，WinUI 3 会重新渲染视觉树，之前查出的所有元素 UID **全部即刻失效**。**标准解法**：**每次 UI 发生变动后，必须重新执行 `winapp ui search` 或 `inspect` 获取最新的元素树，严禁直接调用旧 UID！**
 
 ### 5. PowerShell 5.1 控制台中文乱码是显示问题，不是文件问题
 
