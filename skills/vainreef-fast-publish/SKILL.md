@@ -86,6 +86,12 @@ Agent 工作根目录（就是仓库 clone 所在的父目录）
 2. 用日常语言复述 App 的完整体验。
 3. 结尾询问：`我理解的是这样，对吗？`
 4. 用户确认后进入工程阶段。
+5. **【双窗口并行机制】启动构建时向用户输出友好非阻塞提示**：
+   ```text
+   我已开始为你全自动编写代码、生成界面、打包并进行自动化测试（大约需要 15~20 分钟）。
+   这段时间如果你想提前准备微软开发者账号，或者想提前在微软控制台测试你的应用名称是否可用，可以随时新开一个对话窗口向我提问：“我要如何创建 Partner 开发者账号？”或“如何起名验重？”，我会详细指引你完成。
+   ```
+6. **构建主会话保持极致专注**：本会话专注于代码生成、编译、自包含 MSIX 打包、`winapp ui` 自动化黑盒测试与本地安装，绝不在同一会话里混杂交互问答，避免上下文污染与任务中断。
 
 ## 2. Read the Windows build notes
 
@@ -266,19 +272,25 @@ Agent 根据当前 App 增加针对性测试。
 
 ## 9. Microsoft Partner Center onboarding and operation guide
 
-当且仅当用户对本地应用充分满意，明确表达“想发布到微软商店 / 想分享给其他人”时，Agent 启动开发者中心引导模块：
+本模块为 Agent 向用户提供微软开发者中心（Partner Center）全流程协助的标准规范。支持**独立咨询会话（窗口 2）**与**发布时刻智能断点续接**：
 
-- **详细操作指引**：查阅 [partner-center-guide.md](references/partner-center-guide.md)。
-- **引导用户完成注册**：指导用户前往 [Partner Center](https://partner.microsoft.com/dashboard/registration/developer) 注册个人/公司开发者账号（一次性费用，支持国内双币信用卡）。
-- **获取正式包身份并回填**：
-  1. 引导用户在 Partner Center 中点击「新建应用」并预留产品名称；
-  2. 提取 3 项核心参数：`Package Identity Name`、`Publisher ID`、`PublisherDisplayName`；
-  3. Agent 将真实包身份回填至 `Package.appxmanifest`。
-- **一键准备商店物料**：
-  1. 定制渲染专属高品质应用 Logo（44x44, 150x150, 310x150, StoreLogo 等各尺寸 PNG）；
-  2. 生成 1920x1080 应用真实运行截图；
-  3. 编写中英文产品摘要、亮点列表、搜索关键字与纯本地离线隐私政策声明；
-  4. 指引用户快速完成 IARC 全年龄分级问卷。
+- **详细权威操作手册**：严格查阅 [partner-center-guide.md](references/partner-center-guide.md) 及 `docs/partner-center/` 内的真实表单 DOM 快照。
+- **独立咨询会话（窗口 2）指引规范**：
+  1. 当用户新开窗口提问“如何创建 Partner 账号 / 如何起名验重”时，Agent 专注提供咨询服务；
+  2. 指引用户通过 Xbox 应用注册避开真人验证码异常，选择免费「个人开发者」并完成身份证照片上传；
+  3. **控制台名称前置验重**：指导用户在 Partner Center 点击「+ 新产品」→「MSIX 或 PWA 应用」，输入名称点击「检查可用性」。若重名当场换名，确认可用后点击「保留产品名称」（3 个月有效期）；
+  4. 指导用户在「产品管理」→「产品标识」中提取 3 项核心参数：`Package Identity Name`、`Publisher ID`、`PublisherDisplayName`。
+- **发布时刻的断点智能续接状态机**：
+  - 当用户在构建主会话（窗口 1）试用满意并表达上架意向时，Agent 自动检查发布链条：
+    ```text
+    [ ] 1. 微软个人开发者账号注册与身份证实名认证
+    [ ] 2. Partner Center 应用名称预留与验重 (获得 3 个月保留期)
+    [ ] 3. 提取 3 大 Product Identity 参数回填 Package.appxmanifest
+    [ ] 4. 定制渲染专属 Logo 图标 (44x44, 150x150, 310x150) 与 1080P 截图
+    [ ] 5. 清理 manifest 冗余权限，生成 Store 正式发布包 (.msix)
+    [ ] 6. 协助完成 Partner Center 6 大提审表单填报
+    ```
+  - **断点续接**：若用户已在窗口 2 取得参数，直接接收并回填；若未操作或卡在某一步，Agent 从该断点处精准续接，提供对应表单标准值与物料，带领用户顺畅走通。
 
 ## 10. Package and publish for Microsoft Store
 
