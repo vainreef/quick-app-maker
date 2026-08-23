@@ -11,17 +11,18 @@
 ## 第一条原则：先判断“生成还是下载”
 
 ```text
-能本地生成 → 本地生成（PowerShell + System.Drawing，零网络，最快最稳）
-需要真实内容（照片/图标/字体/声音/视频/模型）→ 走国内镜像与直链下载
+能本地生成/系统自带 → 本地直接取用（零网络，最快最稳，第一优先级）
+需要特定外部真实内容 → 走国内镜像与直链下载（第二优先级）
 ```
 
-1. **测试图片控件/布局**：优先使用 PowerShell 本地生成纯色/渐变 PNG 或直接在 XAML 用带圆角 `Border` + `LinearGradientBrush` / 系统自带 `FontIcon` 占位，零网络依赖。
-2. **UI 图标**：**最高优先级**永远在 XAML 中使用 Windows 10/11 自带的 `Segoe Fluent Icons`（0 文件、0 下载、无 I/O 开销）；需要独立 SVG 文件时再查 Gitee 镜像。
-3. **真实照片**：使用 `img.scdn.io`（国内 CDN，仅用稳定标签或随机图）。
+1. **短音效 / 提示音 / 闹钟铃声**：**100% 优先使用 Windows 自带音频（`C:\Windows\Media\`）**，零网络、零下载。
+2. **UI 控件图标与头像**：**100% 优先使用 XAML 原生控件与系统自带字体**（`Segoe Fluent Icons` 与 `PersonPicture` 控件），无文件 I/O 开销。
+3. **Zip 压缩包与测试数据**：使用 PowerShell 原生 `Compress-Archive` 与 `Set-Content` 本地秒级生成。
+4. **真实背景图片**：使用 `img.scdn.io`（国内 CDN，仅用稳定 `tag=风景` 或纯随机）。
 
 ---
 
-## 一、 本地生成（PowerShell 5.1 原生，零网络）
+## 一、 本地生成与原生文件（PowerShell 5.1 原生，零网络）
 
 ```powershell
 # 1. 纯色 / 渐变占位 PNG（System.Drawing）
@@ -32,10 +33,12 @@ $g.Clear([System.Drawing.Color]::FromArgb(255, 0, 120, 215)) # Fluent 蓝
 $bmp.Save("$PWD\Assets\placeholder.png", [System.Drawing.Imaging.ImageFormat]::Png)
 
 # 2. 文本 / CSV / JSON 测试数据
-# 注意：PowerShell 5.1 执行含中文的 .ps1 必须带 UTF-8 BOM，数据文件写入建议用 UTF8
 Set-Content -Path "$PWD\testdata\data.csv" -Value "id,name,role`n1,张三,管理员`n2,李四,用户" -Encoding UTF8
 
-# 3. 损坏 / 异常 / 边界文件（压力测试用）
+# 3. 标准 Zip 压缩包（原生 PowerShell，无需外部工具）
+Compress-Archive -Path "$PWD\testdata\data.csv" -DestinationPath "$PWD\testdata\sample.zip" -Force
+
+# 4. 损坏 / 异常 / 边界文件（压力测试用）
 # 从正常文件复制并截断，严禁到网上搜索损坏文件
 $bytes = [IO.File]::ReadAllBytes("$PWD\Assets\placeholder.png")
 [IO.File]::WriteAllBytes("$PWD\testdata\corrupted.png", $bytes[0..100]) # 截断损坏文件
@@ -44,15 +47,15 @@ New-Item -ItemType File -Path "$PWD\testdata\zero_byte.dat" -Force | Out-Null # 
 
 ---
 
-## 二、 真实图片素材（img.scdn.io 大陆 CDN）
+## 二、 真实图片与用户头像素材
 
-### 随机 / 稳定标签真实图片
+### 1. 随机 / 稳定标签真实图片（img.scdn.io 大陆 CDN）
 - **接口**：`https://img.scdn.io/api/random.php`
 - **稳定参数**：
   - `?tag=风景`（实测 100% 成功）
   - 不带 tag 纯随机（实测 100% 成功）
-- **避坑提示**：**严禁使用 `?tag=自然`（100% 报 404）或 `?tag=建筑`（高概率失败）**，后端标签覆盖不完整。
-- **重试机制**：由于 CDN 偶发 DNS/连接抖动，`curl` 必须带 `--retry 3 --retry-delay 1`。
+- **避坑提示**：**严禁使用 `?tag=自然`（100% 报 404）或 `?tag=建筑`（高概率失败）**。
+- **重试机制**：`curl` 必须带 `--retry 3 --retry-delay 1`。
 
 ```powershell
 # 方式 A：直接 302 下载图片（推荐，稳定风景图）
@@ -60,41 +63,50 @@ curl.exe -L --retry 3 --retry-delay 1 "https://img.scdn.io/api/random.php?tag=�
 
 # 方式 B：纯随机图片
 curl.exe -L --retry 3 --retry-delay 1 "https://img.scdn.io/api/random.php" -o ".\Assets\random.webp"
-
-# 方式 C：先获取 JSON 元数据再下载
-$r = Invoke-RestMethod "https://img.scdn.io/api/random.php?tag=风景&format=json"
-curl.exe -L --retry 3 --retry-delay 1 $r.data.image_url -o ".\Assets\background.webp"
 ```
 
-> **注意**：ModelScope 等公开数据集仓库（如 `cats_and_dogs`）在 Git 树中只有元数据文本、不含实际 JPG（需 Python SDK `MsDataset.load` 动态拉取，当前工具链无 Python），**严禁通过 git clone 尝试获取图片数据集**。
+### 2. 用户头像 / 角色占位 (Avatar)
+- **首选（XAML 原生控件，零下载）**：WinUI 3 原生自带 `PersonPicture` 控件，自动渲染首字母与标准圆底色：
+  ```xml
+  <PersonPicture DisplayName="张三" Initials="ZS" Width="48" Height="48" />
+  ```
+- **次选（系统字形）**：`<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE77B;" />`
+- **SVG 独立文件**：从 Gitee Lucide 镜像提取 `icons/user.svg` 或 `icons/circle-user.svg`。
 
 ---
 
-## 三、 UI 图标与 SVG（Gitee 官方每日同步镜像）
+## 三、 UI 图标与 SVG（系统内置字形 & Gitee 镜像）
 
-> **图标选型铁律（避坑指南）**：
-> 1. **首选**：XAML 内置 `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" />`（0 下载、0 文件、0 I/O 开销）。
-> 2. **次选（通用/生活类图标）**：优先克隆 **Lucide 镜像**（仓库适中、克隆迅速、SVG 文件齐全）。
-> 3. **末选（特定微软官方控件图标）**：**Fluent UI Icons 镜像包含 11.8 万个小文件**，全量克隆与删除目录极其消耗磁盘 I/O（耗时极长），非必要不要全量克隆。
+### 1. Windows 原生 Segoe Fluent Icons 常用字形（最高优先级，零下载）
 
-### 1. 通用矢量图标 Lucide 国内镜像（推荐，克隆快）
+在 XAML 中直接声明，Windows 11/10 底层内置：
+
+| 图标用途 | XAML 代码 |
+| :--- | :--- |
+| **设置** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" />` |
+| **用户 / 个人** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE77B;" />` |
+| **通知 / 铃铛** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEA8F;" />` |
+| **成功 / 对勾** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE73E;" />` |
+| **警告 / 错误** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE783;" />` |
+| **搜索** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE721;" />` |
+| **添加 / 新建** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE710;" />` |
+| **删除 / 垃圾桶** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" />` |
+| **收藏 / 爱心** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB51;" />` |
+| **商品 / 购物车** | `<FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BF;" />` |
+
+### 2. 通用矢量图标 Lucide 国内镜像（SVG 独立文件推荐）
 - **仓库**：`https://gitee.com/mirrors/lucide.git`
 
 ```powershell
 git clone --depth 1 https://gitee.com/mirrors/lucide.git ".\TempAssets\lucide"
-# 搜索并复制常用生活/主题类图标（cat / music / folder 等）
-Get-ChildItem ".\TempAssets\lucide" -Recurse -Filter "*cat*.svg"
-Copy-Item (Get-ChildItem ".\TempAssets\lucide" -Recurse -Filter "cat.svg" | Select-Object -First 1).FullName ".\Assets\cat.svg"
+# 搜索并复制常用生活/主题类图标（cat / music / folder / user 等）
+Copy-Item ".\TempAssets\lucide\icons\cat.svg" ".\Assets\cat.svg"
+Copy-Item ".\TempAssets\lucide\icons\circle-user.svg" ".\Assets\avatar.svg"
 ```
 
-### 2. 微软官方 Fluent UI System Icons 国内镜像（备选）
+### 3. 微软官方 Fluent UI System Icons 国内镜像（特定控件图标备选）
 - **仓库**：`https://gitee.com/mirrors/fluentui-system-icons.git`
-
-```powershell
-git clone --depth 1 https://gitee.com/mirrors/fluentui-system-icons.git ".\TempAssets\fluent"
-# 搜索并复制特定控件图标
-Copy-Item (Get-ChildItem ".\TempAssets\fluent" -Recurse -Filter "ic_fluent_settings_24_regular.svg" | Select-Object -First 1).FullName ".\Assets\settings.svg"
-```
+- **注意**：该镜像包含 11.8 万个小文件，全量克隆耗时较长，仅在确实需要特定微软官方控件图标时使用。
 
 ---
 
@@ -105,7 +117,6 @@ Copy-Item (Get-ChildItem ".\TempAssets\fluent" -Recurse -Filter "ic_fluent_setti
 - **Bold 粗体**：`https://mirrors.tuna.tsinghua.edu.cn/adobe-fonts/source-han-sans/OTF/SimplifiedChinese/SourceHanSansSC-Bold.otf`
 
 ```powershell
-# 单文件直下到工程 Assets 目录（实测文件头 OTTO 合法）
 curl.exe -L --retry 3 --retry-delay 1 "https://mirrors.tuna.tsinghua.edu.cn/adobe-fonts/source-han-sans/OTF/SimplifiedChinese/SourceHanSansSC-Regular.otf" -o ".\Assets\SourceHanSansSC-Regular.otf"
 ```
 > **WinUI 3 XAML 引用规范**：
@@ -125,17 +136,33 @@ Copy-Item ".\TempAssets\lottie\entry\src\main\ets\common\lottie\data.json" ".\As
 
 ---
 
-## 六、 音频与视频（阿里 OSS 官方样本 & Gitee）
+## 六、 音频与视频（Windows 原生音效 & 阿里 OSS & Gitee）
 
-### 1. 音频 WAV（阿里云杭州 OSS 官方 ASR 测试语音，单文件直链）
+### 1. Windows 原生系统音效（最推荐，本地零网络，标准无损 WAV）
+Windows 10/11 电脑在 `C:\Windows\Media\` 目录下内置了全套高品质系统音效，开发桌面应用时直接复制使用：
+
+| 音效类型 | 推荐文件路径 |
+| :--- | :--- |
+| **通知 / 成功** | `C:\Windows\Media\notify.wav` / `chimes.wav` / `tada.wav` |
+| **倒计时 / 闹钟** | `C:\Windows\Media\Alarm01.wav`（至 `Alarm10.wav`）/ `Ring01.wav` |
+| **按键 / 交互** | `C:\Windows\Media\Windows Navigation Start.wav` / `Windows Pop-up Blocked.wav` |
+| **警告 / 错误** | `C:\Windows\Media\chord.wav` / `Windows Foreground.wav` |
+
+```powershell
+# 复制原生通知音或闹钟铃声到项目工程
+Copy-Item "C:\Windows\Media\notify.wav" ".\Assets\notify.wav"
+Copy-Item "C:\Windows\Media\Alarm01.wav" ".\Assets\alarm.wav"
+```
+
+### 2. 长语音录音 WAV（阿里云杭州 OSS 官方 ASR 样本，用于语音识别/播放测试）
 - **中文语音 WAV**：`https://isv-data.oss-cn-hangzhou.aliyuncs.com/ics/MaaS/ASR/test_audio/asr_example_zh.wav`（177KB，RIFF 合法）
 - **日语语音 WAV**：`https://isv-data.oss-cn-hangzhou.aliyuncs.com/ics/MaaS/ASR/test_audio/asr_example_ja.wav`（200KB，RIFF 合法）
 
 ```powershell
-curl.exe -L --retry 3 --retry-delay 1 "https://isv-data.oss-cn-hangzhou.aliyuncs.com/ics/MaaS/ASR/test_audio/asr_example_zh.wav" -o ".\Assets\sample.wav"
+curl.exe -L --retry 3 --retry-delay 1 "https://isv-data.oss-cn-hangzhou.aliyuncs.com/ics/MaaS/ASR/test_audio/asr_example_zh.wav" -o ".\Assets\sample_speech.wav"
 ```
 
-### 2. MP4 视频（Gitee 现成测试视频）
+### 3. MP4 视频（Gitee 现成测试视频）
 - **仓库**：`https://gitee.com/cheng_gitee/BXC_VideoAnalyzer_v4.git`
 - **内置测试视频路径**：`data/test.mp4`（3.7MB，ftyp 合法 MP4）
 
@@ -153,7 +180,6 @@ Copy-Item ".\TempAssets\video-test\data\test.mp4" ".\Assets\sample.mp4"
 
 ```powershell
 git clone --depth 1 https://gitee.com/marsqiu/glTF-Sample-Models.git ".\TempAssets\gltf"
-# 复制标准 Box 模型（注意包含 \Box\ 子目录）
 Copy-Item ".\TempAssets\gltf\2.0\Box\glTF-Binary\Box.glb" ".\Assets\box.glb"
 ```
 
@@ -162,8 +188,6 @@ Copy-Item ".\TempAssets\gltf\2.0\Box\glTF-Binary\Box.glb" ".\Assets\box.glb"
 ## 八、 品牌 Logo / Emoji / 假数据（npmmirror 国内镜像）
 
 国内 npm 镜像源：`https://registry.npmmirror.com`
-
-若开发机环境包含 `npm` 或需要批量提取标准包资源：
 
 ```powershell
 npm config set registry https://registry.npmmirror.com
@@ -181,13 +205,16 @@ npm install @faker-js/faker
 ## 九、 素材决策树速查表（中国大陆实机专用）
 
 ```text
-UI 图标 (首选)   → Windows 原生 Segoe Fluent Icons 字体图标 (零网络、零下载)
-UI 图标 (SVG)    → Gitee Lucide 镜像 (推荐，克隆快) → Gitee Fluent 镜像 (11万小文件慎用)
-真实照片/背景     → img.scdn.io (仅用 ?tag=风景 或 无标签随机图，带 --retry 3)
+UI 控件图标      → Windows 原生 Segoe Fluent Icons 字体字形 (零网络、零下载)
+用户头像 (Avatar)→ WinUI 3 原生 PersonPicture 控件 / Lucide user.svg
+短音效/通知/闹钟 → Windows 自带 C:\Windows\Media\*.wav (notify.wav / Alarm01.wav)
+长语音录音 (WAV) → 阿里云 OSS (asr_example_zh.wav 单文件直下)
+独立 SVG 图标    → Gitee Lucide 镜像 (推荐，克隆快) → Gitee Fluent 镜像
+真实照片/背景    → img.scdn.io (仅用 ?tag=风景 或 无标签随机图，带 --retry 3)
+标准 Zip 压缩包  → PowerShell 原生 Compress-Archive 命令本地生成
 纯色/占位 PNG    → PowerShell + System.Drawing 本地生成
 中文字体 (OTF)   → 清华大学 TUNA 镜像 (思源黑体单文件直下)
 Lottie 动画 JSON → Gitee OpenHarmony Lottie (data.json)
-音频 (WAV)       → 阿里云 OSS (asr_example_zh.wav 单文件直下)
 视频 (MP4)       → Gitee BXC_VideoAnalyzer_v4 (data/test.mp4)
 3D 模型 (GLB)    → Gitee glTF-Sample-Models (2.0/Box/glTF-Binary/Box.glb)
 品牌 Logo / Emoji→ npmmirror (simple-icons / openmoji)
@@ -207,5 +234,5 @@ Lottie 动画 JSON → Gitee OpenHarmony Lottie (data.json)
    </ItemGroup>
    ```
 2. **临时目录清理与幂等**：
-   克隆到 `TempAssets\` 的临时仓库提取素材后需及时删除，清理命令使用 `-Recurse -Force` 并捕获异常，避免因文件句柄或超时阻塞。
+   克隆到 `TempAssets\` 的临时仓库提取素材后需及时删除，清理命令使用 `-Recurse -Force` 并捕获异常。
 3. **上架前清理**：测试期间使用的临时网络图片（如 `img.scdn.io`），在正式发布提交 Microsoft Store 前必须替换为项目自有原创或明确商业授权资产。
