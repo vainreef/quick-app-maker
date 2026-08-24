@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -13,26 +14,38 @@ public class StoreOrchestrator
     private readonly DesiredState _desired;
     private readonly string _stateRoot;
     private readonly string _logRoot;
+    private readonly StoreCheckpoint _checkpoint;
     private readonly bool _apply;
     private readonly bool _submit;
     private readonly bool _confirmSubmit;
     private readonly bool _reloadVerify;
+    private readonly bool _keepOpen;
 
-    public StoreOrchestrator(DesiredState desired, string stateRoot, bool apply, bool submit, bool confirmSubmit, bool reloadVerify = true)
+    public StoreOrchestrator(
+        DesiredState desired,
+        string stateRoot,
+        StoreCheckpoint checkpoint,
+        bool apply,
+        bool submit,
+        bool confirmSubmit,
+        bool reloadVerify = true,
+        bool keepOpen = false)
     {
         _desired = desired;
         _stateRoot = stateRoot;
         _logRoot = Path.Combine(stateRoot, "logs");
+        _checkpoint = checkpoint;
         _apply = apply;
         _submit = submit;
         _confirmSubmit = confirmSubmit;
         _reloadVerify = reloadVerify;
+        _keepOpen = keepOpen;
 
         Directory.CreateDirectory(_stateRoot);
         Directory.CreateDirectory(_logRoot);
     }
 
-    public void RunPreflight()
+    public Task RunPreflightQualityInspectionAsync()
     {
         Log("INFO", "--- Starting STORE 0: Offline Static Preflight Quality Inspection ---");
 
@@ -74,11 +87,55 @@ public class StoreOrchestrator
         Log("PASS", $"Keywords count verified ({_desired.Values.Keywords.Count} <= 7)");
 
         Log("PASS", "STORE 0: Static preflight passed successfully.");
+        return Task.CompletedTask;
     }
 
-    public async Task RunPipelineAsync(string targetPhase = "all")
+    public (int pid, int port) GetSessionInfo()
     {
-        RunPreflight();
+        string pidFile = Path.Combine(_stateRoot, "edge.pid");
+        string portFile = Path.Combine(_stateRoot, "edge.port");
+
+        int pid = File.Exists(pidFile) && int.TryParse(File.ReadAllText(pidFile).Trim(), out int p) ? p : 0;
+        int port = File.Exists(portFile) && int.TryParse(File.ReadAllText(portFile).Trim(), out int pt) ? pt : 0;
+
+        return (pid, port);
+    }
+
+    public void StopSession()
+    {
+        var (pid, _) = GetSessionInfo();
+        if (pid > 0)
+        {
+            try
+            {
+                var proc = Process.GetProcessById(pid);
+                if (!proc.HasExited)
+                {
+                    proc.Kill(entireProcessTree: true);
+                }
+            }
+            catch { }
+        }
+
+        try { File.Delete(Path.Combine(_stateRoot, "edge.pid")); } catch { }
+        try { File.Delete(Path.Combine(_stateRoot, "edge.port")); } catch { }
+    }
+
+    public async Task EnsureSignedInAsync()
+    {
+        var conn = await CdpConnection.StartOrReuseAsync(_stateRoot);
+        string wsUrl = await conn.GetTargetWebSocketUrlAsync();
+
+        await using var client = new CdpClient();
+        await client.ConnectAsync(new Uri(wsUrl));
+
+        var waiter = new Waiter(client);
+        await EnsureSignedInCoreAsync(client, waiter);
+    }
+
+    public async Task<int> RunAsync(string targetPhase = "all")
+    {
+        await RunPreflightQualityInspectionAsync();
 
         Log("INFO", "--- Starting STORE 1: Session Discovery ---");
         var conn = await CdpConnection.StartOrReuseAsync(_stateRoot);
@@ -95,7 +152,7 @@ public class StoreOrchestrator
         var checkbox = new HeCheckboxAdapter(client, input);
         var heSelect = new HeSelectAdapter(client, ax, input, waiter);
 
-        await EnsureSignedInAsync(client, waiter);
+        await EnsureSignedInCoreAsync(client, waiter);
 
         Log("INFO", "--- Starting STORE 2: Live Compatibility Probe ---");
         var discovery = new SubmissionDiscovery(client, waiter, native);
@@ -106,6 +163,9 @@ public class StoreOrchestrator
         {
             throw new InvalidOperationException("Failed to discover active submission ID from Partner Center overview page.");
         }
+        _checkpoint.SubmissionId = submissionId;
+        SaveCheckpoint();
+
         Log("PASS", $"Live submission discovered: {submissionId}");
 
         var availabilityAdapter = new AvailabilityAdapter(client, waiter, heSelect, native);
@@ -118,6 +178,7 @@ public class StoreOrchestrator
         string GetUrl(string phase)
         {
             if (discResult.Hrefs.TryGetValue(phase, out var href)) return href;
+
             string b = _desired.Site.BaseUrl.TrimEnd('/');
             return phase switch
             {
@@ -136,6 +197,8 @@ public class StoreOrchestrator
             Log("INFO", $"=== Reconciling Phase: [{phaseName}] ===");
             await waiter.NavigateAsync(GetUrl(phaseName), phaseName);
             await execute();
+            _checkpoint.MarkConverged(phaseName);
+            SaveCheckpoint();
             Log("PASS", $"Phase [{phaseName}] CONVERGED");
         }
 
@@ -247,9 +310,11 @@ public class StoreOrchestrator
             ], "Submit to Store");
             Log("PASS", "Submitted successfully to Microsoft Store review.");
         }
+
+        return 0;
     }
 
-    private async Task EnsureSignedInAsync(CdpClient client, Waiter waiter)
+    private async Task EnsureSignedInCoreAsync(CdpClient client, Waiter waiter)
     {
         bool signedIn = await waiter.WaitUntilAsync(async () =>
         {
@@ -263,6 +328,16 @@ public class StoreOrchestrator
             throw new TimeoutException("Partner Center session was not established within login timeout.");
         }
         Log("PASS", "Partner Center session is active");
+    }
+
+    private void SaveCheckpoint()
+    {
+        try
+        {
+            string json = JsonSerializer.Serialize(_checkpoint, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(Path.Combine(_stateRoot, "checkpoint.json"), json);
+        }
+        catch { }
     }
 
     private void Log(string level, string message)

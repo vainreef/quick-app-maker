@@ -48,7 +48,7 @@ public class OptionsAdapter
           const els = Array.from(document.querySelectorAll('textarea')).filter(e => (e.parentElement?.parentElement?.innerText || '').includes('\u4e3a\u4f55\u9700\u8981\u4f7f\u7528'));
           return els.length === 1 ? els[0].value : '';
         })()
-        """) ?? "";
+        """);
 
         return obs;
     }
@@ -107,7 +107,12 @@ public class OptionsAdapter
         // Save
         await _native.ClickStrictAsync([
             "button[data-l10n-key=\"optionsSave\"]",
-            "button[data-l10n-key=\"appsubmission_savebutton\"]"
+            "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
+            "button[data-l10n-key=\"appsubmission_savebutton\"]",
+            "input#saveButtonOptions",
+            "button#saveButtonOptions",
+            "input[value=\"\u4fdd\u5b58\"]",
+            "button[value=\"\u4fdd\u5b58\"]"
         ], "Save options");
 
         await Task.Delay(2000);

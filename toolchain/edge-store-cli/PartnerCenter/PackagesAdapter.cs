@@ -99,9 +99,15 @@ public class PackagesAdapter
 
         // Save
         await _native.ClickStrictAsync([
+            "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
+            "button[data-l10n-key=\"appsubmission_savebutton\"]",
+            "button[uitestid=\"saveButtonPackages\"]",
+            "input#saveButtonPackages",
+            "button#saveButtonPackages",
             "input[value=\"Save\"]",
             "button[value=\"Save\"]",
-            "button[data-l10n-key=\"appsubmission_savebutton\"]"
+            "input[value=\"\u4fdd\u5b58\"]",
+            "button[value=\"\u4fdd\u5b58\"]"
         ], "Save packages");
 
         await Task.Delay(2000);

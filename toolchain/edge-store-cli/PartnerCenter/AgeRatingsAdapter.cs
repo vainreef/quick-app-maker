@@ -75,7 +75,7 @@ public class AgeRatingsAdapter
     {
         await _native.SetRadioAsync("input[name=\"inputMode\"][value=\"questionnaire\"]", "IARC questionnaire");
         await _native.SetRadioAsync("input[name=\"question#1109\"][value=\"2558\"]", "other application type 2558");
-        await _native.SetRadioAsync("#radioGroup input#noVal", "physical media no");
+        await _native.SetRadioAsync("#radioGroup input#noVal, input#noVal", "physical media no");
 
         var questionIds = new[] { "1152", "1188", "1193", "1037", "1194", "1195", "1375", "1196", "1197" };
         foreach (var qid in questionIds)
@@ -89,7 +89,9 @@ public class AgeRatingsAdapter
         // Save draft
         await _native.ClickStrictAsync([
             "he-button[data-l10n-key=\"AppSubmission_AgeRating_SaveButton\"]",
-            "button[data-l10n-key=\"AppSubmission_AgeRating_SaveButton\"]"
+            "button[data-l10n-key=\"AppSubmission_AgeRating_SaveButton\"]",
+            "he-button[data-l10n-key=\"appsubmission_agerating_savebutton\"]",
+            "button[data-l10n-key=\"appsubmission_agerating_savebutton\"]"
         ], "Age ratings preview save");
 
         await Task.Delay(2500);
@@ -103,7 +105,9 @@ public class AgeRatingsAdapter
           });
           if (els.length === 0) return null;
           const r = els[0].getBoundingClientRect();
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2, width: r.width, height: r.height };
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          if (cx <= 0 || cy <= 0 || cx > window.innerWidth || cy > window.innerHeight) return null;
+          return { x: cx, y: cy, width: r.width, height: r.height };
         })()
         """);
 
@@ -133,8 +137,13 @@ public class AgeRatingsAdapter
             return label.includes(target) || e.value === target;
           });
           if (radios.length !== 1) return null;
-          const r = radios[0].getBoundingClientRect();
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2, width: r.width, height: r.height };
+          const e = radios[0];
+          const targetEl = (e.getBoundingClientRect().width <= 0) ? (e.closest('label') || e.parentElement) : e;
+          const r = targetEl.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) return null;
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          if (cx <= 0 || cy <= 0 || cx > window.innerWidth || cy > window.innerHeight) return null;
+          return { x: cx, y: cy, width: r.width, height: r.height };
         })()
         """);
 

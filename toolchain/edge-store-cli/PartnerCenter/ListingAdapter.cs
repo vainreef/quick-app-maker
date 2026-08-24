@@ -125,7 +125,13 @@ public class ListingAdapter
         // Save
         await _native.ClickStrictAsync([
             "button[name=\"save_button\"]",
-            "button[data-l10n-key=\"appsubmission_savebutton\"]"
+            "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
+            "button[data-l10n-key=\"appsubmission_savebutton\"]",
+            "button[uitestid=\"saveButtonListing\"]",
+            "input#saveButtonListing",
+            "button#saveButtonListing",
+            "input[value=\"\u4fdd\u5b58\"]",
+            "button[value=\"\u4fdd\u5b58\"]"
         ], "Save listing");
 
         await Task.Delay(2500);
@@ -142,7 +148,9 @@ public class ListingAdapter
           });
           if (els.length === 0) return null;
           const r = els[0].getBoundingClientRect();
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2, width: r.width, height: r.height };
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          if (cx <= 0 || cy <= 0 || cx > window.innerWidth || cy > window.innerHeight) return null;
+          return { x: cx, y: cy, width: r.width, height: r.height };
         })()
         """);
 

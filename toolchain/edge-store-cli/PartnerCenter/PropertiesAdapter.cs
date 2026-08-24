@@ -128,7 +128,11 @@ public class PropertiesAdapter
 
         // Save
         await _native.ClickStrictAsync([
+            "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
             "button[data-l10n-key=\"appsubmission_savebutton\"]",
+            "button[uitestid=\"saveButtonProperties\"]",
+            "input#saveButtonProperties",
+            "button#saveButtonProperties",
             "input[value=\"\u4fdd\u5b58\"]",
             "button[value=\"\u4fdd\u5b58\"]"
         ], "Save properties");
