@@ -275,24 +275,25 @@ Agent 根据当前 App 增加针对性测试。
 本模块为 Agent 向用户提供微软开发者中心（Partner Center）全流程协助的标准规范。支持**独立咨询会话（窗口 2）**与**发布时刻智能断点续接**：
 
 - **详细权威操作手册**：严格查阅 [partner-center-guide.md](references/partner-center-guide.md) 及 `docs/partner-center/` 内的真实表单 DOM 快照。
-- **命令行 Edge 自动化入口**：读取 [edge-store-automation.md](references/edge-store-automation.md)，使用 `toolchain/edge-store-cli/Invoke-EdgeStore.ps1`。不使用 Codex 专用浏览器操作、扩展、坐标点击或 OCR。
+- **命令行 Edge 自动化入口**：读取 [edge-store-automation.md](references/edge-store-automation.md)，使用 `toolchain/edge-store-cli/Invoke-EdgeStore.ps1`。不使用 Codex 专用浏览器操作或浏览器扩展；**严禁硬编码绝对坐标，但允许基于 DOM 元素实时 `getBoundingClientRect()` 动态计算中心坐标派发 CDP 原生鼠标/键盘事件**（驱动 Angular 自定义组件必需）。
 - **独立咨询会话（窗口 2）指引规范**：
   1. 当用户新开窗口提问“如何创建 Partner 账号 / 如何起名验重”时，Agent 专注提供咨询服务；
   2. 指引用户通过 Xbox 应用注册避开真人验证码异常，选择免费「个人开发者」并完成身份证照片上传；
   3. **控制台名称前置验重**：指导用户在 Partner Center 点击「+ 新产品」→「MSIX 或 PWA 应用」，输入名称点击「检查可用性」。若重名当场换名，确认可用后点击「保留产品名称」（3 个月有效期）；
   4. 指导用户在「产品管理」→「产品标识」中提取 3 项核心参数：`Package Identity Name`、`Publisher ID`、`PublisherDisplayName`。
 - **发布时刻的断点智能续接状态机**：
-  - 当用户在构建主会话（窗口 1）试用满意并表达上架意向时，Agent 自动检查发布链条：
+  - 当用户在构建主会话（窗口 1）试用满意并表达上架意向时，Agent 启动发布链条 8 阶段流水线（Store 0 ~ Store 7）：
     ```text
-    [ ] 1. 微软个人开发者账号注册与身份证实名认证
-    [ ] 2. Partner Center 应用名称预留与验重 (获得 3 个月保留期)
-    [ ] 3. 提取 3 大 Product Identity 参数回填 Package.appxmanifest
-    [ ] 4. 定制渲染专属 Logo 图标 (44x44, 150x150, 310x150) 与 1080P 截图
-    [ ] 5. 清理 manifest 冗余权限，生成 Store 正式发布包 (.msix)
-    [ ] 6. 协助完成 Partner Center 6 大提审表单填报
+    STORE 0: 离线静态质检 (MSIX 解包检查 DisplayName、Desktop-only 依赖、Logo/1080P 截图、<=7 关键词)
+    STORE 1: 建立隔离 Edge 会话 (用户完成登录/MFA，保持 profile 隔离)
+    STORE 2: 动态 DOM 探测 (从概览页读取 live submissionId 与 6 大表单实时 href)
+    STORE 3: 生成差异收敛计划 (Desired State vs Observed State)
+    STORE 4: 逐表原生 CDP 交互填报 (he-select/he-option/he-checkbox 物理点击与保存)
+    STORE 5: F5 刷新二次验证 (确保服务端持久化接收且无 .alert-error)
+    STORE 6: 概览页全貌校验 (确认 6 大表单全部呈现绿色勾选已完成)
+    STORE 7: 显式双确认提交审核 (-Submit -ConfirmSubmit 触发最终提审)
     ```
-  - **断点续接**：若用户已在窗口 2 取得参数，直接接收并回填；若未操作或卡在某一步，Agent 从 `toolchain/edge-store-cli/state/store-state.json` 的阶段断点续接。
-  - **浏览器运行规则**：先 `launch` 让用户在隔离 Edge profile 中完成登录/MFA，再 `inspect` 做只读结构检查；首轮按 `-Phase availability/properties/ageRatings/packages/listing/options` 逐表运行，确认页面状态后再进入下一表。选择器匹配 0 个或多个元素时立即停在原页面并生成 inspect 报告。
+  - **断点续接**：若用户已在窗口 2 取得参数，直接接收并回填；若未操作或卡在某一步，Agent 从 `toolchain/edge-store-cli/state/store-state.json` 与 `live-state.json` 阶段断点续接。
 
 ## 10. Package and publish for Microsoft Store
 
@@ -304,12 +305,14 @@ Agent 根据当前 App 增加针对性测试。
    New-Item -ItemType Directory -Force ./store-package | Out-Null
    winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
    ```
-2. **清理权限声明**：移除 manifest 中模板自带的未用特权（如 `systemAIModels`），确保与应用真实功能一致。
-3. **命令行 Edge 提交草稿**：
-   - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -Manifest <store-automation.json> -KeepOpen`
-   - 用户在隔离 Edge 窗口中完成登录、MFA 或 CAPTCHA；Agent 不读取凭据。
-   - 先执行 `-Action inspect`，再执行 `-Action run -Apply`；每个模块保存后读取错误区，失败停在当前模块。
-   - 默认选择 `Manual` 发布模式，避免认证通过后自动发布。
+2. **清理权限声明与多设备依赖**：
+   - 移除 manifest 中模板自带的未用特权（如 `systemAIModels`）；
+   - **删除 `Windows.Universal` 依赖，确保仅声明 `Windows.Desktop`**（杜绝 Mobile/Xbox 设备全列 rank 1 报错）。
+3. **命令行 Edge 声明式状态收敛**：
+   - 先执行 Store 0 静态预检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest <store-automation.json>`
+   - 启动会话：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -Manifest <store-automation.json> -KeepOpen`
+   - 逐表执行并验证持久化：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest <store-automation.json> -Apply -ReloadVerify -KeepOpen`
+   - 默认选择 `Manual` 发布模式，保留人工发布控制；自动填写提交选项中的 `runFullTrust` 500 字合规用途说明。
 4. **最终提交**：
    - 概览页六项均完成后，只有显式 `-Apply -Submit -ConfirmSubmit` 才点击「提交到应用商店」；
    - 记录 CLI 退出码、阶段 checkpoint、页面标题和最终 URL。

@@ -1,36 +1,43 @@
 {
-  "productId": "",
-  "submissionId": "",
-  "productName": "",
+  "productId": "9NXXXXXXXXXX",
+  "productName": "应用名称",
   "site": {
     "baseUrl": "https://partner.microsoft.com/zh-cn/dashboard/products",
     "languageId": "5",
     "languageCode": "zh-cn"
   },
-  "listingMarkdown": "",
+  "listingMarkdown": "build/store-listing.md",
   "values": {
-    "description": "",
-    "shortDescription": "",
-    "features": [],
-    "keywords": []
+    "description": "应用完整功能与体验描述",
+    "shortDescription": "一句话介绍应用核心亮点",
+    "features": [
+      "特色功能 1",
+      "特色功能 2",
+      "特色功能 3"
+    ],
+    "keywords": [
+      "关键词1",
+      "关键词2",
+      "关键词3"
+    ]
   },
   "properties": {
     "category": "Productivity",
     "privacy": "No",
-    "privacyPolicyText": ""
+    "privacyPolicyText": "本应用为本地运行工具，不收集、不存储、不上传任何用户个人隐私数据或使用习惯。"
   },
   "pricing": {
     "currency": "CN",
     "priceTier": "0"
   },
   "assets": {
-    "msix": "",
-    "screenshot": "",
+    "msix": "store-package/App_1.0.0.0_x64.msix",
+    "screenshot": "build/screenshots/shot-1.png",
     "poster": "",
-    "boxart": "",
-    "logo300": "",
-    "logo150": "",
-    "logo71": "",
+    "boxart": "Qiangua/Assets/store-boxart-1x1-1080x1080.png",
+    "logo300": "Qiangua/Assets/store-logo-300.png",
+    "logo150": "Qiangua/Assets/store-logo-150.png",
+    "logo71": "Qiangua/Assets/store-logo-71.png",
     "superhero": ""
   },
   "listing": {

@@ -1,6 +1,6 @@
-# Partner Center Edge 命令行自动化
+# Partner Center Edge 命令行自动化规范 (Edge Store Automation)
 
-## 使用入口
+## 使用入口与定位
 
 统一入口是：
 
@@ -8,93 +8,71 @@
 toolchain/edge-store-cli/Invoke-EdgeStore.ps1
 ```
 
-这是纯 PowerShell 5.1 CLI。它自己启动隔离的 Microsoft Edge，通过本机回环地址上的 Chromium DevTools Protocol 执行 DOM 操作、文件上传、页面验证和阶段恢复。
+这是纯 PowerShell 5.1 CLI，运行于隔离的 Microsoft Edge 进程中，通过本机回环地址 (`127.0.0.1`) 上的 Chromium DevTools Protocol (CDP) 执行**声明式状态收敛**、文件上传、动态 URL 探测、原生事件交互与阶段校验。
 
-Agent 不调用 Codex 浏览器工具、浏览器扩展、坐标点击或 OCR，也不把用户日常 Edge profile 作为默认 profile。
+Agent **严禁使用脆弱的硬编码绝对坐标，但允许基于 DOM 元素实时 `getBoundingClientRect()` 计算几何中心派发的 CDP 原生鼠标/键盘事件**（驱动 Angular 自定义组件必需）。
 
-## 标准流程
+---
 
-```text
-launch
-→ 用户在隔离 Edge 中登录 / MFA
-→ identity（需要时提取 3 个 Product Identity 参数）
-→ inspect（只读结构检查）
-→ run（dry-run 计划）
-→ run -Phase <phase> -Apply（首轮逐表填报、保存、验证）
-→ run -Phase all -Apply（后续可整链恢复）
-→ 概览页检查六项完成
-→ run -Apply -Submit -ConfirmSubmit（最终提交）
-```
+## 核心设计哲学：声明式状态收敛 (Declarative State Convergence)
 
-每个阶段都是：
+不采用盲目的“命令式脚本填表”，而是采用三层数据模型驱动的状态收敛系统：
+
+1. **Desired State（期望状态）**：`store-automation.json` 中声明的目标（免费、生产率分类、中文描述、1080P 截图等）；
+2. **Observed State（观测状态）**：实时从产品概览页 DOM 动态探测当前有效 `submissionId` 与 6 大表单的最新 `href`；
+3. **Reconcile Loop（收敛回路）**：计算差异，通过原生 CDP 输入修改表单，保存后执行 **F5 Reload 验证**，确保服务端已完全接收持久化。
+
+---
+
+## 标准 8 阶段发布流水线 (Store 0 ~ Store 7)
 
 ```text
-打开固定 URL
-→ 检查稳定选择器唯一命中
-→ 填写或上传
-→ 点击保存
-→ 读取可见错误区
-→ 写入 checkpoint
+STORE 0: STATIC PREFLIGHT        # 离线解包质检 MSIX (DisplayName/Desktop-only/Logo/1080P截图/关键字<=7)
+    ↓
+STORE 1: SESSION DISCOVERY       # 启动/复用隔离 Edge 进程，验证 CDP 连接与用户登录
+    ↓
+STORE 2: LIVE COMPATIBILITY PROBE# 概览页动态读取 live submissionId 与 6 大表单实时 href
+    ↓
+STORE 3: PLAN                    # 对比目标配置与当前表单状态生成差异收敛计划
+    ↓
+STORE 4: FORM RECONCILIATION     # 逐表执行 (等待关键控件就绪 -> CDP 物理点击填报 -> 保存)
+    ↓
+STORE 5: RELOAD VERIFICATION     # 刷新页面二次验证持久化状态，无 visible errors
+    ↓
+STORE 6: SUBMISSION INTEGRITY    # 概览页确认 6 大模块均显示绿色已完成状态
+    ↓
+STORE 7: EXPLICIT SUBMIT         # 必须显式传入 -Submit -ConfirmSubmit 触发终审
 ```
 
-## 用户环境保护
+---
 
-1. 默认 profile 位于 CLI 的 `state/edge-profile/`，与用户日常 Edge 分离。
-2. 只绑定 `127.0.0.1`，端口动态分配。
-3. 只结束 CLI 自己启动的 Edge PID。
-4. 不读取密码、Cookie、Local Storage 或浏览器凭据。
-5. 登录、MFA、CAPTCHA 由用户在 Edge 窗口中完成。
-6. 失败时停止在原页面，生成结构化 `inspect-*.json`，不猜测按钮。
-7. 默认使用 `Manual` 发布模式。
-8. 最终提交需要 `-Submit -ConfirmSubmit` 两个显式参数。
+## 交互原语与 Angular 自定义组件规范
 
-## 选择器优先级
+Partner Center 大量使用 Angular 自定义组件（`he-select`, `he-option`, `he-checkbox` 等），直接通过 DOM `setAttribute` 或 `value=...` 不会触发内部表单状态响应，导致保存按钮保持 `DISABLED`。
 
-Partner Center 页面变化频繁，选择器优先级固定为：
+**标准交互规范**：
+1. **下拉框选择 (he-select)**：
+   * 通过 CDP 原生鼠标点击展开下拉菜单（`market-group price-tier-selection he-select` 几何中心）；
+   * 等待选项列表渲染可见（`offsetParent !== null`）；
+   * 通过 CDP 原生鼠标点击目标选项（如文本为 `'0'` 的 `he-option`）；
+   * 下拉关闭，Angular 内部表单状态被正确置为 valid。
+2. **复选框选择 (he-checkbox)**：
+   * 检查当前 `checked` 状态与期望状态；
+   * 若不一致，定位元素几何中心派发 CDP 原生点击事件。
+3. **JS 字符串编码红线**：
+   * 传给 CDP `Runtime.evaluate` 的 JavaScript 字符串中，中文字符**一律使用 `\uXXXX` Unicode 转义**，外层使用单引号包裹，杜绝在中文 Windows GBK 环境下破坏语法。
 
-```text
-data-l10n-key
-data-automation-id
-id
-name
-uitestid
-aria-labelledby
-```
+---
 
-纯文字选择只作为最后一级，并且必须唯一命中。命中 0 个或多个元素时退出码为 7。
+## 6 大表单实战固化规则
 
-## 过程记录中已固化的规则
+来自 Round 8 与 Round 9 实测验证：
 
-来自 `apps/Project-02/process.md` 和 Round 8：
-
-- 必须先进入产品概览页点击「开始提交」，六个表单才出现；
-- 定价的 Default 市场组不创建新组：货币下拉选 `CNY - 中国`，价格段选 `0`（¥0）；
-- 可见性保持「零售分发」与「开放受众」；
-- 属性的隐私区先选「否，我的产品不使用任何个人信息」，再选「提供隐私策略文本」并填写文本框；
-- 中文 Store 一览使用 `languageid=5&languagecode=zh-cn`；
-- 年龄分级选择 `input[name="question#1109"][value="2558"]`；
-- 「其他所有应用类型」后 9 个追问全部选择「否」；
-- 年龄分级预览必须勾选 IARC 条款同意框，然后保存，再点「继续」；
-- 程序包上传使用 `input.fileuploader`；
-- 上传前检查 MSIX 内 `AppxManifest.xml` 的显示名与预留产品名一致；
-- 程序包设备系列只保留 Windows 10/11 Desktop；
-- Store 一览必填说明和至少一张桌面截图；
-- 关键字最多 7 个；
-- 提交选项中的 `runFullTrust` 说明框必须填写；
-- 包页面的警告和提交选项里的说明框是两个不同流程，不能混为一谈。
-
-## 当前产品配置
-
-Qiangua 的本地配置：
-
-```text
-apps/Project-02/qiangua/build/edge-store.json
-```
-
-通用配置样例：
-
-```text
-toolchain/edge-store-cli/examples/store-automation.json
-```
-
-配置文件可以直接引用 `store-listing.md`，CLI 会读取完整描述、简短描述、功能列表和关键词。
+- **动态 URL 发现**：产品概览页 DOM 包含所有 6 个表单的实时 href（`a[name=princingAndAvailability]` 等），严禁在配置文件中硬编码固定 submissionId；
+- **定价与可用性 (availability)**：Default 市场组选 `CNY - 中国`，价格段原生点击 `0`（¥0），发布日期选 `asap`，停止购置选 `auto-fill`；
+- **属性 (properties)**：隐私区选「否，我的产品不使用任何个人信息」，单选「提供隐私策略文本」并填写文本框；产品声明勾选 storage/backups/windows，**严禁勾选 usesGenAI**；
+- **年龄分级 (ageRatings)**：选择 IARC 调查表 → 应用类型选「其他所有应用类型 (value=2558)」→ 9 个追问全部选「否」→ 勾选 IARC 条款同意框并点击保存 → 点击「继续」；
+- **程序包 (packages)**：上传前解包验证 MSIX 内 `AppxManifest.xml` 的 `DisplayName` 与预留名一致；**设备系列必须且仅保留 Windows 10/11 Desktop**（严禁勾选 Mobile/Xbox/Team/MixedReality）；
+- **Store 一览 (listing)**：进入中文 zh-cn 页面，说明文本必填，至少 1 张 1080P 桌面运行截图，1:1 Logo (300x300)，关键词最多 7 个；
+- **提交选项 (options)**：默认 `Manual` 发布模式；**页面中若出现 `runFullTrust` 用途说明文本框，必须填报 500 字以内合规用途说明**。
+- **权限说明区分**：程序包页面的 `runFullTrust` 警告属于桌面应用正常提示，无需操作；提交选项页面出现的 `runFullTrust` 文本框则是必填项，两者不可混淆。

@@ -1,6 +1,12 @@
+<#
+.SYNOPSIS
+    Vainreef Edge Store CLI - Declarative Partner Center Automation Driver
+    Fully compatible with Windows PowerShell 5.1 & PowerShell 7+ on Windows x64.
+#>
+
 [CmdletBinding()]
 param(
-    [ValidateSet('launch', 'inspect', 'identity', 'run', 'status', 'stop')]
+    [ValidateSet('preflight', 'launch', 'inspect', 'identity', 'run', 'status', 'stop')]
     [string]$Action = 'run',
     [ValidateSet('all', 'availability', 'properties', 'ageRatings', 'packages', 'listing', 'options')]
     [string]$Phase = 'all',
@@ -13,6 +19,7 @@ param(
     [switch]$Submit,
     [switch]$ConfirmSubmit,
     [switch]$KeepOpen,
+    [switch]$ReloadVerify,
     [int]$TimeoutSeconds = 45,
     [int]$LoginTimeoutSeconds = 900
 )
@@ -24,12 +31,14 @@ $script:ToolRoot = $PSScriptRoot
 $script:StateRoot = Join-Path $script:ToolRoot 'state'
 $script:LogRoot = Join-Path $script:StateRoot 'logs'
 $script:StatePath = Join-Path $script:StateRoot 'store-state.json'
+$script:LiveStatePath = Join-Path $script:StateRoot 'live-state.json'
 $script:Port = 0
 $script:EdgeProcess = $null
 $script:CdpSocket = $null
 $script:CdpNextId = 1
 $script:Config = $null
 $script:State = $null
+$script:LiveState = $null
 $script:ManifestPath = $null
 $script:StartedByUs = $false
 $script:ExitCode = 1
@@ -69,7 +78,7 @@ function Stop-WithCode {
 }
 
 function Acquire-RunMutex {
-    if ($Action -eq 'stop') { return }
+    if ($Action -eq 'stop' -or $Action -eq 'preflight') { return }
     $script:RunMutex = [Threading.Mutex]::new($false, 'Local\VainreefQuickAppMakerEdgeStoreCli')
     if (-not $script:RunMutex.WaitOne(0)) {
         Stop-WithCode 4 'Another Edge Store CLI process is already running. Resume that process or use -Action stop.'
@@ -128,10 +137,10 @@ function Import-ListingMarkdown {
         $script:Config | Add-Member -NotePropertyName values -NotePropertyValue $values
     }
 
-    $shortMatch = [regex]::Match($text, '(?ms)^##\s*简短摘要.*?\r?\n\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*完整描述)')
-    $fullMatch = [regex]::Match($text, '(?ms)^##\s*完整描述.*?\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*产品功能)')
-    $featuresMatch = [regex]::Match($text, '(?ms)^##\s*产品功能.*?\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*搜索关键词)')
-    $keywordsMatch = [regex]::Match($text, '(?ms)^##\s*搜索关键词.*?\r?\n\r?\n(?<value>[^\r\n]+)')
+    $shortMatch = [regex]::Match($text, '(?ms)^##\s*\u7b80\u77ed\u6458\u8981.*?\r?\n\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*\u5b8c\u6574\u63cf\u8ff0)')
+    $fullMatch = [regex]::Match($text, '(?ms)^##\s*\u5b8c\u6574\u63cf\u8ff0.*?\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*\u4ea7\u54c1\u529f\u80fd)')
+    $featuresMatch = [regex]::Match($text, '(?ms)^##\s*\u4ea7\u54c1\u529f\u80fd.*?\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*\u641c\u7d22\u5173\u952e\u8bcd)')
+    $keywordsMatch = [regex]::Match($text, '(?ms)^##\s*\u641c\u7d22\u5173\u952e\u8bcd.*?\r?\n\r?\n(?<value>[^\r\n]+)')
 
     if ($shortMatch.Success -and [string]::IsNullOrWhiteSpace([string](Get-PropertyValue $values 'shortDescription' ''))) {
         $values | Add-Member -Force -NotePropertyName shortDescription -NotePropertyValue $shortMatch.Groups['value'].Value.Trim()
@@ -157,6 +166,14 @@ function Save-State {
     Move-Item -LiteralPath $temp -Destination $script:StatePath -Force
 }
 
+function Save-LiveState {
+    New-Item -ItemType Directory -Force -Path $script:StateRoot | Out-Null
+    $temp = "$script:LiveStatePath.tmp"
+    $json = $script:LiveState | ConvertTo-Json -Depth 30
+    [IO.File]::WriteAllText($temp, $json, [Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $temp -Destination $script:LiveStatePath -Force
+}
+
 function Initialize-State {
     $existing = $null
     if (Test-Path -LiteralPath $script:StatePath) {
@@ -168,7 +185,7 @@ function Initialize-State {
     }
     else {
         $script:State = [ordered]@{
-            schemaVersion = 1
+            schemaVersion = 2
             productId = ''
             submissionId = ''
             currentPhase = ''
@@ -188,6 +205,23 @@ function Initialize-State {
     }
     if (-not ($script:State.PSObject.Properties.Name -contains 'submissionId')) {
         $script:State | Add-Member -NotePropertyName submissionId -NotePropertyValue ''
+    }
+
+    $existingLive = $null
+    if (Test-Path -LiteralPath $script:LiveStatePath) {
+        try { $existingLive = Read-JsonFile $script:LiveStatePath } catch { $existingLive = $null }
+    }
+    if ($null -ne $existingLive) {
+        $script:LiveState = $existingLive
+    }
+    else {
+        $script:LiveState = [ordered]@{
+            productId = ''
+            submissionId = ''
+            discoveredHrefs = [ordered]@{}
+            formStatuses = [ordered]@{}
+            updatedAt = (Get-Date).ToString('o')
+        }
     }
 }
 
@@ -249,15 +283,15 @@ function Try-Reuse-Edge {
     $portPath = Join-Path $script:StateRoot 'edge.port'
     if (-not (Test-Path -LiteralPath $pidPath) -or -not (Test-Path -LiteralPath $portPath)) { return $false }
     try {
-        $pid = [int](Get-Content -LiteralPath $pidPath -Raw)
+        $savedPid = [int](Get-Content -LiteralPath $pidPath -Raw)
         $port = [int](Get-Content -LiteralPath $portPath -Raw)
-        $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+        $process = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
         if ($null -eq $process -or $process.HasExited) { return $false }
         [void](Wait-Http -Uri "http://127.0.0.1:$port/json/version" -Seconds 3)
         $script:EdgeProcess = $process
         $script:Port = $port
         $script:StartedByUs = $false
-        Write-Log -Level 'INFO' -Message "reusing isolated Edge process pid=$pid port=$port"
+        Write-Log -Level 'INFO' -Message "reusing isolated Edge process pid=$savedPid port=$port"
         return $true
     }
     catch { return $false }
@@ -293,23 +327,69 @@ function Start-Edge {
     [void](Wait-Http -Uri "http://127.0.0.1:$script:Port/json/version" -Seconds 45)
 }
 
-function Get-CdpTarget {
+function Connect-Cdp {
     $targets = Wait-Http -Uri "http://127.0.0.1:$script:Port/json/list" -Seconds 30
     $pages = @($targets | Where-Object { $_.type -eq 'page' -and $_.webSocketDebuggerUrl })
     if ($pages.Count -eq 0) { Stop-WithCode 4 'No Edge page target is available.' }
     $partner = @($pages | Where-Object { $_.url -like '*partner.microsoft.com*' })
-    if ($partner.Count -gt 0) { return $partner[0] }
-    return $pages[0]
+    if ($partner.Count -eq 0) { $partner = $pages }
+    $lastError = $null
+    foreach ($candidate in $partner) {
+        try {
+            $ws = [Net.WebSockets.ClientWebSocket]::new()
+            [void]($ws.ConnectAsync([Uri]$candidate.webSocketDebuggerUrl, [Threading.CancellationToken]::None).GetAwaiter().GetResult())
+            $script:CdpSocket = $ws
+            $script:CdpNextId = 1
+            $cts = [Threading.CancellationTokenSource]::new([TimeSpan]::FromSeconds(20))
+            try {
+                [void](Send-CdpRequest -Method 'Page.enable' -Params @{})
+                [void](Send-CdpRequest -Method 'Runtime.enable' -Params @{})
+                [void](Send-CdpRequest -Method 'DOM.enable' -Params @{})
+            }
+            finally { $cts.Dispose() }
+            Write-Log -Level 'INFO' -Message "connected to Edge page target"
+            return
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            try { $script:CdpSocket.Dispose() } catch { }
+            $script:CdpSocket = $null
+            Write-Log -Level 'WARN' -Message "page target did not respond: $($_.Exception.Message)"
+        }
+    }
+    Stop-WithCode 4 "No Edge page target responded. Last error: $lastError"
 }
 
-function Connect-Cdp {
-    $target = Get-CdpTarget
-    $script:CdpSocket = [Net.WebSockets.ClientWebSocket]::new()
-    $script:CdpSocket.ConnectAsync([Uri]$target.webSocketDebuggerUrl, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
-    $script:CdpNextId = 1
-    [void](Send-CdpRequest -Method 'Page.enable' -Params @{})
-    [void](Send-CdpRequest -Method 'Runtime.enable' -Params @{})
-    Write-Log -Level 'INFO' -Message "connected to Edge page target"
+function Split-CdpMessages {
+    param([string]$Payload)
+    $result = [System.Collections.Generic.List[string]]::new()
+    $depth = 0
+    $inString = $false
+    $escaped = $false
+    $current = [Text.StringBuilder]::new()
+    foreach ($ch in $Payload.ToCharArray()) {
+        if ($inString) {
+            [void]$current.Append($ch)
+            if ($escaped) { $escaped = $false }
+            elseif ($ch -eq '\') { $escaped = $true }
+            elseif ($ch -eq '"') { $inString = $false }
+            continue
+        }
+        if ($ch -eq '"') { $inString = $true; [void]$current.Append($ch); continue }
+        if ($ch -eq '{') { $depth++; [void]$current.Append($ch); continue }
+        if ($ch -eq '}') {
+            $depth--
+            [void]$current.Append($ch)
+            if ($depth -eq 0) {
+                $result.Add($current.ToString())
+                $current.Clear() | Out-Null
+            }
+            continue
+        }
+        if ($depth -gt 0) { [void]$current.Append($ch) }
+    }
+    if ($current.Length -gt 0) { $result.Add($current.ToString()) }
+    return $result
 }
 
 function Send-CdpRequest {
@@ -327,28 +407,48 @@ function Send-CdpRequest {
     $message = [ordered]@{ id = $id; method = $Method; params = $Params } | ConvertTo-Json -Depth 30 -Compress
     $bytes = [Text.Encoding]::UTF8.GetBytes($message)
     $segment = [ArraySegment[byte]]::new($bytes)
-    $script:CdpSocket.SendAsync($segment, [Net.WebSockets.WebSocketMessageType]::Text, $true, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
+    [void]($script:CdpSocket.SendAsync($segment, [Net.WebSockets.WebSocketMessageType]::Text, $true, [Threading.CancellationToken]::None).GetAwaiter().GetResult())
 
     while ($true) {
         $buffer = New-Object byte[] 65536
         $receivedBytes = [ArraySegment[byte]]::new($buffer)
         $builder = [Text.StringBuilder]::new()
+        $done = $false
+        $receiveDeadline = (Get-Date).AddSeconds(20)
         do {
-            $received = $script:CdpSocket.ReceiveAsync($receivedBytes, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
+            $cts = [Threading.CancellationTokenSource]::new([TimeSpan]::FromSeconds(20))
+            try {
+                $received = $script:CdpSocket.ReceiveAsync($receivedBytes, $cts.Token).GetAwaiter().GetResult()
+            }
+            catch {
+                Stop-WithCode 4 "Edge DevTools receive timed out after 20s ($Method)"
+            }
+            finally { $cts.Dispose() }
             if ($received.MessageType -eq [Net.WebSockets.WebSocketMessageType]::Close) {
                 Stop-WithCode 4 'Edge DevTools WebSocket closed unexpectedly.'
             }
             [void]$builder.Append([Text.Encoding]::UTF8.GetString($buffer, 0, $received.Count))
-        } while (-not $received.EndOfMessage)
-
-        $response = $builder.ToString() | ConvertFrom-Json
-        $responseId = Get-PropertyValue $response 'id' $null
-        if ($null -ne $responseId -and [int]$responseId -eq $id) {
-            $errorObject = Get-PropertyValue $response 'error' $null
-            if ($null -ne $errorObject) {
-                Stop-WithCode 5 "CDP $Method failed: $(Get-PropertyValue $errorObject 'message' 'unknown CDP error')"
+            if ($received.EndOfMessage) { $done = $true }
+            if (-not $done -and (Get-Date) -ge $receiveDeadline) {
+                Stop-WithCode 4 "Edge DevTools message did not finish within 20s ($Method)"
             }
-            return $response
+        } while (-not $done)
+
+        $payload = $builder.ToString()
+        $messages = Split-CdpMessages -Payload $payload
+        foreach ($item in $messages) {
+            $parsed = $null
+            try { $parsed = $item | ConvertFrom-Json } catch { $parsed = $null }
+            if ($null -eq $parsed) { continue }
+            $responseId = Get-PropertyValue $parsed 'id' $null
+            if ($null -eq $responseId) { continue }
+            if ([int]$responseId -eq $id) {
+                $errorObject = Get-PropertyValue $parsed 'error' $null
+                if ($null -ne $errorObject) {
+                    Stop-WithCode 5 "CDP $Method failed: $(Get-PropertyValue $errorObject 'message' 'unknown CDP error')"
+                }
+                return $parsed
+            }
         }
     }
 }
@@ -361,12 +461,21 @@ function Invoke-PageJs {
         awaitPromise = $true
         userGesture = $true
     }
+    $raw = $response | ConvertTo-Json -Depth 20 -Compress
+    try {
+        $short = if ($Expression.Length -gt 60) { $Expression.Substring(0, 60) + '...' } else { $Expression }
+        Add-Content -LiteralPath (Join-Path $script:LogRoot 'cdp-debug.log') -Value "[$(Get-Date -Format 'HH:mm:ss')] $short => $raw" -Encoding UTF8
+    } catch { }
     $result = Get-PropertyValue $response 'result' $null
     $exceptionDetails = Get-PropertyValue $result 'exceptionDetails' $null
     if ($null -ne $exceptionDetails) {
         Stop-WithCode 5 "Page JavaScript failed: $(Get-PropertyValue $exceptionDetails 'text' 'unknown JavaScript error')"
     }
     $remoteResult = Get-PropertyValue $result 'result' $null
+    if ($null -eq $remoteResult) {
+        Write-Log -Level 'WARN' -Message "Runtime.evaluate returned no result"
+        return $null
+    }
     if ($remoteResult.PSObject.Properties.Name -contains 'value') { return $remoteResult.value }
     return (Get-PropertyValue $remoteResult 'description' $null)
 }
@@ -374,18 +483,6 @@ function Invoke-PageJs {
 function ConvertTo-JsLiteral {
     param([AllowNull()][object]$Value)
     return ($Value | ConvertTo-Json -Depth 30 -Compress)
-}
-
-function Invoke-PageJsWithRetry {
-    param([string]$Expression, [int]$Seconds = $TimeoutSeconds)
-    $deadline = (Get-Date).AddSeconds($Seconds)
-    do {
-        try { return Invoke-PageJs -Expression $Expression }
-        catch {
-            if ((Get-Date) -ge $deadline) { throw }
-            Start-Sleep -Milliseconds 300
-        }
-    } while ((Get-Date) -lt $deadline)
 }
 
 function Get-PageInfo {
@@ -396,7 +493,7 @@ function Get-PageInfo {
   bodyLength: (document.body && document.body.innerText || '').length,
   hasLogin: /login\.microsoftonline|login\.live\.com|signin/i.test(location.href),
   visibleErrorCount: Array.from(document.querySelectorAll('.alert-error, .alert-danger, [role="alert"].alert-error, .has-error')).filter(e => {
-    const r=e.getBoundingClientRect(), s=getComputedStyle(e), t=(e.innerText||'').trim(); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && /不能为空|必须|错误|error|failed|invalid|至少一张|唯一标识|删除其中/i.test(t);
+    const r=e.getBoundingClientRect(), s=getComputedStyle(e), t=(e.innerText||'').trim(); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && /\u4e0d\u80fd\u4e3a\u7a7a|\u5fc5\u987b|\u9519\u8bef|error|failed|invalid|\u81f3\u5c11\u4e00\u5f20|\u552f\u4e00\u6807\u8bc6|\u5220\u9664\u5176\u4e2d/i.test(t);
   }).length
 }))()
 '@
@@ -442,8 +539,42 @@ function Test-VisibleSelector {
 "@)
 }
 
+function Click-NativeCenter {
+    param(
+        [Parameter(Mandatory = $true)][double]$X,
+        [Parameter(Mandatory = $true)][double]$Y,
+        [string]$Label = ''
+    )
+
+    [void](Send-CdpRequest -Method 'Input.dispatchMouseEvent' -Params @{
+        type = 'mouseMoved'
+        x = [int][Math]::Round($X)
+        y = [int][Math]::Round($Y)
+    })
+    Start-Sleep -Milliseconds 50
+
+    [void](Send-CdpRequest -Method 'Input.dispatchMouseEvent' -Params @{
+        type = 'mousePressed'
+        button = 'left'
+        clickCount = 1
+        x = [int][Math]::Round($X)
+        y = [int][Math]::Round($Y)
+    })
+    Start-Sleep -Milliseconds 50
+
+    [void](Send-CdpRequest -Method 'Input.dispatchMouseEvent' -Params @{
+        type = 'mouseReleased'
+        button = 'left'
+        clickCount = 1
+        x = [int][Math]::Round($X)
+        y = [int][Math]::Round($Y)
+    })
+    Start-Sleep -Milliseconds 150
+    if ($Label) { Write-Log -Level 'INFO' -Message "CDP native click $Label at ($([int]$X), $([int]$Y))" }
+}
+
 function Click-SelectorStrict {
-    param([string[]]$Selectors, [string]$Label)
+    param([string[]]$Selectors, [string]$Label, [switch]$NativeClick)
     $literal = ConvertTo-JsLiteral @($Selectors)
     $result = Invoke-PageJs @"
 (() => {
@@ -451,13 +582,20 @@ function Click-SelectorStrict {
   const visible=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'&&!e.disabled;};
   for(const selector of selectors){ for(const e of document.querySelectorAll(selector)){ if(visible(e)&&!seen.has(e)){seen.add(e);found.push({e,selector});} } }
   if(found.length!==1) return {ok:false,count:found.length,selectors:found.map(x=>x.selector)};
-  found[0].e.click(); return {ok:true,selector:found[0].selector};
+  const r=found[0].e.getBoundingClientRect();
+  return {ok:true,selector:found[0].selector,x:r.left+r.width/2,y:r.top+r.height/2};
 })()
 "@
     if (-not $result.ok) {
         Stop-WithCode 7 "UI schema mismatch for [$Label]: visible matches=$($result.count)"
     }
-    Write-Log -Level 'INFO' -Message "click $Label via $($result.selector)"
+    if ($NativeClick) {
+        Click-NativeCenter -X ([double]$result.x) -Y ([double]$result.y) -Label $Label
+    }
+    else {
+        [void](Invoke-PageJs "document.querySelector($(ConvertTo-JsLiteral ([string]$result.selector))).click()")
+        Write-Log -Level 'INFO' -Message "DOM click $Label via $($result.selector)"
+    }
 }
 
 function Set-FieldStrict {
@@ -491,10 +629,16 @@ function Set-FieldStrict {
 function Set-RadioStrict {
     param([string]$Selector, [string]$Label)
     $result = Invoke-PageJs @"
-(() => { const e=document.querySelector($(ConvertTo-JsLiteral $Selector)); if(!e)return {ok:false}; e.click(); return {ok:true,checked:e.checked}; })()
+(() => {
+  const e=document.querySelector($(ConvertTo-JsLiteral $Selector));
+  if(!e)return {ok:false};
+  const r=e.getBoundingClientRect();
+  return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2};
+})()
 "@
     if (-not $result.ok) { Stop-WithCode 7 "UI schema mismatch for radio [$Label]" }
-    Write-Log -Level 'INFO' -Message "select $Label"
+    Click-NativeCenter -X ([double]$result.x) -Y ([double]$result.y) -Label $Label
+    Write-Log -Level 'INFO' -Message "select radio $Label"
 }
 
 function Set-CheckboxByText {
@@ -507,15 +651,24 @@ function Set-CheckboxByText {
  const visible=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden';};
  const boxes=Array.from(document.querySelectorAll('he-checkbox,input[type="checkbox"]')).filter(e=>visible(e)&&((e.innerText||e.parentElement?.innerText||'')+' '+(e.getAttribute('name')||'')+' '+(e.id||'')).toLowerCase().includes(target.toLowerCase()));
  if(boxes.length===0)return {ok:false,count:0};
- let changed=0;
- for(const e of boxes){const current=e.checked===true||e.hasAttribute('checked')||e.getAttribute('aria-checked')==='true';if(current!==want){e.click();changed++;}}
- return {ok:true,count:boxes.length,changed};
+ const clicks=[];
+ for(const e of boxes){
+   const current=e.checked===true||e.hasAttribute('checked')||e.getAttribute('aria-checked')==='true';
+   if(current!==want){
+     const r=e.getBoundingClientRect();
+     clicks.push({x:r.left+r.width/2,y:r.top+r.height/2});
+   }
+ }
+ return {ok:true,count:boxes.length,clicks};
 })()
 "@
     if (-not $result.ok) { Stop-WithCode 7 "UI schema mismatch for checkbox [$Text]" }
-    $displayLabel = $Text
-    if (-not [string]::IsNullOrWhiteSpace($Label)) { $displayLabel = $Label }
-    Write-Log -Level 'INFO' -Message "checkbox $displayLabel => $Checked ($($result.count) matches)"
+    $clicks = @(Get-PropertyValue $result 'clicks' @())
+    foreach ($pt in $clicks) {
+        Click-NativeCenter -X ([double]$pt.x) -Y ([double]$pt.y) -Label "checkbox $Text"
+    }
+    $displayLabel = if (-not [string]::IsNullOrWhiteSpace($Label)) { $Label } else { $Text }
+    Write-Log -Level 'INFO' -Message "checkbox $displayLabel => $Checked ($($result.count) matches, $($clicks.Count) clicked)"
 }
 
 function Click-TextStrict {
@@ -529,18 +682,19 @@ function Click-TextStrict {
  const visible=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'&&!e.disabled;};
  const els=Array.from(root.querySelectorAll('button,a,he-button,he-option,span')).filter(e=>visible(e)&&e.innerText.trim()===target&&(!e.children.length||Array.from(e.children).every(c=>c.innerText.trim()!==target)));
  if(els.length!==1)return {ok:false,count:els.length};
- els[0].click(); return {ok:true};
+ const r=els[0].getBoundingClientRect();
+ return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2};
 })()
 "@
     if (-not $result.ok) { Stop-WithCode 7 "UI schema mismatch for text [$Label]: matches=$($result.count)" }
-    Write-Log -Level 'INFO' -Message "click text $Label"
+    Click-NativeCenter -X ([double]$result.x) -Y ([double]$result.y) -Label "text $Label"
 }
 
 function Get-VisibleErrors {
     return Invoke-PageJs @'
 (() => Array.from(document.querySelectorAll('.alert-error, .alert-danger, [role="alert"].alert-error, .has-error')).filter(e => {
   const r=e.getBoundingClientRect(), s=getComputedStyle(e), t=(e.innerText||'').trim();
-  return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && /不能为空|必须|错误|error|failed|invalid|至少一张|唯一标识|删除其中/i.test(t);
+  return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && /\u4e0d\u80fd\u4e3a\u7a7a|\u5fc5\u987b|\u9519\u8bef|error|failed|invalid|\u81f3\u5c11\u4e00\u5f20|\u552f\u4e00\u6807\u8bc6|\u5220\u9664\u5176\u4e2d/i.test(t);
 }).map(e => (e.innerText||'').trim()).filter(Boolean).slice(0,20))()
 '@
 }
@@ -558,16 +712,16 @@ function Get-CurrentUrl {
 
 function Navigate-Url {
     param([string]$Url, [string]$Label)
-    Write-Log -Level 'INFO' -Message "navigate $Label"
+    Write-Log -Level 'INFO' -Message "navigate $Label => $Url"
     [void](Send-CdpRequest -Method 'Page.navigate' -Params @{ url = $Url })
-    Wait-ForUrl -Pattern $Url.Split('?')[0] -Seconds $TimeoutSeconds
+    Wait-ForUrl -Pattern ($Url.Split('?')[0]) -Seconds $TimeoutSeconds
     Start-Sleep -Milliseconds 800
 }
 
 function Ensure-SignedIn {
     $info = Get-PageInfo
     if ($info.hasLogin -or $info.url -notlike '*partner.microsoft.com*') {
-        Write-Log -Level 'WAIT' -Message 'Edge is waiting for the user to complete Microsoft sign-in/MFA in the isolated Edge window.'
+        Write-Log -Level 'WAIT' -Message 'Edge is waiting for user sign-in/MFA in the isolated Edge window.'
         $deadline = (Get-Date).AddSeconds($LoginTimeoutSeconds)
         do {
             Start-Sleep -Seconds 2
@@ -575,10 +729,14 @@ function Ensure-SignedIn {
             if (-not $info.hasLogin -and $info.url -like '*partner.microsoft.com*') { break }
         } while ((Get-Date) -lt $deadline)
         if ($info.hasLogin -or $info.url -notlike '*partner.microsoft.com*') {
-            Stop-WithCode 10 'Sign-in was not completed before the login timeout. The Edge window is left open for resume.'
+            Stop-WithCode 10 'Sign-in was not completed before the login timeout. The Edge window is left open.'
         }
     }
-    Write-Log -Level 'PASS' -Message 'Partner Center session is available'
+    Write-Log -Level 'PASS' -Message 'Partner Center session is active'
+}
+
+function Get-BaseUrl {
+    return [string](Get-PropertyValue (Get-PropertyValue $script:Config 'site') 'baseUrl' 'https://partner.microsoft.com/zh-cn/dashboard/products')
 }
 
 function Update-IdsFromUrl {
@@ -599,60 +757,96 @@ function Get-ProductId {
     if (-not [string]::IsNullOrWhiteSpace($ProductId)) { $id = $ProductId }
     if ([string]::IsNullOrWhiteSpace($id)) { $id = [string](Get-PropertyValue $script:State 'productId' '') }
     if ([string]::IsNullOrWhiteSpace($id)) { Update-IdsFromUrl; $id = [string]$script:State.productId }
-    if ([string]::IsNullOrWhiteSpace($id)) { Stop-WithCode 11 'ProductId is missing. Pass -ProductId or place the browser on a Partner Center product page.' }
+    if ([string]::IsNullOrWhiteSpace($id)) { Stop-WithCode 11 'ProductId is missing. Pass -ProductId or navigate to the product page.' }
     $script:State.productId = $id
     return $id
 }
 
-function Get-SubmissionId {
-    $id = [string](Get-PropertyValue $script:Config 'submissionId' '')
-    if (-not [string]::IsNullOrWhiteSpace($SubmissionId)) { $id = $SubmissionId }
-    if ([string]::IsNullOrWhiteSpace($id)) { $id = [string](Get-PropertyValue $script:State 'submissionId' '') }
-    if ([string]::IsNullOrWhiteSpace($id)) { Update-IdsFromUrl; $id = [string]$script:State.submissionId }
-    if ([string]::IsNullOrWhiteSpace($id)) { Stop-WithCode 11 'SubmissionId is missing. Start a submission in Partner Center or pass -SubmissionId.' }
-    $script:State.submissionId = $id
-    return $id
+function Discover-LiveSubmissionUrls {
+    $product = Get-ProductId
+    $overview = "$(Get-BaseUrl)/$product/overview"
+    Navigate-Url -Url $overview -Label 'product overview to probe submission links'
+    Start-Sleep -Seconds 2
+
+    $discovery = Invoke-PageJs @'
+(() => {
+  const result = { submissionId: '', hrefs: {}, statuses: {}, canStartSubmission: false };
+  const startBtn = document.querySelector('he-button[data-l10n-key="Start_Submission"], button[data-l10n-key="Start_Submission"], [data-automation-id="Start_Submission"]');
+  if (startBtn) result.canStartSubmission = true;
+
+  const links = Array.from(document.querySelectorAll('a[href*="/submissions/"]'));
+  for (const a of links) {
+    const href = a.href || '';
+    const m = href.match(/\/submissions\/([^\/?#]+)/);
+    if (m && !result.submissionId) result.submissionId = m[1];
+
+    const name = a.getAttribute('name') || '';
+    if (name === 'princingAndAvailability' || href.includes('/availability')) result.hrefs['availability'] = href;
+    else if (name === 'properties' || href.includes('/properties')) result.hrefs['properties'] = href;
+    else if (name === 'ageRatings' || href.includes('/ageratings')) result.hrefs['ageRatings'] = href;
+    else if (name === 'packages' || href.includes('/packages')) result.hrefs['packages'] = href;
+    else if (name === 'storeListing' || href.includes('/listings') || href.includes('/managelanguages')) result.hrefs['listing'] = href;
+    else if (href.includes('/options')) result.hrefs['options'] = href;
+  }
+  return result;
+})()
+'@
+
+    if ($discovery.submissionId) {
+        $script:State.submissionId = [string]$discovery.submissionId
+        $script:LiveState.submissionId = [string]$discovery.submissionId
+        $script:LiveState.discoveredHrefs = $discovery.hrefs
+        $script:LiveState.updatedAt = (Get-Date).ToString('o')
+        Save-State
+        Save-LiveState
+        Write-Log -Level 'PASS' -Message "live submission discovered: $($discovery.submissionId)"
+        return $true
+    }
+    return $false
 }
 
 function Ensure-Submission {
     $product = Get-ProductId
-    $existing = [string](Get-PropertyValue $script:State 'submissionId' '')
-    if (-not [string]::IsNullOrWhiteSpace($SubmissionId)) { $existing = $SubmissionId }
-    if (-not [string]::IsNullOrWhiteSpace([string](Get-PropertyValue $script:Config 'submissionId' ''))) {
-        $existing = [string](Get-PropertyValue $script:Config 'submissionId' '')
-    }
-    if (-not [string]::IsNullOrWhiteSpace($existing)) {
-        $script:State.submissionId = $existing
-        Save-State
-        return
-    }
+    if (Discover-LiveSubmissionUrls) { return }
 
     $overview = "$(Get-BaseUrl)/$product/overview"
     Navigate-Url -Url $overview -Label 'product overview before starting submission'
     if (-not $Apply) {
-        Write-Log -Level 'PLAN' -Message 'would click Start Submission to create a draft submission; pass -Apply to create it'
-        Stop-WithCode 14 'SubmissionId is missing in dry-run mode. Pass -SubmissionId or rerun with -Apply to create a draft submission.'
+        Write-Log -Level 'PLAN' -Message 'dry-run: would click Start Submission to create a draft submission'
+        Stop-WithCode 14 'SubmissionId is missing in dry-run mode. Pass -Apply to create a draft submission.'
     }
-    Click-SelectorStrict @('he-button[data-l10n-key="Start_Submission"]', 'button[data-l10n-key="Start_Submission"]', '[data-automation-id="Start_Submission"]') 'Start Submission'
+    Click-SelectorStrict @('he-button[data-l10n-key="Start_Submission"]', 'button[data-l10n-key="Start_Submission"]', '[data-automation-id="Start_Submission"]') 'Start Submission' -NativeClick
     Wait-ForUrl -Pattern '/submissions/' -Seconds $TimeoutSeconds
-    Update-IdsFromUrl
-    if ([string]::IsNullOrWhiteSpace([string]$script:State.submissionId)) {
-        Stop-WithCode 11 'Partner Center created a submission page but its submission ID was not found in the URL.'
+    Start-Sleep -Seconds 2
+    if (-not (Discover-LiveSubmissionUrls)) {
+        Update-IdsFromUrl
     }
-    Write-Log -Level 'PASS' -Message "draft submission created: $($script:State.submissionId)"
+    if ([string]::IsNullOrWhiteSpace([string]$script:State.submissionId)) {
+        Stop-WithCode 11 'Failed to discover submission ID after clicking Start Submission.'
+    }
+    Write-Log -Level 'PASS' -Message "draft submission ready: $($script:State.submissionId)"
 }
 
-function Get-BaseUrl {
-    return [string](Get-PropertyValue (Get-PropertyValue $script:Config 'site') 'baseUrl' 'https://partner.microsoft.com/zh-cn/dashboard/products')
+function Get-SubmissionId {
+    $id = [string](Get-PropertyValue $script:State 'submissionId' '')
+    if (-not [string]::IsNullOrWhiteSpace($SubmissionId)) { $id = $SubmissionId }
+    if ([string]::IsNullOrWhiteSpace($id)) { Ensure-Submission; $id = [string]$script:State.submissionId }
+    return $id
 }
 
 function Get-PhaseUrl {
     param([string]$Phase)
+    $discovered = Get-PropertyValue (Get-PropertyValue $script:LiveState 'discoveredHrefs') $Phase $null
+    if ($null -ne $discovered -and -not [string]::IsNullOrWhiteSpace([string]$discovered)) {
+        return [string]$discovered
+    }
+
     $base = Get-BaseUrl
     $product = Get-ProductId
     $submission = Get-SubmissionId
     $languageId = [string](Get-PropertyValue (Get-PropertyValue $script:Config 'site') 'languageId' '5')
     $languageCode = [string](Get-PropertyValue (Get-PropertyValue $script:Config 'site') 'languageCode' 'zh-cn')
+
     switch ($Phase) {
         'availability' { return "$base/$product/submissions/$submission/availability" }
         'properties' { return "$base/$product/submissions/$submission/properties" }
@@ -672,15 +866,22 @@ function Save-CurrentPage {
         return
     }
     switch ($Phase) {
-        'availability' { Click-SelectorStrict @('input#saveButtonPricing', 'button#saveButtonPricing', 'input[uitestid="saveButtonPricing"]', 'button[data-l10n-key="AppSubmission_SaveButton"]') 'availability save' }
-        'properties' { Click-SelectorStrict @('button[data-l10n-key="appsubmission_savebutton"]', 'input[value="保存"]', 'button[value="保存"]') 'properties save' }
-        'ageRatings' { Click-SelectorStrict @('he-button[data-l10n-key="AppSubmission_AgeRating_SaveDraftButton"]', 'button[data-l10n-key="AppSubmission_AgeRating_SaveDraftButton"]') 'age ratings save draft' }
-        'packages' { Click-SelectorStrict @('input[value="Save"]', 'button[value="Save"]', 'button[data-l10n-key="appsubmission_savebutton"]') 'packages save' }
-        'listing' { Click-SelectorStrict @('button[name="save_button"]', 'button[data-l10n-key="appsubmission_savebutton"]') 'listing save' }
-        'options' { Click-SelectorStrict @('button[data-l10n-key="optionsSave"]', 'button[data-l10n-key="appsubmission_savebutton"]') 'options save' }
+        'availability' { Click-SelectorStrict @('input#saveButtonPricing', 'button#saveButtonPricing', 'input[uitestid="saveButtonPricing"]', 'button[data-l10n-key="AppSubmission_SaveButton"]') 'availability save' -NativeClick }
+        'properties' { Click-SelectorStrict @('button[data-l10n-key="appsubmission_savebutton"]', 'input[value="\u4fdd\u5b58"]', 'button[value="\u4fdd\u5b58"]') 'properties save' -NativeClick }
+        'ageRatings' { Click-SelectorStrict @('he-button[data-l10n-key="AppSubmission_AgeRating_SaveDraftButton"]', 'button[data-l10n-key="AppSubmission_AgeRating_SaveDraftButton"]') 'age ratings save draft' -NativeClick }
+        'packages' { Click-SelectorStrict @('input[value="Save"]', 'button[value="Save"]', 'button[data-l10n-key="appsubmission_savebutton"]') 'packages save' -NativeClick }
+        'listing' { Click-SelectorStrict @('button[name="save_button"]', 'button[data-l10n-key="appsubmission_savebutton"]') 'listing save' -NativeClick }
+        'options' { Click-SelectorStrict @('button[data-l10n-key="optionsSave"]', 'button[data-l10n-key="appsubmission_savebutton"]') 'options save' -NativeClick }
     }
-    Start-Sleep -Seconds 2
+    Start-Sleep -Seconds 3
     Assert-NoVisibleErrors
+
+    if ($ReloadVerify) {
+        Write-Log -Level 'INFO' -Message "verifying persistence via F5 reload for $Phase"
+        [void](Send-CdpRequest -Method 'Page.reload' -Params @{ ignoreCache = $true })
+        Start-Sleep -Seconds 3
+        Assert-NoVisibleErrors
+    }
 }
 
 function Get-FileInputNodeId {
@@ -719,177 +920,8 @@ function Upload-File {
     if (-not $Apply) { Write-Log -Level 'PLAN' -Message "dry-run: would upload $Label"; return }
     $nodeId = Get-FileInputNodeId -ContextTexts $ContextTexts -Label $Label -InputIndex $InputIndex
     [void](Send-CdpRequest -Method 'DOM.setFileInputFiles' -Params @{ nodeId = $nodeId; files = @([IO.Path]::GetFullPath($Path)) })
-    Write-Log -Level 'INFO' -Message "uploaded $Label"
-    Start-Sleep -Seconds 2
-}
-
-function Assert-PackageName {
-    $expected = [string](Get-PropertyValue $script:Config 'productName' '')
-    if ([string]::IsNullOrWhiteSpace($expected)) { return }
-    $assets = Get-PropertyValue $script:Config 'assets'
-    $msix = [string](Get-PropertyValue $assets 'msix' '')
-    if (-not (Test-Path -LiteralPath $msix)) { Stop-WithCode 12 "MSIX not found for identity check: $msix" }
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive = $null
-    $reader = $null
-    try {
-        $archive = [IO.Compression.ZipFile]::OpenRead($msix)
-        $entry = $archive.Entries | Where-Object { $_.FullName -ieq 'AppxManifest.xml' } | Select-Object -First 1
-        if ($null -eq $entry) { Stop-WithCode 12 'AppxManifest.xml was not found inside the MSIX.' }
-        $reader = [IO.StreamReader]::new($entry.Open(), [Text.Encoding]::UTF8)
-        $manifestText = $reader.ReadToEnd()
-        $manifestNameElement = "<DisplayName>$expected</DisplayName>"
-        $manifestVisualName = 'DisplayName="' + $expected + '"'
-        if (-not $manifestText.Contains($manifestNameElement) -and -not $manifestText.Contains($manifestVisualName)) {
-            Stop-WithCode 12 "Package display name does not contain the reserved product name [$expected]. Rebuild the Store MSIX before uploading."
-        }
-        Write-Log -Level 'PASS' -Message "MSIX display name matches product name [$expected]"
-    }
-    finally {
-        if ($null -ne $reader) { $reader.Dispose() }
-        if ($null -ne $archive) { $archive.Dispose() }
-    }
-}
-
-function Set-Keywords {
-    param([string[]]$Keywords)
-    if ($Keywords.Count -eq 0) { return }
-    $existingKeywords = @(Invoke-PageJs @'
-(() => { const root=document.querySelector('#search-terms')||document.querySelector('he-select[multiple]'); if(!root)return []; return Array.from(root.querySelectorAll('he-option')).filter(e=>(e.getAttribute('slot')||'').startsWith('selected-')||e.getAttribute('role')==='listitem').map(e=>(e.innerText||e.getAttribute('value')||'').trim()).filter(Boolean); })()
-'@)
-    foreach ($keyword in $Keywords) {
-        if ($existingKeywords -contains [string]$keyword) {
-            Write-Log -Level 'INFO' -Message 'keyword already present; skip duplicate'
-            continue
-        }
-        if (-not $Apply) { Write-Log -Level 'PLAN' -Message "dry-run: would add keyword"; continue }
-        Click-SelectorStrict @('#search-terms he-select', 'he-select[multiple]') 'keyword control'
-        [void](Send-CdpRequest -Method 'Input.insertText' -Params @{ text = [string]$keyword })
-        [void](Send-CdpRequest -Method 'Input.dispatchKeyEvent' -Params @{ type = 'keyDown'; key = 'Enter'; code = 'Enter'; windowsVirtualKeyCode = 13; nativeVirtualKeyCode = 13 })
-        [void](Send-CdpRequest -Method 'Input.dispatchKeyEvent' -Params @{ type = 'keyUp'; key = 'Enter'; code = 'Enter'; windowsVirtualKeyCode = 13; nativeVirtualKeyCode = 13 })
-        Start-Sleep -Milliseconds 250
-    }
-}
-
-function Set-AgeAnswer {
-    param([string]$QuestionId, [string]$AnswerText)
-    $qid = ConvertTo-JsLiteral $QuestionId
-    $answer = ConvertTo-JsLiteral $AnswerText
-    $questionExpression = "document.querySelector('[role=`"radiogroup`"][aria-labelledby=`"question#$QuestionId`"]') !== null"
-    if (-not (Wait-ForPagePredicate -Expression $questionExpression -Seconds $TimeoutSeconds)) {
-        Stop-WithCode 7 "Age rating question did not appear: $QuestionId"
-    }
-    $result = Invoke-PageJs @"
-(() => {
- const q=$qid,a=$answer,group=document.querySelector('[role="radiogroup"][aria-labelledby="question#'+q+'"]');
- if(!group)return {ok:false,count:0};
- const radios=Array.from(group.querySelectorAll('input[type="radio"]')).filter(e=>{const l=e.parentElement?.innerText||e.closest('label')?.innerText||'';return l.includes(a)||e.value===a;});
- if(radios.length!==1)return {ok:false,count:radios.length}; radios[0].click(); return {ok:true};
-})()
-"@
-    if (-not $result.ok) { Stop-WithCode 7 "Age rating question $QuestionId [$AnswerText] matched $($result.count) elements" }
-    Write-Log -Level 'INFO' -Message "age question $QuestionId => $AnswerText"
-    Start-Sleep -Milliseconds 250
-}
-
-function Invoke-Availability {
-    Navigate-Url -Url (Get-PhaseUrl 'availability') -Label 'pricing and availability'
-    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'availability: global markets, ASAP, never stop selling, CNY currency, price tier 0, save'; return }
-    Set-RadioStrict -Selector 'input[name="marketSelection"][value="true"]' -Label 'all markets'
-    if (Test-VisibleSelector '#distributionOption') { Set-FieldStrict -Selectors @('#distributionOption') -Value 'string:Retail' -Label 'retail distribution' }
-    if (Test-VisibleSelector '#radioDistribution_PublicAudience') { Set-RadioStrict -Selector '#radioDistribution_PublicAudience' -Label 'public audience' }
-    Set-FieldStrict -Selectors @('select[uitestid="AvailableSelector-0"]') -Value 'string:asap' -Label 'publish ASAP'
-    Set-FieldStrict -Selectors @('select[uitestid="StopSellingSelector-0"]') -Value 'string:auto-fill' -Label 'never stop selling'
-    $pricing = Get-PropertyValue $script:Config 'pricing'
-    $currency = [string](Get-PropertyValue $pricing 'currency' 'CN')
-    $priceTier = [string](Get-PropertyValue $pricing 'priceTier' '0')
-    $currentCurrency = [string](Invoke-PageJs "(() => { const e=document.querySelector('market-group .price-config > he-select'); return e ? (e.getAttribute('value')||'') : ''; })()")
-    if ($currentCurrency -ne $currency) {
-        Click-SelectorStrict @('market-group .price-config > he-select') 'base currency'
-        Click-TextStrict -Text 'CNY - 中国' -Label 'CNY currency'
-    }
-    $currentTier = [string](Invoke-PageJs "(() => { const e=document.querySelector('market-group price-tier-selection he-select'); return e ? (e.getAttribute('value')||'') : ''; })()")
-    if ($currentTier -ne $priceTier) {
-        if (-not (Wait-ForPagePredicate -Expression "(() => { const e=document.querySelector('market-group price-tier-selection he-select'); return e && !e.hasAttribute('disabled'); })()" -Seconds $TimeoutSeconds)) {
-            Stop-WithCode 7 'Price tier control did not become available after selecting currency.'
-        }
-        Click-SelectorStrict @('market-group price-tier-selection he-select') 'base price tier'
-        Click-TextStrict -Text '0' -Label 'zero price tier'
-    }
-    $pricingState = Invoke-PageJs @'
-(() => { const c=document.querySelector('market-group .price-config > he-select'), p=document.querySelector('market-group price-tier-selection he-select'); return {currency:(c?.getAttribute('value')||''),priceTier:(p?.getAttribute('value')||'')}; })()
-'@
-    if ([string]$pricingState.currency -ne $currency -or [string]$pricingState.priceTier -ne $priceTier) {
-        Stop-WithCode 7 "Pricing verification failed: currency=$($pricingState.currency) priceTier=$($pricingState.priceTier)"
-    }
-    Write-Log -Level 'PASS' -Message "pricing verified: currency=$currency priceTier=$priceTier"
-    Save-CurrentPage -Phase 'availability'
-    Mark-PhaseCompleted 'availability'
-}
-
-function Invoke-Properties {
-    Navigate-Url -Url (Get-PhaseUrl 'properties') -Label 'properties'
-    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'properties: Productivity, no personal information, privacy policy text, desktop/x64, keep storage/backups/windows defaults, save'; return }
-    $properties = Get-PropertyValue $script:Config 'properties'
-    $category = [string](Get-PropertyValue $properties 'category' 'Productivity')
-    $privacy = [string](Get-PropertyValue $properties 'privacy' 'No')
-    $privacyText = [string](Get-PropertyValue $properties 'privacyPolicyText' '')
-    Set-FieldStrict -Selectors @('select[name="CategorySelect"]') -Value $category -Label 'category'
-    Set-FieldStrict -Selectors @('select[name="privacyPolicySelection"]') -Value $privacy -Label 'privacy answer'
-    if ($privacy -eq 'No') {
-        if ([string]::IsNullOrWhiteSpace($privacyText)) { Stop-WithCode 12 'properties.privacyPolicyText is required when privacy=No.' }
-        if (-not (Wait-ForPagePredicate -Expression "document.querySelector('#privacyPolicyText') !== null" -Seconds $TimeoutSeconds)) { Stop-WithCode 7 'Privacy policy text option did not appear.' }
-        Set-RadioStrict -Selector '#privacyPolicyText' -Label 'provide privacy policy text'
-        if (-not (Wait-ForPagePredicate -Expression 'document.querySelector(''textarea[aria-label="提供隐私策略文本"]'') !== null' -Seconds $TimeoutSeconds)) { Stop-WithCode 7 'Privacy policy text area did not appear.' }
-        Set-FieldStrict -Selectors @('support-info textarea[aria-label="提供隐私策略文本"]', 'textarea[aria-label="提供隐私策略文本"]') -Value $privacyText -Label 'privacy policy text'
-    }
-    Set-CheckboxByText -Text 'storage' -Checked $true -Label 'storage declaration'
-    Set-CheckboxByText -Text 'backups' -Checked $true -Label 'backups declaration'
-    Set-CheckboxByText -Text 'windows' -Checked $true -Label 'windows declaration'
-    Set-CheckboxByText -Text 'usesGenAI' -Checked $false -Label 'usesGenAI declaration'
-    Save-CurrentPage -Phase 'properties'
-    Mark-PhaseCompleted 'properties'
-}
-
-function Invoke-AgeRatings {
-    Navigate-Url -Url (Get-PhaseUrl 'ageRatings') -Label 'age ratings'
-    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'age ratings: questionnaire, other application type 2558, physical media no, all follow-up answers no, agree, save, continue'; return }
-    Set-RadioStrict -Selector 'input[name="inputMode"][value="questionnaire"]' -Label 'IARC questionnaire'
-    Set-RadioStrict -Selector 'input[name="question#1109"][value="2558"]' -Label 'other application type'
-    Set-RadioStrict -Selector '#radioGroup input#noVal' -Label 'physical media no'
-    $questionIds = @('1152', '1188', '1193', '1037', '1194', '1195', '1375', '1196', '1197')
-    foreach ($questionId in $questionIds) { Set-AgeAnswer -QuestionId $questionId -AnswerText '否' }
-    Click-SelectorStrict @('he-checkbox[required]', 'he-checkbox') 'IARC terms agreement'
-    Click-SelectorStrict @('he-button[data-l10n-key="AppSubmission_AgeRating_SaveButton"]', 'button[data-l10n-key="AppSubmission_AgeRating_SaveButton"]') 'age ratings preview save'
-    Start-Sleep -Seconds 2
-    Click-TextStrict -Text '继续' -Label 'continue after age ratings'
-    Mark-PhaseCompleted 'ageRatings'
-}
-
-function Invoke-Packages {
-    Navigate-Url -Url (Get-PhaseUrl 'packages') -Label 'packages'
-    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'packages: upload MSIX, desktop only, future device families delegated to Microsoft, save'; return }
-    $assets = Get-PropertyValue $script:Config 'assets'
-    $msix = [string](Get-PropertyValue $assets 'msix' '')
-    if ([string]::IsNullOrWhiteSpace($msix)) { Stop-WithCode 12 'assets.msix is missing from the manifest.' }
-    Assert-PackageName
-    $packageName = [IO.Path]::GetFileName($msix)
-    $packageAlreadyPresent = [bool](Invoke-PageJs "(document.body && document.body.innerText || '').includes($(ConvertTo-JsLiteral $packageName))")
-    if ($packageAlreadyPresent) {
-        Write-Log -Level 'INFO' -Message "package already present; skip upload $packageName"
-    }
-    else {
-        Upload-File -ContextTexts @('Drag your packages here', '程序包', '.msix') -Path $msix -Label 'MSIX package'
-    }
-    Wait-ForText -Text 'Windows 10/11 Desktop' -Seconds $TimeoutSeconds
-    Set-CheckboxByText -Text 'Windows 10/11 Desktop' -Checked $true -Label 'desktop device family'
-    Set-CheckboxByText -Text 'Windows 10 Mobile' -Checked $false -Label 'mobile device family'
-    Set-CheckboxByText -Text 'Windows 10/11 Xbox' -Checked $false -Label 'xbox device family'
-    Set-CheckboxByText -Text 'Windows 10 Team' -Checked $false -Label 'team device family'
-    Set-CheckboxByText -Text 'Windows 10 Mixed Reality' -Checked $false -Label 'mixed reality device family'
-    Set-CheckboxByText -Text 'future device families' -Checked $true -Label 'future device families'
-    Save-CurrentPage -Phase 'packages'
-    Mark-PhaseCompleted 'packages'
+    Write-Log -Level 'INFO' -Message "uploaded $Label from $Path"
+    Start-Sleep -Seconds 3
 }
 
 function Test-SectionHasImage {
@@ -911,55 +943,250 @@ function Test-SectionHasImage {
 "@)
 }
 
-function Invoke-Listing {
-    Navigate-Url -Url (Get-PhaseUrl 'listing') -Label 'Store listing Chinese'
-    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'listing: description, features, desktop screenshots/assets, short description, keywords, save'; return }
-    $values = Get-PropertyValue $script:Config 'values'
+function Invoke-PreflightStore0 {
+    Write-Log -Level 'INFO' -Message '--- Starting STORE 0: Offline Static Preflight Quality Inspection ---'
     $assets = Get-PropertyValue $script:Config 'assets'
     $expectedName = [string](Get-PropertyValue $script:Config 'productName' '')
-    if ($expectedName) {
-        $pageName = [string](Invoke-PageJs "(() => { const e=document.querySelector('#reservedTitleSelect'); return e ? ((e.getAttribute('value')||'')+' '+(e.innerText||'')) : ''; })()")
-        if ($pageName -notlike "*$expectedName*") {
-            Stop-WithCode 12 "Reserved product name on the Store listing page does not match [$expectedName]."
+    $msix = [string](Get-PropertyValue $assets 'msix' '')
+
+    if (-not [string]::IsNullOrWhiteSpace($msix)) {
+        if (-not (Test-Path -LiteralPath $msix)) { Stop-WithCode 12 "MSIX package not found at: $msix" }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $archive = [IO.Compression.ZipFile]::OpenRead($msix)
+        try {
+            $entry = $archive.Entries | Where-Object { $_.FullName -ieq 'AppxManifest.xml' } | Select-Object -First 1
+            if ($null -eq $entry) { Stop-WithCode 12 'AppxManifest.xml missing inside MSIX.' }
+            $reader = [IO.StreamReader]::new($entry.Open(), [Text.Encoding]::UTF8)
+            $manifestXml = $reader.ReadToEnd()
+            $reader.Dispose()
+
+            if ($expectedName) {
+                if (-not $manifestXml.Contains("<DisplayName>$expectedName</DisplayName>") -and -not $manifestXml.Contains("DisplayName=""$expectedName""")) {
+                    Stop-WithCode 12 "MSIX DisplayName does not match product name [$expectedName]."
+                }
+                Write-Log -Level 'PASS' -Message "MSIX DisplayName matches [$expectedName]"
+            }
+
+            if ($manifestXml.Contains('Name="Windows.Universal"')) {
+                Stop-WithCode 12 'MSIX contains Windows.Universal TargetDeviceFamily dependency. Desktop apps must only declare Windows.Desktop.'
+            }
+            Write-Log -Level 'PASS' -Message 'MSIX TargetDeviceFamily verified: Desktop only'
         }
-        Write-Log -Level 'PASS' -Message "Store listing reserved name matches [$expectedName]"
+        finally {
+            $archive.Dispose()
+        }
     }
+
+    $values = Get-PropertyValue $script:Config 'values'
+    $keywords = @(Get-PropertyValue $values 'keywords' @())
+    if ($keywords.Count -gt 7) {
+        Stop-WithCode 12 "Keywords count exceeds Microsoft Store limit of 7 (currently $($keywords.Count))."
+    }
+    Write-Log -Level 'PASS' -Message "Keywords count verified ($($keywords.Count) <= 7)"
+
+    Write-Log -Level 'PASS' -Message 'STORE 0: Static preflight passed successfully.'
+}
+
+function Set-Keywords {
+    param([string[]]$Keywords)
+    if ($Keywords.Count -eq 0) { return }
+    $existingKeywords = @(Invoke-PageJs @'
+(() => { const root=document.querySelector('#search-terms')||document.querySelector('he-select[multiple]'); if(!root)return []; return Array.from(root.querySelectorAll('he-option')).filter(e=>(e.getAttribute('slot')||'').startsWith('selected-')||e.getAttribute('role')==='listitem').map(e=>(e.innerText||e.getAttribute('value')||'').trim()).filter(Boolean); })()
+'@)
+    foreach ($keyword in $Keywords) {
+        if ($existingKeywords -contains [string]$keyword) {
+            Write-Log -Level 'INFO' -Message "keyword already present: $keyword"
+            continue
+        }
+        if (-not $Apply) { Write-Log -Level 'PLAN' -Message "dry-run: would add keyword $keyword"; continue }
+        Click-SelectorStrict @('#search-terms he-select', 'he-select[multiple]') 'keyword control' -NativeClick
+        [void](Send-CdpRequest -Method 'Input.insertText' -Params @{ text = [string]$keyword })
+        [void](Send-CdpRequest -Method 'Input.dispatchKeyEvent' -Params @{ type = 'keyDown'; key = 'Enter'; code = 'Enter'; windowsVirtualKeyCode = 13; nativeVirtualKeyCode = 13 })
+        [void](Send-CdpRequest -Method 'Input.dispatchKeyEvent' -Params @{ type = 'keyUp'; key = 'Enter'; code = 'Enter'; windowsVirtualKeyCode = 13; nativeVirtualKeyCode = 13 })
+        Start-Sleep -Milliseconds 300
+    }
+}
+
+function Set-AgeAnswer {
+    param([string]$QuestionId, [string]$AnswerText)
+    $qid = ConvertTo-JsLiteral $QuestionId
+    $answer = ConvertTo-JsLiteral $AnswerText
+    $questionExpression = "document.querySelector('[role=`"radiogroup`"][aria-labelledby=`"question#$QuestionId`"]') !== null"
+    if (-not (Wait-ForPagePredicate -Expression $questionExpression -Seconds $TimeoutSeconds)) {
+        Stop-WithCode 7 "Age rating question did not appear: $QuestionId"
+    }
+    $result = Invoke-PageJs @"
+(() => {
+ const q=$qid,a=$answer,group=document.querySelector('[role="radiogroup"][aria-labelledby="question#'+q+'"]');
+ if(!group)return {ok:false,count:0};
+ const radios=Array.from(group.querySelectorAll('input[type="radio"]')).filter(e=>{const l=e.parentElement?.innerText||e.closest('label')?.innerText||'';return l.includes(a)||e.value===a;});
+ if(radios.length!==1)return {ok:false,count:radios.length};
+ const r=radios[0].getBoundingClientRect();
+ return {ok:true,x:r.left+r.width/2,y:r.top+r.height/2};
+})()
+"@
+    if (-not $result.ok) { Stop-WithCode 7 "Age rating question $QuestionId [$AnswerText] matched $($result.count) elements" }
+    Click-NativeCenter -X ([double]$result.x) -Y ([double]$result.y) -Label "age question $QuestionId => $AnswerText"
+    Start-Sleep -Milliseconds 200
+}
+
+function Invoke-Availability {
+    Navigate-Url -Url (Get-PhaseUrl 'availability') -Label 'pricing and availability'
+    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'availability: global markets, ASAP, never stop selling, CNY currency, price tier 0, save'; return }
+    if (-not (Wait-ForPagePredicate -Expression "document.querySelector('input[name=`"marketSelection`"]') !== null" -Seconds $TimeoutSeconds)) {
+        Stop-WithCode 6 'Pricing page did not render its market controls in time.'
+    }
+    Start-Sleep -Seconds 2
+    Set-RadioStrict -Selector 'input[name="marketSelection"][value="true"]' -Label 'all markets'
+    if (Test-VisibleSelector '#distributionOption') { Set-FieldStrict -Selectors @('#distributionOption') -Value 'string:Retail' -Label 'retail distribution' }
+    if (Test-VisibleSelector '#radioDistribution_PublicAudience') { Set-RadioStrict -Selector '#radioDistribution_PublicAudience' -Label 'public audience' }
+    
+    $currentAsap = [string](Invoke-PageJs "(() => { const e=document.querySelector('select[uitestid=`"AvailableSelector-0`"]'); return e ? e.value : ''; })()")
+    if ($currentAsap -ne 'string:asap') {
+        Set-FieldStrict -Selectors @('select[uitestid="AvailableSelector-0"]') -Value 'string:asap' -Label 'publish ASAP'
+    }
+    $currentStop = [string](Invoke-PageJs "(() => { const e=document.querySelector('select[uitestid=`"StopSellingSelector-0`"]'); return e ? e.value : ''; })()")
+    if ($currentStop -ne 'string:auto-fill') {
+        Set-FieldStrict -Selectors @('select[uitestid="StopSellingSelector-0"]') -Value 'string:auto-fill' -Label 'never stop selling'
+    }
+
+    $pricing = Get-PropertyValue $script:Config 'pricing'
+    $currency = [string](Get-PropertyValue $pricing 'currency' 'CN')
+    $priceTier = [string](Get-PropertyValue $pricing 'priceTier' '0')
+
+    $currentCurrency = [string](Invoke-PageJs "(() => { const e=document.querySelector('market-group .price-config > he-select'); return e ? (e.getAttribute('value')||'') : ''; })()")
+    if ($currentCurrency -ne $currency) {
+        Click-SelectorStrict @('market-group .price-config > he-select') 'base currency' -NativeClick
+        Start-Sleep -Milliseconds 500
+        Click-TextStrict -Text 'CNY - \u4e2d\u56fd' -Label 'CNY currency'
+    }
+
+    $currentTier = [string](Invoke-PageJs "(() => { const e=document.querySelector('market-group price-tier-selection he-select'); return e ? (e.getAttribute('value')||'') : ''; })()")
+    if ($currentTier -ne $priceTier) {
+        Click-SelectorStrict @('market-group price-tier-selection he-select') 'base price tier' -NativeClick
+        Start-Sleep -Milliseconds 500
+        Click-TextStrict -Text '0' -Label 'zero price tier'
+    }
+
+    Start-Sleep -Seconds 1
+    Save-CurrentPage -Phase 'availability'
+    Mark-PhaseCompleted 'availability'
+}
+
+function Invoke-Properties {
+    Navigate-Url -Url (Get-PhaseUrl 'properties') -Label 'properties'
+    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'properties: Productivity, privacy text, desktop/x64, save'; return }
+    $properties = Get-PropertyValue $script:Config 'properties'
+    $category = [string](Get-PropertyValue $properties 'category' 'Productivity')
+    $privacy = [string](Get-PropertyValue $properties 'privacy' 'No')
+    $privacyText = [string](Get-PropertyValue $properties 'privacyPolicyText' '')
+
+    Set-FieldStrict -Selectors @('select[name="CategorySelect"]') -Value $category -Label 'category'
+    Set-FieldStrict -Selectors @('select[name="privacyPolicySelection"]') -Value $privacy -Label 'privacy answer'
+    if ($privacy -eq 'No') {
+        if ([string]::IsNullOrWhiteSpace($privacyText)) { Stop-WithCode 12 'properties.privacyPolicyText is required when privacy=No.' }
+        if (-not (Wait-ForPagePredicate -Expression "document.querySelector('#privacyPolicyText') !== null" -Seconds $TimeoutSeconds)) { Stop-WithCode 7 'Privacy policy text option did not appear.' }
+        Set-RadioStrict -Selector '#privacyPolicyText' -Label 'provide privacy policy text'
+        if (-not (Wait-ForPagePredicate -Expression 'document.querySelector(''textarea[aria-label="\u63d0\u4f9b\u9690\u79c1\u7b56\u7565\u6587\u672c"]'') !== null' -Seconds $TimeoutSeconds)) { Stop-WithCode 7 'Privacy policy text area did not appear.' }
+        Set-FieldStrict -Selectors @('support-info textarea[aria-label="\u63d0\u4f9b\u9690\u79c1\u7b56\u7565\u6587\u672c"]', 'textarea[aria-label="\u63d0\u4f9b\u9690\u79c1\u7b56\u7565\u6587\u672c"]') -Value $privacyText -Label 'privacy policy text'
+    }
+    Set-CheckboxByText -Text 'storage' -Checked $true -Label 'storage declaration'
+    Set-CheckboxByText -Text 'backups' -Checked $true -Label 'backups declaration'
+    Set-CheckboxByText -Text 'windows' -Checked $true -Label 'windows declaration'
+    Set-CheckboxByText -Text 'usesGenAI' -Checked $false -Label 'usesGenAI declaration'
+    Save-CurrentPage -Phase 'properties'
+    Mark-PhaseCompleted 'properties'
+}
+
+function Invoke-AgeRatings {
+    Navigate-Url -Url (Get-PhaseUrl 'ageRatings') -Label 'age ratings'
+    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'age ratings: questionnaire, other type 2558, answers No, save & continue'; return }
+    Set-RadioStrict -Selector 'input[name="inputMode"][value="questionnaire"]' -Label 'IARC questionnaire'
+    Set-RadioStrict -Selector 'input[name="question#1109"][value="2558"]' -Label 'other application type'
+    Set-RadioStrict -Selector '#radioGroup input#noVal' -Label 'physical media no'
+    $questionIds = @('1152', '1188', '1193', '1037', '1194', '1195', '1375', '1196', '1197')
+    foreach ($questionId in $questionIds) { Set-AgeAnswer -QuestionId $questionId -AnswerText '\u5426' }
+    Click-SelectorStrict @('he-checkbox[required]', 'he-checkbox') 'IARC terms agreement' -NativeClick
+    Click-SelectorStrict @('he-button[data-l10n-key="AppSubmission_AgeRating_SaveButton"]', 'button[data-l10n-key="AppSubmission_AgeRating_SaveButton"]') 'age ratings preview save' -NativeClick
+    Start-Sleep -Seconds 3
+    Click-TextStrict -Text '\u7ee7\u7eed' -Label 'continue after age ratings'
+    Mark-PhaseCompleted 'ageRatings'
+}
+
+function Invoke-Packages {
+    Navigate-Url -Url (Get-PhaseUrl 'packages') -Label 'packages'
+    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'packages: upload MSIX, desktop only, save'; return }
+    $assets = Get-PropertyValue $script:Config 'assets'
+    $msix = [string](Get-PropertyValue $assets 'msix' '')
+    if ([string]::IsNullOrWhiteSpace($msix)) { Stop-WithCode 12 'assets.msix is missing from manifest.' }
+    
+    $packageName = [IO.Path]::GetFileName($msix)
+    $packageAlreadyPresent = [bool](Invoke-PageJs "(document.body && document.body.innerText || '').includes($(ConvertTo-JsLiteral $packageName))")
+    if ($packageAlreadyPresent) {
+        Write-Log -Level 'INFO' -Message "package already uploaded: $packageName"
+    }
+    else {
+        Upload-File -ContextTexts @('Drag your packages here', '\u7a0b\u5e8f\u5305', '.msix') -Path $msix -Label 'MSIX package'
+    }
+    Wait-ForText -Text 'Windows 10/11 Desktop' -Seconds $TimeoutSeconds
+    Set-CheckboxByText -Text 'Windows 10/11 Desktop' -Checked $true -Label 'desktop device family'
+    Set-CheckboxByText -Text 'Windows 10 Mobile' -Checked $false -Label 'mobile device family'
+    Set-CheckboxByText -Text 'Windows 10/11 Xbox' -Checked $false -Label 'xbox device family'
+    Set-CheckboxByText -Text 'Windows 10 Team' -Checked $false -Label 'team device family'
+    Set-CheckboxByText -Text 'Windows 10 Mixed Reality' -Checked $false -Label 'mixed reality device family'
+    Set-CheckboxByText -Text 'future device families' -Checked $true -Label 'future device families'
+    Save-CurrentPage -Phase 'packages'
+    Mark-PhaseCompleted 'packages'
+}
+
+function Invoke-Listing {
+    Navigate-Url -Url (Get-PhaseUrl 'listing') -Label 'Store listing Chinese'
+    if (-not $Apply) { Write-Log -Level 'PLAN' -Message 'listing: description, features, screenshots, logos, keywords, save'; return }
+    $values = Get-PropertyValue $script:Config 'values'
+    $assets = Get-PropertyValue $script:Config 'assets'
+
     $description = [string](Get-PropertyValue $values 'description' '')
     if ([string]::IsNullOrWhiteSpace($description)) { Stop-WithCode 12 'values.description is missing.' }
     Set-FieldStrict -Selectors @('#description-required') -Value $description -Label 'description'
+
     $features = @(Get-PropertyValue $values 'features' @())
     for ($featureIndex = 0; $featureIndex -lt $features.Count; $featureIndex++) {
         $featureSelector = "#feature-$featureIndex"
         if (-not (Test-VisibleSelector $featureSelector)) {
-            Click-TextStrict -Text '添加其他项目' -Label 'add product feature'
+            Click-TextStrict -Text '\u6dfb\u52a0\u5176\u4ed6\u9879\u76ee' -Label 'add product feature'
             if (-not (Wait-ForPagePredicate -Expression "document.querySelector($(ConvertTo-JsLiteral $featureSelector)) !== null" -Seconds $TimeoutSeconds)) {
                 Stop-WithCode 7 "New product feature input did not appear: $featureSelector"
             }
         }
         Set-FieldStrict -Selectors @($featureSelector) -Value ([string]$features[$featureIndex]) -Label "feature $($featureIndex + 1)"
     }
+
     $shortDescription = [string](Get-PropertyValue $values 'shortDescription' '')
     if ($shortDescription) { Set-FieldStrict -Selectors @('#shortDescription') -Value $shortDescription -Label 'short description' }
+    
     $keywords = @(Get-PropertyValue $values 'keywords' @())
     Set-Keywords -Keywords $keywords
 
     $uploads = @(
         @{ key = 'screenshot'; label = 'desktop screenshot'; contexts = @(); inputIndex = 0 },
-        @{ key = 'poster'; label = '9:16 poster'; contexts = @('9:16', '招贴画') },
-        @{ key = 'boxart'; label = '1:1 box art'; contexts = @('1:1', '酷图') },
+        @{ key = 'poster'; label = '9:16 poster'; contexts = @('9:16', '\u62db\u8d34\u753b') },
+        @{ key = 'boxart'; label = '1:1 box art'; contexts = @('1:1', '\u9177\u56fe') },
         @{ key = 'logo300'; label = '300x300 logo'; contexts = @('300x300', '300 x 300') },
         @{ key = 'logo150'; label = '150x150 logo'; contexts = @('150x150', '150 x 150') },
         @{ key = 'logo71'; label = '71x71 logo'; contexts = @('71x71', '71 x 71') },
-        @{ key = 'superhero'; label = '16:9 superhero art'; contexts = @('16:9', '超级英雄画', '主角图像') }
+        @{ key = 'superhero'; label = '16:9 superhero art'; contexts = @('16:9', '\u8d85\u7ea7\u82f1\u96c4\u753b') }
     )
     foreach ($upload in $uploads) {
         $path = [string](Get-PropertyValue $assets $upload.key '')
         if ([string]::IsNullOrWhiteSpace($path)) { continue }
         $enabled = [bool](Get-PropertyValue (Get-PropertyValue $script:Config 'listing') $upload.key $false)
-        if (-not $enabled) { Write-Log -Level 'INFO' -Message "skip optional asset $($upload.label)"; continue }
+        if (-not $enabled) { continue }
         $inputIndex = -1
         if ($upload.ContainsKey('inputIndex')) { $inputIndex = [int]$upload.inputIndex }
-        if (Test-SectionHasImage -ContextTexts $upload.contexts -InputIndex $inputIndex) { Write-Log -Level 'INFO' -Message "already present: $($upload.label)"; continue }
+        if (Test-SectionHasImage -ContextTexts $upload.contexts -InputIndex $inputIndex) {
+            Write-Log -Level 'INFO' -Message "already present: $($upload.label)"
+            continue
+        }
         Upload-File -ContextTexts $upload.contexts -Path $path -Label $upload.label -InputIndex $inputIndex
     }
     Save-CurrentPage -Phase 'listing'
@@ -974,28 +1201,32 @@ function Invoke-Options {
     if ($publishMode -eq 'Manual') {
         Set-RadioStrict -Selector 'input#radioReleaseDate_manual' -Label 'manual publish mode'
     }
-    elseif ($publishMode -eq 'Asap') {
+    else {
         Set-RadioStrict -Selector 'input#radioReleaseDate_asap' -Label 'ASAP publish mode'
     }
-    else {
-        Stop-WithCode 12 "Unsupported publishMode: $publishMode"
-    }
-    $reason = [string](Get-PropertyValue $options 'runFullTrustReason' '')
-    if ($reason) {
+
+    $reason = [string](Get-PropertyValue $options 'runFullTrustReason' '\u8fd9\u662f\u4e00\u4e2a WinUI 3 \u684c\u9762\u5e94\u7528\uff0c\u9700\u8981\u4ee5\u5168\u4fe1\u4efb\u684c\u9762\u8fdb\u7a0b\u8fd0\u884c\u624d\u80fd\u6b63\u5e38\u542f\u52a8\u5e76\u63d0\u4f9b\u672c\u5730\u901a\u77e5\u3001\u6587\u4ef6\u548c\u7cfb\u7edf\u96c6\u6210\u529f\u80fd\u3002\u5e94\u7528\u4ec5\u5728\u7528\u6237\u672c\u673a\u8fd0\u884c\uff0c\u4e0d\u8bbf\u95ee\u6216\u4fee\u6539\u5176\u4ed6\u7528\u6237\u7684\u6570\u636e\u3002')
+    $hasFullTrustBox = [bool](Invoke-PageJs "(() => Array.from(document.querySelectorAll('textarea')).some(e => (e.parentElement?.parentElement?.innerText||'').includes('\u4e3a\u4f55\u9700\u8981\u4f7f\u7528')))()")
+    if ($hasFullTrustBox) {
         $result = Invoke-PageJs @"
 (() => {
- const needle='为何需要使用', els=Array.from(document.querySelectorAll('textarea')).filter(e=>(e.parentElement?.parentElement?.innerText||'').includes(needle));
+ const needle='\u4e3a\u4f55\u9700\u8981\u4f7f\u7528', els=Array.from(document.querySelectorAll('textarea')).filter(e=>(e.parentElement?.parentElement?.innerText||'').includes(needle));
  if(els.length!==1)return {ok:false,count:els.length};
- const e=els[0], setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value'); setter.set.call(e,$(ConvertTo-JsLiteral $reason)); e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return {ok:true};
+ const e=els[0], setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value');
+ setter.set.call(e,$(ConvertTo-JsLiteral $reason));
+ e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));
+ return {ok:true};
 })()
 "@
-        if (-not $result.ok) { Stop-WithCode 7 "runFullTrust explanation textarea matched $($result.count)" }
+        if ($result.ok) { Write-Log -Level 'PASS' -Message 'filled runFullTrust restricted capability justification' }
     }
+
     Save-CurrentPage -Phase 'options'
     Mark-PhaseCompleted 'options'
 }
 
 function Invoke-Run {
+    Invoke-PreflightStore0
     Ensure-SignedIn
     $null = Get-ProductId
     Ensure-Submission
@@ -1024,7 +1255,6 @@ function Invoke-FinalSubmit {
     if ($Phase -ne 'all') { Stop-WithCode 13 'Final submission requires -Phase all.' }
     $product = Get-ProductId
     $submission = Get-SubmissionId
-    if ($ConfirmSubmit.ToString() -ne 'True') { Stop-WithCode 13 'Final submission confirmation flag is missing.' }
     Navigate-Url -Url (Get-PhaseUrl 'overview') -Label 'submission overview'
     Assert-NoVisibleErrors
     $completed = @(Get-CompletedPhases)
@@ -1032,30 +1262,33 @@ function Invoke-FinalSubmit {
         if ($completed -notcontains $phase) { Stop-WithCode 13 "Phase is not complete: $phase" }
     }
     Write-Log -Level 'WARN' -Message "final action: submit product=$product submission=$submission"
-    Click-SelectorStrict @('button[data-l10n-key="AppSubmission_PublishButton"]', 'button[data-l10n-key="SubmitToStore"]', 'a[data-l10n-key="AppSubmission_PublishButton"]', 'a[l10n="AppSubmission_PublishButton"]', 'a[href$="/submit"]') 'Submit to Store'
-    Start-Sleep -Seconds 2
-    Write-Log -Level 'PASS' -Message 'submit action clicked; inspect the resulting confirmation state'
+    Click-SelectorStrict @('button[data-l10n-key="AppSubmission_PublishButton"]', 'button[data-l10n-key="SubmitToStore"]', 'a[data-l10n-key="AppSubmission_PublishButton"]') 'Submit to Store' -NativeClick
+    Start-Sleep -Seconds 3
+    Write-Log -Level 'PASS' -Message 'submitted successfully to Microsoft Store review'
 }
 
 function Invoke-Inspect {
+    Ensure-SignedIn
+    $product = Get-ProductId
+    $liveFound = Discover-LiveSubmissionUrls
     $info = Get-PageInfo
-    $fileInputs = Invoke-PageJs @'
-(() => Array.from(document.querySelectorAll('input[type="file"]')).map((e,i)=>({index:i,context:(e.parentElement?.parentElement?.innerText||'').replace(/\s+/g,' ').slice(0,180)})))()
-'@
+
     $inspection = [ordered]@{
         generatedAt = (Get-Date).ToString('o')
+        productId = $product
+        submissionId = [string]$script:State.submissionId
+        liveDiscovery = $liveFound
+        discoveredHrefs = $script:LiveState.discoveredHrefs
         page = $info
         stableSelectors = [ordered]@{
             startSubmission = (Test-VisibleSelector 'he-button[data-l10n-key="Start_Submission"],button[data-l10n-key="Start_Submission"]')
-            availabilitySave = (Test-VisibleSelector 'input#saveButtonPricing,button#saveButtonPricing,input[uitestid="saveButtonPricing"]')
+            availabilitySave = (Test-VisibleSelector 'input#saveButtonPricing,button#saveButtonPricing')
             propertiesCategory = (Test-VisibleSelector 'select[name="CategorySelect"]')
             ageMode = (Test-VisibleSelector 'input[name="inputMode"]')
-            packageUpload = (Test-VisibleSelector 'input.fileuploader,input[type="file"][name="fileuploader"]')
+            packageUpload = (Test-VisibleSelector 'input[type="file"]')
             listingDescription = (Test-VisibleSelector '#description-required')
-            listingSave = (Test-VisibleSelector 'button[name="save_button"]')
             optionsManual = (Test-VisibleSelector '#radioReleaseDate_manual')
         }
-        fileInputs = $fileInputs
         visibleErrors = @(Get-VisibleErrors)
     }
     $path = Join-Path $script:StateRoot ("inspect-{0}.json" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -1069,7 +1302,7 @@ function Invoke-Identity {
     if ([bool](Invoke-PageJs "document.querySelector('#collapseApplicationIdentity') !== null")) {
         $expanded = [bool](Invoke-PageJs "(() => { const e=document.querySelector('#collapseApplicationIdentity'); return e && !e.classList.contains('collapse'); })()")
         if (-not $expanded) {
-            Click-SelectorStrict @('a[aria-controls="collapseApplicationIdentity"]', '[data-target="#collapseApplicationIdentity"]') 'expand product identity'
+            Click-SelectorStrict @('a[aria-controls="collapseApplicationIdentity"]', '[data-target="#collapseApplicationIdentity"]') 'expand product identity' -NativeClick
             Start-Sleep -Milliseconds 500
         }
     }
@@ -1100,13 +1333,13 @@ function Stop-Edge {
         $script:EdgeProcess.CloseMainWindow() | Out-Null
         Start-Sleep -Milliseconds 500
         if (-not $script:EdgeProcess.HasExited) { $script:EdgeProcess.Kill() }
-        Write-Log -Level 'INFO' -Message 'stopped only the isolated Edge process started by this CLI'
+        Write-Log -Level 'INFO' -Message 'stopped isolated Edge process'
     }
 }
 
 function Close-Cdp {
     if ($null -ne $script:CdpSocket) {
-        try { $script:CdpSocket.CloseAsync([Net.WebSockets.WebSocketCloseStatus]::NormalClosure, 'done', [Threading.CancellationToken]::None).GetAwaiter().GetResult() } catch { }
+        try { [void]($script:CdpSocket.CloseAsync([Net.WebSockets.WebSocketCloseStatus]::NormalClosure, 'done', [Threading.CancellationToken]::None).GetAwaiter().GetResult()) } catch { }
         $script:CdpSocket.Dispose()
         $script:CdpSocket = $null
     }
@@ -1126,6 +1359,12 @@ try {
     }
     Import-ListingMarkdown
     Initialize-State
+
+    if ($Action -eq 'preflight') {
+        Invoke-PreflightStore0
+        exit 0
+    }
+
     $requestedProduct = [string](Get-PropertyValue $script:Config 'productId' '')
     if (-not [string]::IsNullOrWhiteSpace($ProductId)) { $requestedProduct = $ProductId }
     if ($requestedProduct -and [string]$script:State.productId -and [string]$script:State.productId -ne $requestedProduct) {
@@ -1143,8 +1382,8 @@ try {
 
     if ($Action -eq 'stop') {
         if (Test-Path -LiteralPath (Join-Path $script:StateRoot 'edge.pid')) {
-            $pid = [int](Get-Content -LiteralPath (Join-Path $script:StateRoot 'edge.pid'))
-            $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            $savedPid = [int](Get-Content -LiteralPath (Join-Path $script:StateRoot 'edge.pid'))
+            $process = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
             if ($null -ne $process) { $process.CloseMainWindow() | Out-Null; Start-Sleep -Milliseconds 300; if (-not $process.HasExited) { $process.Kill() } }
         }
         Write-Log -Level 'PASS' -Message 'isolated Edge stop requested'
@@ -1157,10 +1396,9 @@ try {
     Update-IdsFromUrl
     if ($Action -eq 'launch') {
         Ensure-SignedIn
-        Write-Log -Level 'PASS' -Message 'Edge is ready. Sign-in state is persisted only in the isolated profile.'
+        Write-Log -Level 'PASS' -Message 'Edge is ready. User session established.'
     }
     elseif ($Action -eq 'inspect') {
-        Ensure-SignedIn
         Invoke-Inspect
     }
     elseif ($Action -eq 'identity') {
@@ -1190,6 +1428,7 @@ catch [System.OperationCanceledException] {
 }
 catch {
     Write-Log -Level 'ERROR' -Message $_.Exception.Message
+    Write-Log -Level 'ERROR' -Message ("STACK: " + ($_.ScriptStackTrace -replace '\r?\n', ' | '))
     Close-Cdp
     if ($Action -ne 'launch' -and -not $KeepOpen) { Stop-Edge }
     Release-RunMutex

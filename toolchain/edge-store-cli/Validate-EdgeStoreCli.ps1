@@ -20,7 +20,8 @@ if ($errors.Count -gt 0) {
 
 $config = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($Strict) {
-    foreach ($name in @('productId', 'submissionId', 'productName')) {
+    # productId and productName are required for strict manifest; submissionId is dynamically discovered from DOM
+    foreach ($name in @('productId', 'productName')) {
         if ([string]::IsNullOrWhiteSpace([string]$config.$name)) { throw "Strict manifest field is empty: $name" }
     }
     if ($null -eq $config.pricing -or $config.pricing.currency -ne 'CN' -or $config.pricing.priceTier -ne '0') {

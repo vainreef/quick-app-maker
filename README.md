@@ -36,12 +36,12 @@ graph TD
     end
 
     subgraph Layer4 ["4. 商店发布与断点续接层 (Partner Center & Store)"]
-        C2 -->|用户主动提出: '我想发布到商店'| S1["启动发布链条 6 大检查项状态机"]
-        W4 -.回填 3 大 Package Identity.- -> S1
-        S1 --> S2["定制 1:1 专属 App Logo 与 1080P 真实运行截图"]
-        S2 --> S3["winapp package 生成 Store 正式包 (清理冗余权限)"]
-        S3 --> S4["命令行 Edge CLI 自动填报 6 大表单并逐项校验"]
-        S4 --> S5["点击'提交到应用商店' -> 24~72h 审核全球上线！"]
+        C2 -->|用户主动提出: '我想发布到商店'| S0["Store 0: 离线静态质检 (MSIX解包/Desktop依赖/Logo/截图/<=7关键字)"]
+        W4 -.回填 3 大 Package Identity.- -> S0
+        S0 --> S1["Store 1~2: 启动隔离 Edge & 动态探测 live submissionId 与 6 表真实 href"]
+        S1 --> S2["Store 3~4: 声明式差异收敛 (he-select/he-checkbox 原生 CDP 物理点击)"]
+        S2 --> S3["Store 5~6: F5 刷新持久化二次验证 & 概览页 6 大模块绿勾总检"]
+        S3 --> S4["Store 7: 显式双确认提交审核 (-Submit -ConfirmSubmit) -> 24~72h 全球上线！"]
     end
 ```
 
@@ -98,15 +98,15 @@ quick-app-maker/
 │       ├── partner-center-guide.md          # 微软 Partner Center 注册、名称验重与 6 大表单全指南
 │       ├── delivery-considerations.md       # 交付边界、权限、离线与性能考量
 │       ├── official-sources.md              # 微软官方文档与 API 规范入口
-│       ├── edge-store-automation.md         # 纯命令行 Edge Partner Center 自动化规范
-│       └── toolchain/v1/commands.md         # 41 个实机验证避坑指南、命令硬规则、UI 自动化生命周期
-├── toolchain/edge-store-cli/                # 纯 PowerShell + Edge CDP 商店填表 CLI
-│   ├── Invoke-EdgeStore.ps1                 # launch / identity / inspect / run / status / stop
-│   ├── Validate-EdgeStoreCli.ps1             # PowerShell parser + JSON preflight
-│   ├── README.md                            # CLI 用法、隔离 profile 与恢复规则
-│   └── examples/store-automation.json       # 通用配置样例
+│       ├── edge-store-automation.md         # 声明式状态收敛与 Store 0~7 自动化标准
+│       └── toolchain/v1/commands.md         # 53 个实机验证避坑指南、命令硬规则、UI 自动化生命周期
+├── toolchain/edge-store-cli/                # 纯 PowerShell + Edge CDP 声明式状态收敛 CLI
+│   ├── Invoke-EdgeStore.ps1                 # preflight / launch / identity / inspect / run / status / stop
+│   ├── Validate-EdgeStoreCli.ps1             # AST 语法校验与配置预检
+│   ├── README.md                            # CLI 用法、Store 0~7 流水线与退出码约定
+│   └── examples/store-automation.json       # 纯声明式 Desired State 配置文件样例
 ├── docs/                                    # 📚 归档与实战证据库
-│   ├── windows-smoke-test.md                # 1~6 轮真实 Windows 机器全流程实测战绩记录
+│   ├── windows-smoke-test.md                # 1~9 轮真实 Windows 机器全流程实测战绩记录
 │   └── partner-center/                      # 8 个 Partner Center 真实页面 DOM 快照与实测记录
 │       ├── 微软PartnerCenter个人账户注册记录.md
 │       ├── 页面快照-应用和游戏概述.html
@@ -145,11 +145,13 @@ quick-app-maker/
   * 通过 Xbox 应用免验证码注册，开通免费个人开发者；
   * **控制台名称前置验重**：在控制台点击 `+ 新产品 -> MSIX 或 PWA 应用`，输入名称点击 **「检查可用性」**。若重名当场换名，确认可用后立即预留，拿到 3 大 `Product Identity` 参数，**从源头杜绝下游重命名推倒重来**！
 
-### 4. 【交付与发布支柱】共创把玩优先 & 商店断点智能续接
+### 4. 【交付与发布支柱】声明式状态收敛 & Store 0~7 流水线
 * **首版交付心智**：第一版安装到电脑后，Agent 热情邀请用户试用：“已装在电脑上，随时可以打开把玩，哪里不顺手随时告诉我，我们继续修改直到你满意为止”，**严禁首版主动推销上架**。
-* **发布时刻断点智能续接**：当用户充分把玩满意并提出上架时，Agent 启动 6 项检查状态机：
-  * 若用户在窗口 2 已拿到 3 大参数，直接回填打包；
-  * 若未完成，Agent 从 `toolchain/edge-store-cli/state/store-state.json` 断点续接，使用隔离 Edge CLI 填报 6 大表单（定价、属性、年龄分级、程序包、Store 一览、提交选项），最后由显式提交命令触发审核！
+* **声明式状态收敛**：当用户满意并提出上架时，启动 Store 0~7 标准流水线：
+  * **Store 0 静态质检**：解包检查 MSIX 的 DisplayName、Desktop-only 依赖、Logo/1080P 截图及 $\le 7$ 个关键词；
+  * **Store 1~3 动态发现与差异计算**：实时从概览页 DOM 读取当前有效 submissionId 与 6 大表单实时 href，比对 Desired State 与 Observed State；
+  * **Store 4~5 物理交互与 F5 刷新验证**：基于元素中心派发 CDP 原生鼠标事件（驱动 Angular `he-select` 等组件），保存后执行 F5 Reload 确保服务端持久化接收；
+  * **Store 6~7 概览总检与双确认提交**：确认 6 项均变绿勾后，经显式 `-Submit -ConfirmSubmit` 提交微软商店全球上线！
 
 ---
 
@@ -163,3 +165,6 @@ quick-app-maker/
 | **轮次 4** | 纪念日 DaysMatter | 链路全通 | 沉淀数据预置法、ContentDialog 模式，新增 7 个坑点（26~32 条） |
 | **轮次 5** | RememberWhat 记得什么 | 31 分钟全通 | 解决计划通知底层投影问题，新增 4 个坑点（33~36 条），确立降噪屏障 |
 | **轮次 6** | OldTimes 旧时光 | 链路全通 | 攻克 XamlCompiler `WMC9999` 根因、弹窗 `XamlRoot` 崩溃，确立 5 大黄金铁律（37~41 条） |
+| **轮次 7** | 牵挂 Qiangua (App研发) | 链路全通 | 确立封面双动画、导航目录与 DatePicker 投影非空规则 |
+| **轮次 8** | 牵挂笔记 (Store表单实测) | 6表全通 | 攻克 `winapp package --output`、`Windows.Universal` 依赖污染、6 大表单全字段标准（42~46 条） |
+| **轮次 9** | 牵挂笔记 (Edge CLI 实测) | 全链收敛 | 攻克 UTF-8 BOM 编码、$PID 保留变量、VoidTaskResult 截断、CDP 粘包、Angular `he-select` 原生点击与动态 Submission ID 发现（47~53 条），建立 Store 0~7 状态收敛体系 |
