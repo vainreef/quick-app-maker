@@ -1,20 +1,65 @@
-# Edge Store CLI
+# Edge Store CLI (V2 - .NET 10 声明式状态收敛驱动)
 
-这是一个**纯命令行、声明式状态收敛**的 Microsoft Edge 控制器，使用 Edge 自带的 Chromium DevTools Protocol（CDP）控制一个隔离的 Edge 进程。
-
-它不依赖 Codex 专用浏览器工具、浏览器扩展、Selenium、Playwright 或 Node.js。Windows 自带 PowerShell 5.1，结合本仓库预备的 Edge 即可运行。
+这是一个基于 **.NET 10 (C#)** 构建的现代化、强类型、声明式 Microsoft Edge 浏览器自动化驱动，通过 Chromium DevTools Protocol (CDP) 控制隔离的 Edge 进程，实现 Microsoft Partner Center 商店提审全流程的状态收敛与验证。
 
 ---
 
-## 核心设计理念：声明式状态收敛
+## 核心架构分层 (3-Layer Architecture)
 
-旧版命令式脚本（“navigate → setAttribute → click save”）在面对 Partner Center 的 Angular SPA 自定义控件（`he-select`, `he-option`, `he-checkbox`）与动态 Submission ID 时极易失效。
+```text
+store-automation.json
+    │
+    ▼
+┌──────────────────────────────┐
+│      Store Orchestrator      │
+│      Store 0 ~ Store 7       │  <-- 声明式全流程编排器 (Preflight / Plan / Convergence)
+│   Desired / Observe / Plan   │
+│  Reconcile / Verify / Submit │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│    Partner Center Adapter    │
+│                              │
+│     AvailabilityAdapter      │
+│      PropertiesAdapter       │  <-- 6 大表单业务适配器 (Observe / Diff / Apply / ReloadVerify)
+│      AgeRatingsAdapter       │
+│       PackagesAdapter        │
+│        ListingAdapter        │
+│        OptionsAdapter        │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│     Component Adapters       │  <-- LitElement / Angular 特殊组件深度适配
+│   HeSelect / HeCheckbox      │      (Shadow DOM 穿透、AX 树选项定位、中心物理点击、状态断言)
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│        Browser Driver        │
+│                              │
+│       CdpClient (WS)         │  <-- .NET 10 原生驱动核心 (DOM.getDocument pierce=true,
+│      DOM + Shadow DOM        │      Accessibility.queryAXTree, getBoxModel, InputDriver,
+│      Accessibility Tree      │      契约式 Waiter 消除一切 Start-Sleep)
+│   Native mouse / keyboard    │
+│   wait / navigation / upload │
+└──────────────┬───────────────┘
+               │
+               ▼
+         Microsoft Edge
+```
 
-新版 CLI 升级为**声明式状态收敛系统**：
-1. **Desired State**：用户在 `store-automation.json` 声明目标（免费、生产率分类、中文描述、1080P 截图等）；
-2. **Observed State**：实时从产品概览页 DOM 动态嗅探当前 `submissionId` 与 6 大表单的最新 `href`；
-3. **CDP 原生物理输入**：严禁硬编码绝对坐标，基于目标元素实时 `getBoundingClientRect()` 计算中心坐标，派发 CDP 原生鼠标事件；
-4. **F5 刷新二次验证**：表单保存后支持强制 F5 Reload 重新读取 DOM，验证服务端真正持久化。
+---
+
+## 为什么从 PowerShell 升级到 .NET 10 C#
+
+1. **类型安全与零编码陷阱**：彻底告别 PowerShell 5.1 在 GBK/ANSI 环境下的 UTF-8 乱码、`\uXXXX` 多重转义混淆、以及单元素数组被管道自动拆包的经典陷阱；
+2. **真正的 Shadow DOM 穿透**：通过 CDP 原生 `DOM.getDocument(depth: -1, pierce: true)` 与 `Accessibility.queryAXTree` 依角色和名称进行**语义化定位**，优雅解决 LitElement `he-select` / `he-option` 选项查找；
+3. **真实字段级 Observed State 与幂等性 Diff**：
+   - 观测模型直接读取页面真实值（货币、价格段、分类、隐私文本、设备家族、特权说明）；
+   - 二次运行直接比对出 `0 changes -> CONVERGED: No action required`；
+4. **零新增环境依赖**：`quick-app-maker` 本身就会安装 .NET 10 SDK，直接使用系统预备的 `dotnet` 运行，无需 Node.js 或 Python。
 
 ---
 
@@ -27,11 +72,11 @@ STORE 1: SESSION DISCOVERY       # 启动/复用隔离 Edge 进程，验证 CDP 
     ↓
 STORE 2: LIVE COMPATIBILITY PROBE# 概览页动态读取 live submissionId 与 6 大表单实时 href
     ↓
-STORE 3: PLAN                    # 对比目标配置与当前表单状态生成差异收敛计划
+STORE 3: PLAN                    # 计算 DesiredState vs ObservedState 生成精准 Diff 计划
     ↓
-STORE 4: FORM RECONCILIATION     # 逐表执行 (等待关键控件 -> CDP 物理点击填报 -> 保存)
+STORE 4: FORM RECONCILIATION     # 逐表执行 (HeSelect 语义点击 / 原生表单修改 / 保存)
     ↓
-STORE 5: RELOAD VERIFICATION     # 刷新页面验证持久化状态无错误
+STORE 5: RELOAD VERIFICATION     # 强制 F5 刷新页面二次读取，验证服务端真正持久化
     ↓
 STORE 6: SUBMISSION INTEGRITY    # 概览页确认 6 大模块均显示绿色已完成状态
     ↓
@@ -42,7 +87,7 @@ STORE 7: EXPLICIT SUBMIT         # 必须显式传入 -Submit -ConfirmSubmit 触
 
 ## 常用命令
 
-### 0. 本地语法与 AST 检查
+### 0. 验证 C# 工程与配置语法
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Validate-EdgeStoreCli.ps1 -Strict
 ```
@@ -57,19 +102,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -Manifest .\<app>\build\edge-store.json -KeepOpen
 ```
 
-### 3. 只读探测与 Inspect 报告
+### 3. 单表/全表声明式收敛（含 F5 刷新二次持久化校验）
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action inspect -Manifest .\<app>\build\edge-store.json -KeepOpen
-```
-
-### 4. 提取 Product Identity 三大核心凭据
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action identity -Manifest .\<app>\build\edge-store.json -KeepOpen
-```
-
-### 5. 单表/全表自动化填报
-```powershell
-# 推荐首次按表逐项执行：
+# 按表逐项收敛：
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase availability -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase properties   -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase ageRatings   -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
@@ -77,11 +112,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase listing      -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase options      -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
 
-# 或整链一键收敛（含 F5 刷新持久化校验）：
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -ReloadVerify -KeepOpen
+# 或整链一键收敛：
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
 ```
 
-### 6. 显式最终提交
+### 4. 显式最终提交
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -Submit -ConfirmSubmit
 ```
@@ -92,16 +127,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 
 | 退出码 | 含义 |
 | ---: | --- |
-| 0 | 成功完成 |
+| 0 | 阶段完成 / 已收敛 (CONVERGED) |
+| 1 | 执行异常或验证未收敛 |
 | 2 | 配置文件路径或 JSON 语法错误 |
-| 3 | Edge 浏览器可执行文件未找到 |
-| 4 | DevTools 端口或 WebSocket 连接异常 |
-| 5 | CDP 执行失败或页面 JS 抛出异常 |
-| 6 | 页面或关键控件加载超时 |
-| 7 | UI 结构与预设选择器不匹配 |
-| 8 | 页面存在红字验证错误 (.alert-error) |
-| 10 | 等待用户登录/MFA 超时 |
-| 11 | Product ID 缺失或概览页无法探测到提交信息 |
-| 12 | 物料配置缺失（MSIX 未找到、DisplayName 不匹配、图片不存在） |
-| 13 | 最终提交前置条件未满足（存在未完成模块） |
-| 14 | dry-run 模式下需要创建新提交草稿 |
+| 3 | .NET 10 SDK 或 Edge 可执行文件未找到 |

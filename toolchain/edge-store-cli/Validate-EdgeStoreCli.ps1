@@ -1,26 +1,29 @@
 [CmdletBinding()]
 param(
-    [string]$ScriptPath = (Join-Path $PSScriptRoot 'Invoke-EdgeStore.ps1'),
+    [string]$ProjectDir = $PSScriptRoot,
     [string]$ManifestPath = (Join-Path $PSScriptRoot 'examples\store-automation.json'),
     [switch]$Strict
 )
 
 $ErrorActionPreference = 'Stop'
 
-if (-not (Test-Path -LiteralPath $ScriptPath)) { throw "Script not found: $ScriptPath" }
+$csproj = Join-Path $ProjectDir 'EdgeStore.Cli.csproj'
+if (-not (Test-Path -LiteralPath $csproj)) { throw "C# project file not found: $csproj" }
 if (-not (Test-Path -LiteralPath $ManifestPath)) { throw "Manifest not found: $ManifestPath" }
 
-$tokens = $null
-$errors = $null
-[System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$tokens, [ref]$errors) | Out-Null
-if ($errors.Count -gt 0) {
-    $errors | ForEach-Object { Write-Error ("{0}:{1}: {2}" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message) }
-    exit 1
+$launcher = Join-Path $ProjectDir 'Invoke-EdgeStore.ps1'
+if (Test-Path -LiteralPath $launcher) {
+    $tokens = $null
+    $errors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($launcher, [ref]$tokens, [ref]$errors) | Out-Null
+    if ($errors.Count -gt 0) {
+        $errors | ForEach-Object { Write-Error ("{0}:{1}: {2}" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message) }
+        exit 1
+    }
 }
 
 $config = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($Strict) {
-    # productId and productName are required for strict manifest; submissionId is dynamically discovered from DOM
     foreach ($name in @('productId', 'productName')) {
         if ([string]::IsNullOrWhiteSpace([string]$config.$name)) { throw "Strict manifest field is empty: $name" }
     }
@@ -39,8 +42,9 @@ if ($Strict) {
         if ($enabled -and -not [IO.Path]::IsPathRooted([string]$property.Value) -and -not (Test-Path -LiteralPath (Join-Path $base $property.Value))) { throw "Enabled asset file is missing: $($property.Name)" }
     }
 }
-Write-Output "EDGE_STORE_CLI_VALID"
+
+Write-Output "EDGE_STORE_CLI_VALID (V2 C# .NET 10 Driver)"
 if ($Strict) { Write-Output 'MODE: STRICT' }
-Write-Output "SCRIPT: $([IO.Path]::GetFullPath($ScriptPath))"
+Write-Output "PROJECT: $([IO.Path]::GetFullPath($csproj))"
 Write-Output "MANIFEST: $([IO.Path]::GetFullPath($ManifestPath))"
 exit 0

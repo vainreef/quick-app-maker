@@ -100,10 +100,17 @@ quick-app-maker/
 │       ├── official-sources.md              # 微软官方文档与 API 规范入口
 │       ├── edge-store-automation.md         # 声明式状态收敛与 Store 0~7 自动化标准
 │       └── toolchain/v1/commands.md         # 53 个实机验证避坑指南、命令硬规则、UI 自动化生命周期
-├── toolchain/edge-store-cli/                # 纯 PowerShell + Edge CDP 声明式状态收敛 CLI
-│   ├── Invoke-EdgeStore.ps1                 # preflight / launch / identity / inspect / run / status / stop
-│   ├── Validate-EdgeStoreCli.ps1             # AST 语法校验与配置预检
-│   ├── README.md                            # CLI 用法、Store 0~7 流水线与退出码约定
+├── toolchain/edge-store-cli/                # 🚀 .NET 10 (C#) 声明式状态收敛驱动 (V2)
+│   ├── Invoke-EdgeStore.ps1                 # 超薄启动器 (PowerShell Launcher)
+│   ├── EdgeStore.Cli.csproj                 # C# .NET 10 控制台项目
+│   ├── Program.cs                           # 命令行入口与参数解析
+│   ├── Orchestration/                       # Store 0 ~ Store 7 全流程编排器
+│   ├── Cdp/                                 # CdpClient, DomDriver (pierce=true), AxLocator, Waiter
+│   ├── ComponentAdapters/                   # LitElement / Angular (HeSelect, HeCheckbox) 专属适配器
+│   ├── PartnerCenter/                       # 6 大提审表单业务适配器 (Observe/Diff/Apply/ReloadVerify)
+│   ├── State/                               # 强类型 DesiredState / 字段级 ObservedState / ReconcilePlan
+│   ├── Validate-EdgeStoreCli.ps1             # 工程与配置预检
+│   ├── README.md                            # V2 架构文档、Store 0~7 流水线与退出码约定
 │   └── examples/store-automation.json       # 纯声明式 Desired State 配置文件样例
 ├── docs/                                    # 📚 归档与实战证据库
 │   ├── windows-smoke-test.md                # 1~9 轮真实 Windows 机器全流程实测战绩记录
