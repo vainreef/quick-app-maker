@@ -14,6 +14,7 @@ public class Program
         string phase = "all";
         string manifestPath = "";
         string productId = "";
+        string stateDir = "";
         bool apply = false;
         bool submit = false;
         bool confirmSubmit = false;
@@ -44,6 +45,10 @@ public class Program
                 case "-productid":
                     if (i + 1 < args.Length) productId = args[++i];
                     break;
+                case "--state-dir":
+                case "-statedir":
+                    if (i + 1 < args.Length) stateDir = args[++i];
+                    break;
                 case "--apply":
                 case "-apply":
                     apply = true;
@@ -68,7 +73,10 @@ public class Program
 
         string appRoot = AppContext.BaseDirectory;
         string toolRoot = Directory.GetCurrentDirectory();
-        string stateRoot = Path.Combine(toolRoot, "state");
+
+        string stateRoot = !string.IsNullOrWhiteSpace(stateDir)
+            ? Path.GetFullPath(stateDir)
+            : Path.Combine(toolRoot, "state");
 
         if (string.IsNullOrWhiteSpace(manifestPath))
         {
@@ -99,117 +107,130 @@ public class Program
         // Resolve relative paths in assets
         ResolvePaths(desired, baseDir);
 
-        // Import markdown listing if provided
-        ImportListingMarkdown(desired, baseDir);
-
-        if (!string.IsNullOrEmpty(productId))
+        if (!string.IsNullOrWhiteSpace(productId))
         {
             desired.ProductId = productId;
         }
 
-        var orchestrator = new StoreOrchestrator(desired, stateRoot, apply, submit, confirmSubmit, reloadVerify);
+        // Check if markdown listing file exists and load it
+        if (!string.IsNullOrWhiteSpace(desired.ListingMarkdown))
+        {
+            string mdPath = Path.IsPathRooted(desired.ListingMarkdown)
+                ? desired.ListingMarkdown
+                : Path.Combine(baseDir, desired.ListingMarkdown);
+
+            if (File.Exists(mdPath))
+            {
+                ImportMarkdownListing(desired, mdPath);
+            }
+        }
+
+        Directory.CreateDirectory(stateRoot);
+        var checkpoint = new StoreCheckpoint
+        {
+            ProductId = desired.ProductId
+        };
+
+        var orchestrator = new StoreOrchestrator(desired, stateRoot, checkpoint, apply, submit, confirmSubmit, reloadVerify, keepOpen);
 
         try
         {
-            if (action == "preflight")
+            switch (action)
             {
-                orchestrator.RunPreflight();
-                return 0;
-            }
+                case "preflight":
+                    Console.WriteLine("[INFO] Running STORE 0 Offline Preflight...");
+                    await orchestrator.RunPreflightQualityInspectionAsync();
+                    Console.WriteLine("[PASS] Preflight passed successfully.");
+                    return 0;
 
-            if (action == "launch")
-            {
-                var conn = await CdpConnection.StartOrReuseAsync(stateRoot);
-                Console.WriteLine($"[PASS] Isolated Edge process ready. PID={conn.EdgeProcess?.Id} Port={conn.Port}");
-                return 0;
-            }
+                case "launch":
+                    Console.WriteLine("[INFO] Launching Edge isolated session...");
+                    await orchestrator.EnsureSignedInAsync();
+                    Console.WriteLine("[PASS] Edge session ready.");
+                    return 0;
 
-            if (action == "stop")
-            {
-                string pidFile = Path.Combine(stateRoot, "edge.pid");
-                if (File.Exists(pidFile))
-                {
-                    int pid = int.Parse(File.ReadAllText(pidFile).Trim());
-                    try
-                    {
-                        var proc = System.Diagnostics.Process.GetProcessById(pid);
-                        proc.Kill();
-                        Console.WriteLine($"[PASS] Stopped isolated Edge process pid={pid}");
-                    }
-                    catch { }
-                }
-                return 0;
-            }
+                case "status":
+                    Console.WriteLine("[INFO] Checking Edge Store session status...");
+                    var (livePid, livePort) = orchestrator.GetSessionInfo();
+                    Console.WriteLine($"PID: {livePid}, Port: {livePort}");
+                    return 0;
 
-            await orchestrator.RunPipelineAsync(phase);
-            return 0;
+                case "stop":
+                    Console.WriteLine("[INFO] Stopping Edge session...");
+                    orchestrator.StopSession();
+                    Console.WriteLine("[PASS] Stopped.");
+                    return 0;
+
+                case "run":
+                    return await orchestrator.RunAsync(phase);
+
+                default:
+                    Console.WriteLine($"[ERROR] Unknown action: {action}");
+                    return 2;
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ERROR] {ex.Message}");
-            Console.WriteLine($"[STACK] {ex.StackTrace}");
+            Console.WriteLine($"[ERROR] Unhandled exception: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
             return 1;
         }
     }
 
-    private static void ResolvePaths(DesiredState desired, string baseDir)
+    private static void ResolvePaths(DesiredState state, string baseDir)
     {
-        string Resolve(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return path;
-            return Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(Path.Combine(baseDir, path));
-        }
-
-        desired.Assets.Msix = Resolve(desired.Assets.Msix);
-        desired.Assets.Screenshot = Resolve(desired.Assets.Screenshot);
-        desired.Assets.Poster = Resolve(desired.Assets.Poster);
-        desired.Assets.Boxart = Resolve(desired.Assets.Boxart);
-        desired.Assets.Logo300 = Resolve(desired.Assets.Logo300);
-        desired.Assets.Logo150 = Resolve(desired.Assets.Logo150);
-        desired.Assets.Logo71 = Resolve(desired.Assets.Logo71);
-        desired.Assets.Superhero = Resolve(desired.Assets.Superhero);
-
-        if (!string.IsNullOrEmpty(desired.ListingMarkdown))
-        {
-            desired.ListingMarkdown = Resolve(desired.ListingMarkdown);
-        }
+        if (state.Assets == null) return;
+        state.Assets.Msix = ResolveOne(state.Assets.Msix, baseDir);
+        state.Assets.Screenshot = ResolveOne(state.Assets.Screenshot, baseDir);
+        state.Assets.Poster = ResolveOne(state.Assets.Poster, baseDir);
+        state.Assets.Boxart = ResolveOne(state.Assets.Boxart, baseDir);
+        state.Assets.Logo300 = ResolveOne(state.Assets.Logo300, baseDir);
+        state.Assets.Logo150 = ResolveOne(state.Assets.Logo150, baseDir);
+        state.Assets.Logo71 = ResolveOne(state.Assets.Logo71, baseDir);
+        state.Assets.Superhero = ResolveOne(state.Assets.Superhero, baseDir);
     }
 
-    private static void ImportListingMarkdown(DesiredState desired, string baseDir)
+    private static string ResolveOne(string path, string baseDir)
     {
-        if (string.IsNullOrWhiteSpace(desired.ListingMarkdown) || !File.Exists(desired.ListingMarkdown)) return;
+        if (string.IsNullOrWhiteSpace(path)) return "";
+        if (Path.IsPathRooted(path)) return path;
+        return Path.GetFullPath(Path.Combine(baseDir, path));
+    }
 
-        string text = File.ReadAllText(desired.ListingMarkdown);
+    private static void ImportMarkdownListing(DesiredState state, string mdPath)
+    {
+        string text = File.ReadAllText(mdPath);
 
-        var shortMatch = Regex.Match(text, @"(?ms)^##\s*简短摘要.*?\r?\n\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*完整描述)");
-        var fullMatch = Regex.Match(text, @"(?ms)^##\s*完整描述.*?\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*产品功能)");
-        var featuresMatch = Regex.Match(text, @"(?ms)^##\s*产品功能.*?\r?\n(?<value>.*?)(?=\r?\n\r?\n##\s*搜索关键词)");
-        var keywordsMatch = Regex.Match(text, @"(?ms)^##\s*搜索关键词.*?\r?\n\r?\n(?<value>[^\r\n]+)");
+        var shortDescMatch = Regex.Match(text, @"##\s*Short Description\s*\n+([\s\S]*?)(?=\n##|$)", RegexOptions.IgnoreCase);
+        if (shortDescMatch.Success && !string.IsNullOrWhiteSpace(shortDescMatch.Groups[1].Value))
+        {
+            state.Values.ShortDescription = shortDescMatch.Groups[1].Value.Trim();
+        }
 
-        if (shortMatch.Success && string.IsNullOrWhiteSpace(desired.Values.ShortDescription))
+        var descMatch = Regex.Match(text, @"##\s*Description\s*\n+([\s\S]*?)(?=\n##|$)", RegexOptions.IgnoreCase);
+        if (descMatch.Success && !string.IsNullOrWhiteSpace(descMatch.Groups[1].Value))
         {
-            desired.Values.ShortDescription = shortMatch.Groups["value"].Value.Trim();
+            state.Values.Description = descMatch.Groups[1].Value.Trim();
         }
-        if (fullMatch.Success && string.IsNullOrWhiteSpace(desired.Values.Description))
+
+        var featMatch = Regex.Match(text, @"##\s*Features\s*\n+([\s\S]*?)(?=\n##|$)", RegexOptions.IgnoreCase);
+        if (featMatch.Success)
         {
-            desired.Values.Description = fullMatch.Groups["value"].Value.Trim();
+            var items = Regex.Matches(featMatch.Groups[1].Value, @"^[-*]\s*(.+)$", RegexOptions.Multiline)
+                             .Select(m => m.Groups[1].Value.Trim())
+                             .Where(s => !string.IsNullOrWhiteSpace(s))
+                             .ToList();
+            if (items.Count > 0) state.Values.Features = items;
         }
-        if (featuresMatch.Success && desired.Values.Features.Count == 0)
+
+        var kwMatch = Regex.Match(text, @"##\s*Keywords\s*\n+([\s\S]*?)(?=\n##|$)", RegexOptions.IgnoreCase);
+        if (kwMatch.Success)
         {
-            desired.Values.Features = featuresMatch.Groups["value"].Value
-                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-                .Where(line => Regex.IsMatch(line, @"^\s*-\s+"))
-                .Select(line => Regex.Replace(line, @"^\s*-\s+", "").Trim())
-                .Where(line => !string.IsNullOrWhiteSpace(line))
-                .ToList();
-        }
-        if (keywordsMatch.Success && desired.Values.Keywords.Count == 0)
-        {
-            desired.Values.Keywords = keywordsMatch.Groups["value"].Value
-                .Split(new[] { ';', '；' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(k => k.Trim())
-                .Where(k => !string.IsNullOrEmpty(k))
-                .ToList();
+            var items = Regex.Matches(kwMatch.Groups[1].Value, @"^[-*]\s*(.+)$", RegexOptions.Multiline)
+                             .Select(m => m.Groups[1].Value.Trim())
+                             .Where(s => !string.IsNullOrWhiteSpace(s))
+                             .ToList();
+            if (items.Count > 0) state.Values.Keywords = items;
         }
     }
 }

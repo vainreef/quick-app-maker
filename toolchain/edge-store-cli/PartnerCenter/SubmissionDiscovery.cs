@@ -22,12 +22,26 @@ public class SubmissionDiscovery
         string overviewUrl = $"{baseUrl.TrimEnd('/')}/{productId}/overview";
         await _waiter.NavigateAsync(overviewUrl, "Product Overview for Discovery");
 
-        // Wait for overview page SPA body to render
+        // Phase A: wait for navigation commit (old DOM teardown)
+        await _waiter.WaitUntilAsync(async () =>
+        {
+            var len = await _client.EvaluateAsync<int>("document.body ? document.body.innerText.length : 0");
+            return len < 100;
+        }, timeout: TimeSpan.FromSeconds(15), description: "Wait for navigation commit (body teardown)");
+
+        // Phase B: wait for overview SPA body skeleton to render
         await _waiter.WaitUntilAsync(async () =>
         {
             var len = await _client.EvaluateAsync<int>("document.body ? document.body.innerText.length : 0");
             return len > 200;
         }, timeout: TimeSpan.FromSeconds(30), description: "Wait for overview SPA body content");
+
+        // Phase C: wait for submission module links to be present
+        await _waiter.WaitUntilAsync(async () =>
+        {
+            int links = await _client.EvaluateAsync<int>("document.querySelectorAll('a[href*=\"/submissions/\"]').length");
+            return links >= 2;
+        }, timeout: TimeSpan.FromSeconds(30), description: "Wait for submission module links");
 
         var result = await ProbeOverviewDomAsync();
         if (!string.IsNullOrEmpty(result.SubmissionId))
@@ -38,7 +52,11 @@ public class SubmissionDiscovery
         // If no active draft submission exists and autoCreate is allowed, click Start Submission
         if (result.CanStartSubmission && autoCreateIfMissing)
         {
-            await _native.ClickStrictAsync(["he-button[data-l10n-key=\"Start_Submission\"]", "button[data-l10n-key=\"Start_Submission\"]", "[data-automation-id=\"Start_Submission\"]"], "Start Submission");
+            await _native.ClickStrictAsync([
+                "he-button[data-l10n-key=\"Start_Submission\"]",
+                "button[data-l10n-key=\"Start_Submission\"]",
+                "[data-automation-id=\"Start_Submission\"]"
+            ], "Start Submission");
             await _waiter.WaitForUrlAsync("/submissions/");
             await Task.Delay(1500);
             result = await ProbeOverviewDomAsync();
@@ -78,7 +96,30 @@ public class SubmissionDiscovery
             return new DiscoveryResult();
         }
 
-        return JsonSerializer.Deserialize<DiscoveryResult>(json) ?? new DiscoveryResult();
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var discovery = new DiscoveryResult
+            {
+                SubmissionId = root.TryGetProperty("submissionId", out var s) ? s.GetString() ?? "" : "",
+                CanStartSubmission = root.TryGetProperty("canStartSubmission", out var c) && c.GetBoolean()
+            };
+
+            if (root.TryGetProperty("hrefs", out var hrefs) && hrefs.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in hrefs.EnumerateObject())
+                {
+                    discovery.Hrefs[prop.Name] = prop.Value.GetString() ?? "";
+                }
+            }
+
+            return discovery;
+        }
+        catch
+        {
+            return new DiscoveryResult();
+        }
     }
 }
 

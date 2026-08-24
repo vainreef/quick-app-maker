@@ -55,18 +55,42 @@ public class NativeFormAdapter
 
     public async Task SetRadioAsync(string selector, string label = "")
     {
-        var rect = await _client.EvaluateAsync<JsElementRect>($$"""
-        (() => {
-          const e = document.querySelector({{JsonSerializer.Serialize(selector)}});
-          if (!e) return null;
-          const r = e.getBoundingClientRect();
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2, width: r.width, height: r.height };
-        })()
-        """);
+        JsElementRect? rect = null;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            rect = await _client.EvaluateAsync<JsElementRect>($$"""
+            (async () => {
+              let e = document.querySelector({{JsonSerializer.Serialize(selector)}});
+              if (!e) return null;
+              let target = e;
+              const r0 = e.getBoundingClientRect();
+              if (r0.width <= 0 || r0.height <= 0) {
+                // Native control is visually hidden (custom-styled radio): target its label instead
+                const id = e.id;
+                const lbl = id ? document.querySelector('label[for="' + id + '"]') : null;
+                const wrapped = e.closest('label');
+                target = lbl || wrapped;
+                if (!target) return null;
+              }
+              const r = target.getBoundingClientRect();
+              if (r.width <= 0 || r.height <= 0) return null; // layout not ready yet
+              target.scrollIntoView({ block: 'center', behavior: 'instant' });
+              await new Promise(res => setTimeout(res, 150));
+              const r2 = target.getBoundingClientRect();
+              if (r2.width <= 0 || r2.height <= 0) return null;
+              const cx = r2.left + r2.width / 2, cy = r2.top + r2.height / 2;
+              if (cx <= 0 || cy <= 0 || cx > window.innerWidth || cy > window.innerHeight) return null;
+              return { x: cx, y: cy, width: r2.width, height: r2.height };
+            })()
+            """);
+            if (rect != null) break;
+            await Task.Delay(300);
+        }
 
         if (rect == null)
         {
-            throw new InvalidOperationException($"Cannot locate radio [{label} ({selector})]");
+            throw new InvalidOperationException($"Cannot locate radio [{label} ({selector})] after waiting for layout");
         }
 
         await _input.ClickCoordinatesAsync(rect.X, rect.Y, label: $"Select radio [{label}]");
@@ -74,27 +98,40 @@ public class NativeFormAdapter
 
     public async Task ClickStrictAsync(string[] selectors, string label = "")
     {
-        var rect = await _client.EvaluateAsync<JsElementRect>($$"""
-        (() => {
-          const selectors = {{JsonSerializer.Serialize(selectors)}};
-          const seen = new Set(), found = [];
-          const visible = e => {
-            const r = e.getBoundingClientRect(), s = getComputedStyle(e);
-            return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && !e.disabled;
-          };
-          for (const selector of selectors) {
-            for (const e of document.querySelectorAll(selector)) {
-              if (visible(e) && !seen.has(e)) {
-                seen.add(e);
-                found.push(e);
+        JsElementRect? rect = null;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            rect = await _client.EvaluateAsync<JsElementRect>($$"""
+            (async () => {
+              const selectors = {{JsonSerializer.Serialize(selectors)}};
+              const seen = new Set(), found = [];
+              const visible = e => {
+                const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+                return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && !e.disabled;
+              };
+              for (const selector of selectors) {
+                for (const e of document.querySelectorAll(selector)) {
+                  if (visible(e) && !seen.has(e)) {
+                    seen.add(e);
+                    found.push(e);
+                  }
+                }
               }
-            }
-          }
-          if (found.length !== 1) return null;
-          const r = found[0].getBoundingClientRect();
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2, width: r.width, height: r.height };
-        })()
-        """);
+              if (found.length !== 1) return null;
+              const target = found[0];
+              target.scrollIntoView({ block: 'center', behavior: 'instant' });
+              await new Promise(res => setTimeout(res, 150));
+              const r = target.getBoundingClientRect();
+              if (r.width <= 0 || r.height <= 0) return null;
+              const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+              if (cx <= 0 || cy <= 0 || cx > window.innerWidth || cy > window.innerHeight) return null;
+              return { x: cx, y: cy, width: r.width, height: r.height };
+            })()
+            """);
+            if (rect != null) break;
+            await Task.Delay(300);
+        }
 
         if (rect == null)
         {

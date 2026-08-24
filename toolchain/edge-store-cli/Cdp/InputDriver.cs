@@ -27,6 +27,11 @@ public class InputDriver
         int ix = (int)Math.Round(x);
         int iy = (int)Math.Round(y);
 
+        if (ix <= 0 || iy <= 0)
+        {
+            throw new InvalidOperationException($"Refusing to click invalid coordinates ({ix},{iy}) for [{label}] — element layout is not ready or coordinates are out of viewport.");
+        }
+
         await _client.SendAsync("Input.dispatchMouseEvent", new
         {
             type = "mouseMoved",

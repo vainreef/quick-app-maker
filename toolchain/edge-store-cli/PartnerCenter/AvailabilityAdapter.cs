@@ -79,6 +79,11 @@ public class AvailabilityAdapter
             plan.AddChange("availability.allMarkets", observed.AllMarkets, true, "Select global markets");
         }
 
+        if (observed.Audience != "Public")
+        {
+            plan.AddChange("availability.audience", observed.Audience, "Public", "Select public audience");
+        }
+
         if (observed.ReleaseSchedule != "string:asap")
         {
             plan.AddChange("availability.releaseSchedule", observed.ReleaseSchedule, "string:asap", "Set release date to ASAP");
@@ -90,7 +95,8 @@ public class AvailabilityAdapter
         }
 
         string expectedCurrency = desired.Pricing.Currency == "CN" ? "CNY - 中国" : desired.Pricing.Currency;
-        if (!string.IsNullOrEmpty(observed.Currency) && !observed.Currency.Contains("CNY", StringComparison.OrdinalIgnoreCase))
+        if (!observed.Currency.Contains("CNY", StringComparison.OrdinalIgnoreCase) &&
+            !observed.Currency.Contains("CN", StringComparison.OrdinalIgnoreCase))
         {
             plan.AddChange("availability.currency", observed.Currency, expectedCurrency, "Set base currency to CNY");
         }
@@ -110,11 +116,13 @@ public class AvailabilityAdapter
             await _native.SetRadioAsync("input[name=\"marketSelection\"][value=\"true\"]", "all markets");
         }
 
-        // Retail distribution & public audience if visible
-        bool hasPublicAudience = await _client.EvaluateAsync<bool>("document.querySelector('#radioDistribution_PublicAudience') !== null");
-        if (hasPublicAudience)
+        if (plan.Actions.Any(a => a.Field == "availability.audience"))
         {
-            await _native.SetRadioAsync("#radioDistribution_PublicAudience", "public audience");
+            bool hasPublicAudience = await _client.EvaluateAsync<bool>("document.querySelector('#radioDistribution_PublicAudience') !== null");
+            if (hasPublicAudience)
+            {
+                await _native.SetRadioAsync("#radioDistribution_PublicAudience", "public audience");
+            }
         }
 
         if (plan.Actions.Any(a => a.Field == "availability.releaseSchedule"))

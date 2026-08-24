@@ -11,7 +11,7 @@ param(
     [string]$Phase = 'all',
     [string]$Manifest = '',
     [string]$ProductId = '',
-    [string]$SubmissionId = '',
+    [string]$StateDir = '',
     [switch]$Apply,
     [switch]$Submit,
     [switch]$ConfirmSubmit,
@@ -57,6 +57,10 @@ if (-not [string]::IsNullOrWhiteSpace($ProductId)) {
     $argsList.Add("--product-id")
     $argsList.Add($ProductId)
 }
+
+$effectiveStateDir = if (-not [string]::IsNullOrWhiteSpace($StateDir)) { $StateDir } else { Join-Path $toolRoot 'state' }
+$argsList.Add("--state-dir")
+$argsList.Add("`"$effectiveStateDir`"")
 
 if ($Apply) { $argsList.Add("--apply") }
 if ($Submit) { $argsList.Add("--submit") }
