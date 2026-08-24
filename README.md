@@ -40,7 +40,7 @@ graph TD
         W4 -.回填 3 大 Package Identity.- -> S1
         S1 --> S2["定制 1:1 专属 App Logo 与 1080P 真实运行截图"]
         S2 --> S3["winapp package 生成 Store 正式包 (清理冗余权限)"]
-        S3 --> S4["参考 partner-center-guide.md 辅助用户填报 6 大表单 (定价/属性/年龄分级/包/语言物料/选项)"]
+        S3 --> S4["命令行 Edge CLI 自动填报 6 大表单并逐项校验"]
         S4 --> S5["点击'提交到应用商店' -> 24~72h 审核全球上线！"]
     end
 ```
@@ -98,7 +98,13 @@ quick-app-maker/
 │       ├── partner-center-guide.md          # 微软 Partner Center 注册、名称验重与 6 大表单全指南
 │       ├── delivery-considerations.md       # 交付边界、权限、离线与性能考量
 │       ├── official-sources.md              # 微软官方文档与 API 规范入口
+│       ├── edge-store-automation.md         # 纯命令行 Edge Partner Center 自动化规范
 │       └── toolchain/v1/commands.md         # 41 个实机验证避坑指南、命令硬规则、UI 自动化生命周期
+├── toolchain/edge-store-cli/                # 纯 PowerShell + Edge CDP 商店填表 CLI
+│   ├── Invoke-EdgeStore.ps1                 # launch / identity / inspect / run / status / stop
+│   ├── Validate-EdgeStoreCli.ps1             # PowerShell parser + JSON preflight
+│   ├── README.md                            # CLI 用法、隔离 profile 与恢复规则
+│   └── examples/store-automation.json       # 通用配置样例
 ├── docs/                                    # 📚 归档与实战证据库
 │   ├── windows-smoke-test.md                # 1~6 轮真实 Windows 机器全流程实测战绩记录
 │   └── partner-center/                      # 8 个 Partner Center 真实页面 DOM 快照与实测记录
@@ -143,7 +149,7 @@ quick-app-maker/
 * **首版交付心智**：第一版安装到电脑后，Agent 热情邀请用户试用：“已装在电脑上，随时可以打开把玩，哪里不顺手随时告诉我，我们继续修改直到你满意为止”，**严禁首版主动推销上架**。
 * **发布时刻断点智能续接**：当用户充分把玩满意并提出上架时，Agent 启动 6 项检查状态机：
   * 若用户在窗口 2 已拿到 3 大参数，直接回填打包；
-  * 若未完成，Agent 从断点处精准续接，参考 `docs/partner-center/` 快照辅助用户填报 6 大表单（定价、属性、年龄分级、程序包、Store 一览、提交选项），点击提交审核（24~72h 全球上线）！
+  * 若未完成，Agent 从 `toolchain/edge-store-cli/state/store-state.json` 断点续接，使用隔离 Edge CLI 填报 6 大表单（定价、属性、年龄分级、程序包、Store 一览、提交选项），最后由显式提交命令触发审核！
 
 ---
 

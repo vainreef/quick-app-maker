@@ -78,7 +78,7 @@
      - 发布日期：选择 **「尽快 (As soon as possible)」**；
      - 停止购置：选择 **「永不 (Never)」**；
   4. **基本价格 (Base Price)**：
-     - 在市场组中选择基本价格为 **「免费 (Free)」**；
+     - 在 Default 市场组的基本价格区域，货币选择 **「CNY - 中国」**，价格段选择 **`0`（¥0）**；
   5. **保存**：配置完成后，底部的 **「保存草稿」** 按钮激活生效，点击保存。
 
 ---
@@ -90,7 +90,8 @@
      - 主类别：根据应用性质选择（如：`效率 Productivity` 或 `实用工具 Utilities`）；
      - 子类别：选择对应的细分项；
   2. **隐私策略 (Privacy Policy)**：
-     - 选择 **「是」**，并填入纯本地应用隐私政策 URL（Agent 协助提供，声明“本应用为纯本地工具，不收集或上传任何用户个人隐私”）；
+     - 第一个下拉框选择 **「否，我的产品不使用任何个人信息」**；
+     - 下方选择 **「提供隐私策略文本」**，直接填写应用自己的隐私策略文字；
   3. **产品声明 (Product Declarations)**：
      - 勾选：`storage`（本地数据存储）、`windows`、`backups`（本地备份支持）；
      - ⚠️ **避坑警示**：若应用未接入端侧 AI 模型，**绝对不要勾选 `usesGenAI`**，防止被审核要求提供 AI 演示与合规证明；
@@ -118,7 +119,8 @@
   1. **构建商店包**：Agent 执行本地打包命令，生成合规的 `.msix` 发布包：
      ```powershell
      dotnet publish -c Release -r win-x64 -o ./publish
-     winapp package ./publish --self-contained --executable <AppName>.exe -o ./store-package
+     New-Item -ItemType Directory -Force ./store-package | Out-Null
+     winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
      ```
   2. **上传程序包**：在 `#pkg_upload` 区域拖拽或选择生成的 `.msix` 文件；
   3. **设备系列可用性 (Device family availability)**：
@@ -149,11 +151,12 @@
 - **页面 URL**：`.../submissions/<submission-id>/options`
 - **Agent 推荐填报标准**：
   1. **发布暂缓选项 (Publishing Mode)**：
-     - 选择 **「尽快 (Asap)」**（认证通过后立即自动上架发布）；
-  2. **认证说明 (Notes for Certification)**：
-     - 填入给微软审核员的简要说明，例如：
-       `本应用为纯本地离线桌面工具，无需注册登录即可使用全部功能，数据仅保存在本地。`
-  3. **保存**：点击底部的 **「保存」** 按钮。
+     - 默认选择 **「除非我选择“立即发布”，否则不发布此提交」(Manual)**，认证通过后保留人工发布控制；
+     - 只有用户明确要求自动发布时才选择 **「尽快 (Asap)」**。
+  2. **认证说明 (Notes for Certification)**：当前页面主要显示跳转提示，详细测试信息按页面入口填写；
+  3. **受限的功能 (Restricted capabilities)**：如果包声明 `runFullTrust`，填写页面出现的用途说明框（最多 500 字），例如：
+     `这是一个 WinUI 3 桌面应用，需要以全信任桌面进程运行才能正常启动并提供本地通知、文件和系统集成功能。应用仅在用户本机运行，不访问或修改其他用户的数据。`
+  4. **保存**：点击底部的 **「保存」** 按钮。
 
 ---
 

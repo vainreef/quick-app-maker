@@ -31,5 +31,8 @@ packages/
 # Local tool caches
 .nuget/
 
+# Edge Store CLI runtime state (isolated profile, logs, checkpoints)
+toolchain/edge-store-cli/state/
+
 # User app workspace: local only, never push to repository
 apps/

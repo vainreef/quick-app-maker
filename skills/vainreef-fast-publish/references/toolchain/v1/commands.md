@@ -96,7 +96,7 @@ winapp package ./publish --cert .\<Identity>_cert.pfx --cert-password password
 ```powershell
 # 证书导入必须显式密码（winapp 默认密码是 password）
 $pwd = ConvertTo-SecureString -String "password" -Force -AsPlainText
-Import-PfxCertificate -FilePath .\<Identity>_cert.pfx -CertStoreLocation Cert:\LocalMachine\TrustedPeople -Password $pwd
+Import-PfxCertificate -FilePath .\<Identity>_cert.pfx -CertStoreLocation Cert:\CurrentUser\TrustedPeople -Password $pwd
 
 Add-AppxPackage -Path .\<Identity>_<version>_<arch>.msix
 Get-AppxPackage -Name <Identity> | Select-Object Version, Status
@@ -113,18 +113,17 @@ explorer.exe "shell:AppsFolder\<PFN>!App"
 
 ## 7. Store command
 
-下面的命令等待 Partner Center 实测确认：
+Partner Center 网页提交使用仓库内的纯命令行 Edge CLI：
 
 ```powershell
-winapp store publish ./*.msix --appId APP_ID
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 `
+  -Action inspect -Manifest .\<app>\build\edge-store.json -KeepOpen
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 `
+  -Action run -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
 ```
 
-执行前保存：
-
-```powershell
-winapp store --help
-winapp store publish --help
-```
+最终提交单独使用 `-Submit -ConfirmSubmit`。`winapp store publish` 仍以当前 `winapp store --help` 输出为准，不作为 Partner Center 表单自动化入口。
 
 ## 命令执行硬规则（两轮血泪教训，违反必卡死）
 

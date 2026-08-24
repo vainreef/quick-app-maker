@@ -275,6 +275,7 @@ Agent 根据当前 App 增加针对性测试。
 本模块为 Agent 向用户提供微软开发者中心（Partner Center）全流程协助的标准规范。支持**独立咨询会话（窗口 2）**与**发布时刻智能断点续接**：
 
 - **详细权威操作手册**：严格查阅 [partner-center-guide.md](references/partner-center-guide.md) 及 `docs/partner-center/` 内的真实表单 DOM 快照。
+- **命令行 Edge 自动化入口**：读取 [edge-store-automation.md](references/edge-store-automation.md)，使用 `toolchain/edge-store-cli/Invoke-EdgeStore.ps1`。不使用 Codex 专用浏览器操作、扩展、坐标点击或 OCR。
 - **独立咨询会话（窗口 2）指引规范**：
   1. 当用户新开窗口提问“如何创建 Partner 账号 / 如何起名验重”时，Agent 专注提供咨询服务；
   2. 指引用户通过 Xbox 应用注册避开真人验证码异常，选择免费「个人开发者」并完成身份证照片上传；
@@ -290,7 +291,8 @@ Agent 根据当前 App 增加针对性测试。
     [ ] 5. 清理 manifest 冗余权限，生成 Store 正式发布包 (.msix)
     [ ] 6. 协助完成 Partner Center 6 大提审表单填报
     ```
-  - **断点续接**：若用户已在窗口 2 取得参数，直接接收并回填；若未操作或卡在某一步，Agent 从该断点处精准续接，提供对应表单标准值与物料，带领用户顺畅走通。
+  - **断点续接**：若用户已在窗口 2 取得参数，直接接收并回填；若未操作或卡在某一步，Agent 从 `toolchain/edge-store-cli/state/store-state.json` 的阶段断点续接。
+  - **浏览器运行规则**：先 `launch` 让用户在隔离 Edge profile 中完成登录/MFA，再 `inspect` 做只读结构检查；首轮按 `-Phase availability/properties/ageRatings/packages/listing/options` 逐表运行，确认页面状态后再进入下一表。选择器匹配 0 个或多个元素时立即停在原页面并生成 inspect 报告。
 
 ## 10. Package and publish for Microsoft Store
 
@@ -299,13 +301,18 @@ Agent 根据当前 App 增加针对性测试。
 1. **构建商店发布包**：
    ```powershell
    dotnet publish -c Release -r win-x64 -o ./publish
-   winapp package ./publish --self-contained --executable <AppName>.exe -o ./store-package
+   New-Item -ItemType Directory -Force ./store-package | Out-Null
+   winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
    ```
 2. **清理权限声明**：移除 manifest 中模板自带的未用特权（如 `systemAIModels`），确保与应用真实功能一致。
-3. **提交与审核**：
-   - 指引用户在 Partner Center 提交页面上传 `.msix` / `.msixupload` 安装包；
-   - 确认定价（免费/全球）与各项资料完整勾选后，由用户点击「提交到应用商店」；
-   - 记录预估审核时间（通常 24 ~ 72 小时）。
+3. **命令行 Edge 提交草稿**：
+   - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -Manifest <store-automation.json> -KeepOpen`
+   - 用户在隔离 Edge 窗口中完成登录、MFA 或 CAPTCHA；Agent 不读取凭据。
+   - 先执行 `-Action inspect`，再执行 `-Action run -Apply`；每个模块保存后读取错误区，失败停在当前模块。
+   - 默认选择 `Manual` 发布模式，避免认证通过后自动发布。
+4. **最终提交**：
+   - 概览页六项均完成后，只有显式 `-Apply -Submit -ConfirmSubmit` 才点击「提交到应用商店」；
+   - 记录 CLI 退出码、阶段 checkpoint、页面标题和最终 URL。
 
 ## 11. Technical run report
 
