@@ -20,3 +20,4 @@ The only supported implementation is `toolchain/edge-store-cli/`. The ignored `a
 - Never upload a package when a same-name row is Processing, Error, or duplicated; only one `Validated` row is upload success.
 - Use `inspect` or `status` for current-page status; `run -Phase all` is an explicit six-phase operation, not a status probe.
 - For brand new product submissions, execute `Invoke-EdgeStore.ps1 -Action reserve -AppName "<AppName>" -Manifest <manifest>` to automate name reservation and Identity extraction. Never dump manual Partner Center console steps onto the user or prompt interactive choice dialogs.
+- Workspace boundary: All files, downloads, caches (.cache/), and scripts MUST strictly reside in the current working directory. Never download, write, or access files in $env:TEMP, %LOCALAPPDATA%, C:\Users\..., or /tmp.

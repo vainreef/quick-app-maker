@@ -52,7 +52,7 @@ graph TD
 ## Agent 3 步极速开工指令
 
 ### 第一步：执行唯一公开入口
-用户只要说 `用 https://gitee.com/freevian/quick-app-maker README 开始`，Agent 在 Windows PowerShell 中直接执行下面三行（使用 `main` 分支）：
+用户只要说 `用 https://gitee.com/freevian/quick-app-maker README 开始`，Agent 在 Windows PowerShell 中直接**原样完整执行**下面三行（下载到当前工作目录执行，**严禁自行修改命令将文件下载到 `$env:TEMP` 等外部目录**）：
 
 ```powershell
 $entry = Join-Path (Get-Location).Path '.bootstrap-entry.ps1'
