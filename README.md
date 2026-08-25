@@ -55,7 +55,7 @@ graph TD
 用户只要说 `用 https://gitee.com/freevian/quick-app-maker README 开始`，Agent 在 Windows PowerShell 中直接执行下面三行（使用 `main` 分支）：
 
 ```powershell
-$entry = Join-Path $env:TEMP 'vainreef-quick-app-maker-entry.ps1'
+$entry = Join-Path (Get-Location).Path '.bootstrap-entry.ps1'
 Invoke-WebRequest -UseBasicParsing -Uri 'https://gitee.com/freevian/quick-app-maker/raw/main/bootstrap/entry.ps1' -OutFile $entry
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 ```
@@ -64,11 +64,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 一键脚本执行完毕后输出：
 ```text
 BOOTSTRAP_READY
-WORKSPACE_ROOT: <仓库的父目录>
+WORKSPACE_ROOT: <当前工作目录/仓库的父目录>
 NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery
 ```
 
-* **工作目录铁律**：所有新项目目录 `<app-slug>/`、`README.md`、临时测试、安装包全部放在 `WORKSPACE_ROOT`（与 `quick-app-maker/` 同级）。
+* **工作目录铁律（绝对红线）**：严禁往任何系统目录、用户全局目录或系统临时目录（如 `$env:TEMP`、`%LOCALAPPDATA%`、`C:\Users\...`、`C:\temp`）写入或读取任何文件！所有新项目目录 `<app-slug>/`、`README.md`、临时测试、工具缓存（`.cache/`）、安装包必须全部放在当前工作目录（`WORKSPACE_ROOT`）内。
 * **仓库只读保护**：`quick-app-maker/` 是只读 Skill 知识库，**Agent 禁止任何 git add/commit/push 操作**。
 
 ### 第三步：开工前更新知识库并进入需求访谈

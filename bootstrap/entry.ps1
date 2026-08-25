@@ -4,13 +4,12 @@ param(
     [string]$Branch = 'main'
 )
 
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-
 $repoUrl = 'https://gitee.com/freevian/quick-app-maker.git'
 $gitVersion = '2.47.1.windows.1'
 $gitUrl = 'https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/Git-2.47.1-64-bit.exe'
-$bootstrapCache = Join-Path $env:LOCALAPPDATA 'Vainreef\QuickAppMaker\bootstrap'
+
+$current = (Get-Location).Path
+$bootstrapCache = Join-Path $current '.cache\bootstrap'
 $gitInstaller = Join-Path $bootstrapCache 'Git-2.47.1-64-bit.exe'
 $gitLog = Join-Path $bootstrapCache 'git-clone.log'
 

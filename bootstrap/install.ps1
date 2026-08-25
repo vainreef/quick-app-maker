@@ -21,9 +21,10 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
     throw "Toolchain manifest is missing: $manifestPath"
 }
 $toolchain = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-
 $toolchainVersion = $toolchain.release
-$cacheRoot = Join-Path $env:LOCALAPPDATA "Vainreef\QuickAppMaker\cache\$toolchainVersion"
+$workspaceRoot = if (Test-Path -LiteralPath (Join-Path $RepoRoot '.git')) { Split-Path -Parent $RepoRoot } else { $RepoRoot }
+if (-not $workspaceRoot) { $workspaceRoot = (Get-Location).Path }
+$cacheRoot = Join-Path $workspaceRoot ".cache\$toolchainVersion"
 $logsRoot = Join-Path $cacheRoot 'logs'
 $workersRoot = Join-Path $scriptDir 'workers'
 
@@ -279,6 +280,6 @@ Write-Host "Git: $(& $gitPath --version)"
 Write-Host ".NET SDK: $dotnetVersion"
 Write-Host "WinAppCLI: $winAppVersion"
 Write-Host "WinUI template: $templateVersion"
-Write-Host "WORKSPACE_ROOT: $(Split-Path -Parent $RepoRoot)（所有 App 项目、round-notes 与临时文件都放这里，与仓库同级；禁止写其他路径）"
+Write-Host "WORKSPACE_ROOT: $workspaceRoot（所有 App 项目、.cache/ 工具缓存与临时文件都放这里，与仓库同级；严禁写系统临时目录或其他路径）"
 Write-Host '仓库目录只读：不修改仓库内容，不 git add/commit/push'
 Write-Host 'NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery'

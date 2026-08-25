@@ -116,7 +116,7 @@
 在 Windows PowerShell 中执行：
 
 ```powershell
-$entry = Join-Path $env:TEMP 'vainreef-quick-app-maker-entry.ps1'
+$entry = Join-Path (Get-Location).Path '.bootstrap-entry.ps1'
 Invoke-WebRequest -UseBasicParsing -Uri 'https://gitee.com/freevian/quick-app-maker/raw/main/bootstrap/entry.ps1' -OutFile $entry
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 ```
@@ -157,7 +157,7 @@ winapp --version:
 ## 3. Create a disposable WinUI project
 
 ```powershell
-$smokeRoot = Join-Path $env:LOCALAPPDATA 'Vainreef\QuickAppMaker\smoke'
+$smokeRoot = Join-Path (Get-Location).Path 'smoke-app'
 New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
 Set-Location $smokeRoot
 

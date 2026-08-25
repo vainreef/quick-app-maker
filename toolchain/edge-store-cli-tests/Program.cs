@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using Vainreef.EdgeStore.State;
 
-var root = Path.Combine(Path.GetTempPath(), "edge-store-cli-tests-" + Guid.NewGuid().ToString("N"));
+var root = Path.Combine(AppContext.BaseDirectory, ".test-scratch-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
 try
 {

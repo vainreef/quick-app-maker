@@ -28,7 +28,11 @@ packages/
 *.pem
 *.key
 
-# Local tool caches
+# Local tool and bootstrap caches (strictly within workspace)
+.cache/
+.bootstrap-entry.ps1
+smoke-app/
+.test-scratch*
 .nuget/
 
 # Edge Store CLI runtime state (isolated profile, logs, checkpoints)

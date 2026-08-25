@@ -29,7 +29,7 @@ $LASTEXITCODE
 ## 2. Create a disposable project
 
 ```powershell
-$smokeRoot = Join-Path $env:LOCALAPPDATA 'Vainreef\QuickAppMaker\smoke'
+$smokeRoot = Join-Path (Get-Location).Path 'smoke-app'
 New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
 Set-Location $smokeRoot
 

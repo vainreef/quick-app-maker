@@ -96,10 +96,10 @@ bootstrap/
 [FAIL] 错误和日志位置
 ```
 
-缓存和日志位于：
+缓存和日志严格位于工作根目录内的本地缓存文件夹：
 
 ```text
-%LOCALAPPDATA%\Vainreef\QuickAppMaker\
+<WORKSPACE_ROOT>\.cache\
 ```
 
 正常完成后不生成 `bootstrap-report.md`。出现问题时读取对应日志，修复后重新运行同一个入口；已安装组件会自动跳过。
