@@ -1,29 +1,35 @@
 <#
 .SYNOPSIS
-    Vainreef Edge Store CLI - Ultra-thin PowerShell Launcher for .NET 10 Driver
+    Vainreef Edge Store CLI - Ultra-thin Direct PowerShell Launcher for .NET 10 Driver
 #>
 
 [CmdletBinding()]
 param(
-    [ValidateSet('preflight', 'launch', 'inspect', 'identity', 'run', 'status', 'stop')]
+    [ValidateSet('preflight', 'launch', 'inspect', 'reserve', 'identity', 'run', 'status', 'verify', 'stop')]
     [string]$Action = 'run',
     [ValidateSet('all', 'availability', 'properties', 'ageRatings', 'packages', 'listing', 'options')]
     [string]$Phase = 'all',
     [string]$Manifest = '',
     [string]$ProductId = '',
+    [string]$AppName = '',
     [string]$StateDir = '',
     [switch]$Apply,
     [switch]$Submit,
     [switch]$ConfirmSubmit,
     [switch]$KeepOpen,
+    [switch]$ReloadVerify,
     [switch]$SkipReloadVerify
 )
 
 $ErrorActionPreference = 'Stop'
+[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
-$toolRoot = $PSScriptRoot
+$toolRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
+if (-not $toolRoot) { $toolRoot = (Get-Location).Path }
+
 $projectPath = Join-Path $toolRoot 'EdgeStore.Cli.csproj'
-
 if (-not (Test-Path -LiteralPath $projectPath)) {
     Write-Error "EdgeStore.Cli.csproj not found at: $projectPath"
     exit 2
@@ -38,35 +44,54 @@ if (-not $dotnet) {
     exit 3
 }
 
-$argsList = [System.Collections.Generic.List[string]]::new()
-$argsList.Add("run")
-$argsList.Add("--project")
-$argsList.Add("`"$projectPath`"")
-$argsList.Add("--")
-$argsList.Add("--action")
-$argsList.Add($Action)
-$argsList.Add("--phase")
-$argsList.Add($Phase)
+$dllPath = Join-Path $toolRoot 'bin\Release\net10.0\EdgeStore.Cli.dll'
+if (-not (Test-Path -LiteralPath $dllPath)) {
+    $dllPath = Join-Path $toolRoot 'bin\Debug\net10.0\EdgeStore.Cli.dll'
+}
+
+# Build if DLL does not exist yet
+if (-not (Test-Path -LiteralPath $dllPath)) {
+    Write-Host "[INFO] Building Edge Store CLI..."
+    $build = Start-Process -FilePath $dotnet.Source -ArgumentList "build `"$projectPath`" -c Release --nologo -v q" -NoNewWindow -PassThru -Wait
+    if ($build.ExitCode -ne 0) {
+        Write-Error "Edge Store CLI build failed with exit code $($build.ExitCode)."
+        exit 1
+    }
+    $dllPath = Join-Path $toolRoot 'bin\Release\net10.0\EdgeStore.Cli.dll'
+}
+
+$forwardArgs = [System.Collections.Generic.List[string]]::new()
+$forwardArgs.Add($dllPath)
+$forwardArgs.Add("--action")
+$forwardArgs.Add($Action)
+$forwardArgs.Add("--phase")
+$forwardArgs.Add($Phase)
 
 if (-not [string]::IsNullOrWhiteSpace($Manifest)) {
-    $argsList.Add("--manifest")
-    $argsList.Add("`"$Manifest`"")
+    $forwardArgs.Add("--manifest")
+    $forwardArgs.Add($Manifest)
 }
 
 if (-not [string]::IsNullOrWhiteSpace($ProductId)) {
-    $argsList.Add("--product-id")
-    $argsList.Add($ProductId)
+    $forwardArgs.Add("--product-id")
+    $forwardArgs.Add($ProductId)
+}
+
+if (-not [string]::IsNullOrWhiteSpace($AppName)) {
+    $forwardArgs.Add("--app-name")
+    $forwardArgs.Add($AppName)
 }
 
 $effectiveStateDir = if (-not [string]::IsNullOrWhiteSpace($StateDir)) { $StateDir } else { Join-Path $toolRoot 'state' }
-$argsList.Add("--state-dir")
-$argsList.Add("`"$effectiveStateDir`"")
+$forwardArgs.Add("--state-dir")
+$forwardArgs.Add($effectiveStateDir)
 
-if ($Apply) { $argsList.Add("--apply") }
-if ($Submit) { $argsList.Add("--submit") }
-if ($ConfirmSubmit) { $argsList.Add("--confirm-submit") }
-if ($KeepOpen) { $argsList.Add("--keep-open") }
-if ($SkipReloadVerify) { $argsList.Add("--skip-reload-verify") }
+if ($Apply) { $forwardArgs.Add("--apply") }
+if ($Submit) { $forwardArgs.Add("--submit") }
+if ($ConfirmSubmit) { $forwardArgs.Add("--confirm-submit") }
+if ($KeepOpen) { $forwardArgs.Add("--keep-open") }
+if ($ReloadVerify -and $SkipReloadVerify) { throw 'Use either -ReloadVerify or -SkipReloadVerify, not both.' }
+if ($SkipReloadVerify) { $forwardArgs.Add("--skip-reload-verify") }
 
-$process = Start-Process -FilePath $dotnet.Source -ArgumentList ($argsList -join ' ') -NoNewWindow -PassThru -Wait
-exit $process.ExitCode
+& $dotnet.Source @forwardArgs
+exit $LASTEXITCODE

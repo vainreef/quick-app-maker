@@ -22,26 +22,19 @@ public class SubmissionDiscovery
         string overviewUrl = $"{baseUrl.TrimEnd('/')}/{productId}/overview";
         await _waiter.NavigateAsync(overviewUrl, "Product Overview for Discovery");
 
-        // Phase A: wait for navigation commit (old DOM teardown)
-        await _waiter.WaitUntilAsync(async () =>
-        {
-            var len = await _client.EvaluateAsync<int>("document.body ? document.body.innerText.length : 0");
-            return len < 100;
-        }, timeout: TimeSpan.FromSeconds(15), description: "Wait for navigation commit (body teardown)");
-
-        // Phase B: wait for overview SPA body skeleton to render
-        await _waiter.WaitUntilAsync(async () =>
+        // Wait for positive overview evidence. Waiting for an intermediate body
+        // teardown is racy because a warm SPA can replace the view in one frame.
+        await _waiter.RequireAsync(async () =>
         {
             var len = await _client.EvaluateAsync<int>("document.body ? document.body.innerText.length : 0");
             return len > 200;
-        }, timeout: TimeSpan.FromSeconds(30), description: "Wait for overview SPA body content");
+        }, TimeSpan.FromSeconds(90), "Wait for overview SPA content");
 
-        // Phase C: wait for submission module links to be present
-        await _waiter.WaitUntilAsync(async () =>
+        bool linksReady = await _waiter.WaitUntilAsync(async () =>
         {
             int links = await _client.EvaluateAsync<int>("document.querySelectorAll('a[href*=\"/submissions/\"]').length");
             return links >= 2;
-        }, timeout: TimeSpan.FromSeconds(30), description: "Wait for submission module links");
+        }, TimeSpan.FromSeconds(60), description: "Wait for submission module links");
 
         var result = await ProbeOverviewDomAsync();
         if (!string.IsNullOrEmpty(result.SubmissionId))
@@ -61,6 +54,9 @@ public class SubmissionDiscovery
             await Task.Delay(1500);
             result = await ProbeOverviewDomAsync();
         }
+
+        if (!linksReady && !result.CanStartSubmission)
+            throw new InvalidOperationException("Overview rendered without submission module links or a Start Submission action.");
 
         return result;
     }

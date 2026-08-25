@@ -38,7 +38,10 @@ public class CdpConnection
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SESSION] Saved Edge session is stale: {ex.Message}");
+            }
         }
 
         // Allocate a free TCP port

@@ -55,8 +55,7 @@ public class AxLocator
 
     public async Task<ResolvedNode?> FindByCssAsync(string selector)
     {
-        int rootId = await _dom.GetRootNodeIdAsync();
-        int? nodeId = await _dom.QuerySelectorAsync(rootId, selector);
+        int? nodeId = await _dom.RequestNodeBySelectorAsync(selector);
         if (nodeId.HasValue)
         {
             return new ResolvedNode

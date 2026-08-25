@@ -1,11 +1,15 @@
 [CmdletBinding()]
 param(
-    [string]$ProjectDir = $PSScriptRoot,
-    [string]$ManifestPath = (Join-Path $PSScriptRoot 'examples\store-automation.json'),
+    [string]$ProjectDir = '',
+    [string]$ManifestPath = '',
     [switch]$Strict
 )
 
 $ErrorActionPreference = 'Stop'
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
+if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
+if ([string]::IsNullOrWhiteSpace($ProjectDir)) { $ProjectDir = $scriptDir }
+if ([string]::IsNullOrWhiteSpace($ManifestPath)) { $ManifestPath = Join-Path $ProjectDir 'examples\store-automation.json' }
 
 $csproj = Join-Path $ProjectDir 'EdgeStore.Cli.csproj'
 if (-not (Test-Path -LiteralPath $csproj)) { throw "C# project file not found: $csproj" }
@@ -30,8 +34,11 @@ if ($Strict) {
     if ($null -eq $config.pricing -or $config.pricing.currency -ne 'CN' -or $config.pricing.priceTier -ne '0') {
         throw 'Strict manifest pricing must be currency CN and price tier 0.'
     }
-    if ($null -eq $config.properties -or $config.properties.privacy -ne 'No' -or [string]::IsNullOrWhiteSpace([string]$config.properties.privacyPolicyText)) {
-        throw 'Strict manifest must select privacy=No and provide privacyPolicyText.'
+    if ($null -eq $config.properties -or @('No','Yes') -notcontains [string]$config.properties.privacy) {
+        throw 'Strict manifest properties.privacy must be Yes or No.'
+    }
+    if ($config.properties.privacy -eq 'Yes' -and [string]::IsNullOrWhiteSpace([string]$config.properties.privacyPolicyUrl)) {
+        throw 'privacy=Yes requires properties.privacyPolicyUrl.'
     }
     $base = Split-Path -Parent $ManifestPath
     foreach ($property in $config.assets.PSObject.Properties) {

@@ -19,11 +19,11 @@ public class OptionsAdapter
 
     public async Task<ObservedOptions> ObserveAsync()
     {
-        await _waiter.WaitUntilAsync(async () =>
+        await _waiter.RequireAsync(async () =>
         {
             var len = await _client.EvaluateAsync<int>("document.body ? document.body.innerText.length : 0");
             return len > 100;
-        }, timeout: TimeSpan.FromSeconds(30), description: "Wait for options page");
+        }, TimeSpan.FromSeconds(60), "Wait for options form controls");
 
         var obs = new ObservedOptions();
 
@@ -48,7 +48,7 @@ public class OptionsAdapter
           const els = Array.from(document.querySelectorAll('textarea')).filter(e => (e.parentElement?.parentElement?.innerText || '').includes('\u4e3a\u4f55\u9700\u8981\u4f7f\u7528'));
           return els.length === 1 ? els[0].value : '';
         })()
-        """);
+        """) ?? "";
 
         return obs;
     }
@@ -57,14 +57,14 @@ public class OptionsAdapter
     {
         var plan = new ReconcilePlan { Phase = "options" };
 
-        if (desired.SubmissionOptions.PublishMode != observed.PublishMode)
+        if (!ModesEqual(desired.SubmissionOptions.PublishMode, observed.PublishMode))
         {
             plan.AddChange("options.publishMode", observed.PublishMode, desired.SubmissionOptions.PublishMode, $"Set publish mode to {desired.SubmissionOptions.PublishMode}");
         }
 
-        if (observed.HasFullTrustBox && string.IsNullOrWhiteSpace(observed.FullTrustReasonText))
+        if (observed.HasFullTrustBox && observed.FullTrustReasonText.Trim() != desired.SubmissionOptions.RunFullTrustReason.Trim())
         {
-            plan.AddChange("options.runFullTrustReason", "(empty)", "...", "Fill runFullTrust justification text");
+            plan.AddChange("options.runFullTrustReason", observed.FullTrustReasonText, desired.SubmissionOptions.RunFullTrustReason, "Fill runFullTrust justification text");
         }
 
         return plan;
@@ -119,10 +119,20 @@ public class OptionsAdapter
         await _native.AssertNoVisibleErrorsAsync();
     }
 
+    private static bool ModesEqual(string desired, string observed)
+        => string.Equals(NormalizeMode(desired), NormalizeMode(observed), StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeMode(string value)
+        => value.Trim().Equals("ASAP", StringComparison.OrdinalIgnoreCase) || value.Trim().Equals("Asap", StringComparison.OrdinalIgnoreCase)
+            ? "ASAP" : value.Trim();
+
     public async Task VerifyAsync(DesiredState desired)
     {
         await _waiter.ReloadAsync(ignoreCache: true);
         var observed = await ObserveAsync();
+        var plan = PlanDiff(desired, observed);
+        if (plan.HasDifferences)
+            throw new InvalidOperationException($"Options cold-load verification failed:\n{plan}");
         await _native.AssertNoVisibleErrorsAsync();
     }
 }

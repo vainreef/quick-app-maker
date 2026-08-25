@@ -54,10 +54,12 @@ public class ObservedProperties
     public string Category { get; set; } = string.Empty;
     public string PrivacyAnswer { get; set; } = string.Empty;
     public string PrivacyPolicyText { get; set; } = string.Empty;
+    public string PrivacyPolicyUrl { get; set; } = string.Empty;
     public bool StorageDeclaration { get; set; }
     public bool BackupsDeclaration { get; set; }
     public bool WindowsDeclaration { get; set; }
     public bool UsesGenAi { get; set; }
+    public bool HasPrivacyTextChoice { get; set; }
 }
 
 public class ObservedAgeRatings
@@ -72,6 +74,7 @@ public class ObservedAgeRatings
 public class ObservedPackages
 {
     public List<string> UploadedPackageNames { get; set; } = [];
+    public List<PackageEntry> Entries { get; set; } = [];
     public bool DesktopFamily { get; set; }
     public bool MobileFamily { get; set; }
     public bool XboxFamily { get; set; }
@@ -91,6 +94,10 @@ public class ObservedListing
     public bool HasLogo300 { get; set; }
     public bool HasLogo150 { get; set; }
     public bool HasBoxart { get; set; }
+    public bool HasLogo71 { get; set; }
+    public bool RequiredScreenshotSatisfied { get; set; }
+    public bool FormReady { get; set; }
+    public List<string> LanguageCodes { get; set; } = [];
 }
 
 public class ObservedOptions

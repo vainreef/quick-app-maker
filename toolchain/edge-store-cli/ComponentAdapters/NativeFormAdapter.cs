@@ -24,10 +24,10 @@ public class NativeFormAdapter
             const r = e.getBoundingClientRect(), s = getComputedStyle(e);
             return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
           };
-          let found = [];
+          let found = [], seen = new Set();
           for (const selector of selectors) {
             for (const e of document.querySelectorAll(selector)) {
-              if (visible(e)) found.push(e);
+              if (visible(e) && !seen.has(e)) { seen.add(e); found.push(e); }
             }
           }
           if (found.length !== 1) return { ok: false, count: found.length };
@@ -43,6 +43,7 @@ public class NativeFormAdapter
           }
           e.dispatchEvent(new Event('input', { bubbles: true }));
           e.dispatchEvent(new Event('change', { bubbles: true }));
+          e.dispatchEvent(new Event('blur', { bubbles: true }));
           return { ok: true, value: e.value };
         })()
         """);
@@ -139,6 +140,48 @@ public class NativeFormAdapter
         }
 
         await _input.ClickCoordinatesAsync(rect.X, rect.Y, label: $"Click [{label}]");
+    }
+
+    public async Task ClickByTextAsync(string[] texts, string label = "")
+    {
+        var rect = await _client.EvaluateAsync<JsElementRect>($$"""
+        (async () => {
+          const wanted={{JsonSerializer.Serialize(texts)}}.map(x=>x.trim().toLowerCase());
+          const candidates=Array.from(document.querySelectorAll('button,he-button,a,[role="button"]')).filter(e=>{
+            const t=(e.innerText||e.getAttribute('aria-label')||'').trim().toLowerCase();
+            const r=e.getBoundingClientRect(),s=getComputedStyle(e);
+            return wanted.includes(t)&&r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'&&!e.disabled;
+          });
+          if(candidates.length!==1) return null;
+          const e=candidates[0]; e.scrollIntoView({block:'center',behavior:'instant'});
+          await new Promise(r=>setTimeout(r,120));
+          const r=e.getBoundingClientRect();
+          return {x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height};
+        })()
+        """);
+        if (rect == null) throw new InvalidOperationException($"Expected one visible text button for [{label}], found a different count.");
+        await _input.ClickCoordinatesAsync(rect.X, rect.Y, $"Click [{label}]");
+    }
+
+    public async Task ClickDialogButtonAsync(string[] texts, string label = "")
+    {
+        var rect = await _client.EvaluateAsync<JsElementRect>($$"""
+        (async () => {
+          const wanted={{JsonSerializer.Serialize(texts)}}.map(x=>x.trim().toLowerCase());
+          const dialogs=Array.from(document.querySelectorAll('[role="dialog"],[aria-modal="true"]')).filter(d=>{
+            const r=d.getBoundingClientRect(),s=getComputedStyle(d); return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden';
+          });
+          const found=dialogs.flatMap(d=>Array.from(d.querySelectorAll('button,he-button,[role="button"]'))).filter(e=>{
+            const t=(e.innerText||e.getAttribute('aria-label')||'').trim().toLowerCase(),r=e.getBoundingClientRect();
+            return wanted.includes(t)&&r.width>0&&r.height>0&&!e.disabled;
+          });
+          if(found.length!==1) return null;
+          const e=found[0]; e.scrollIntoView({block:'center',behavior:'instant'}); await new Promise(r=>setTimeout(r,80));
+          const r=e.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height};
+        })()
+        """);
+        if (rect == null) throw new InvalidOperationException($"Expected one visible dialog button for [{label}].");
+        await _input.ClickCoordinatesAsync(rect.X, rect.Y, $"Click dialog [{label}]");
     }
 
     public async Task<List<string>> GetVisibleErrorsAsync()

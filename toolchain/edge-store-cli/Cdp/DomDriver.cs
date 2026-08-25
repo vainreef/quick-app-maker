@@ -13,8 +13,39 @@ public class DomDriver
 
     public async Task<int> GetRootNodeIdAsync()
     {
-        var doc = await _client.SendAsync("DOM.getDocument", new { depth = -1, pierce = true });
+        // Never serialize an entire Partner Center SPA. A shallow root is enough
+        // for DOM.requestNode / querySelector and stays bounded on large pages.
+        var doc = await _client.SendAsync("DOM.getDocument", new { depth = 1, pierce = false });
         return doc.RootElement.GetProperty("result").GetProperty("root").GetProperty("nodeId").GetInt32();
+    }
+
+    public async Task<int?> RequestNodeBySelectorAsync(string selector)
+    {
+        var response = await _client.SendAsync("Runtime.evaluate", new
+        {
+            expression = $"document.querySelector({JsonSerializer.Serialize(selector)})",
+            returnByValue = false
+        });
+        var remote = response.RootElement.GetProperty("result").GetProperty("result");
+        if (!remote.TryGetProperty("objectId", out var objectId)) return null;
+        var node = await _client.SendAsync("DOM.requestNode", new { objectId = objectId.GetString() });
+        int id = node.RootElement.GetProperty("result").GetProperty("nodeId").GetInt32();
+        return id > 0 ? id : null;
+    }
+
+    public async Task<int?> RequestNodeByExpressionAsync(string expression)
+    {
+        var response = await _client.SendAsync("Runtime.evaluate", new
+        {
+            expression,
+            returnByValue = false,
+            awaitPromise = true
+        });
+        var remote = response.RootElement.GetProperty("result").GetProperty("result");
+        if (!remote.TryGetProperty("objectId", out var objectId)) return null;
+        var node = await _client.SendAsync("DOM.requestNode", new { objectId = objectId.GetString() });
+        int id = node.RootElement.GetProperty("result").GetProperty("nodeId").GetInt32();
+        return id > 0 ? id : null;
     }
 
     public async Task<int?> QuerySelectorAsync(int rootNodeId, string selector)
@@ -67,7 +98,10 @@ public class DomDriver
         {
             await _client.SendAsync("DOM.scrollIntoViewIfNeeded", param);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CDP-WARN] scrollIntoView failed: {ex.Message}");
+        }
     }
 
     public async Task SetFileInputFilesAsync(int nodeId, string[] files)

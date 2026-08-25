@@ -21,11 +21,11 @@ public class PropertiesAdapter
 
     public async Task<ObservedProperties> ObserveAsync()
     {
-        await _waiter.WaitUntilAsync(async () =>
+        await _waiter.RequireAsync(async () =>
         {
             var hasCat = await _client.EvaluateAsync<bool>("document.querySelector('select[name=\"CategorySelect\"]') !== null");
             return hasCat;
-        }, timeout: TimeSpan.FromSeconds(30), description: "Wait for properties CategorySelect");
+        }, TimeSpan.FromSeconds(60), "Wait for properties CategorySelect");
 
         var obs = new ObservedProperties();
 
@@ -38,8 +38,14 @@ public class PropertiesAdapter
 
         obs.PrivacyAnswer = await _client.EvaluateAsync<string>("""
         (() => {
+          const r = document.querySelector('input[name="privacyPolicySelection"]:checked');
+          if (r) return r.id === 'privacyPolicyURL' ? 'Yes' : 'No';
           const e = document.querySelector('select[name="privacyPolicySelection"]');
-          return e ? e.value : '';
+          if (!e) return '';
+          const v=(e.value||'').trim().toLowerCase();
+          if (['yes','true','1','url'].includes(v)) return 'Yes';
+          if (['no','false','0','none'].includes(v)) return 'No';
+          return e.value;
         })()
         """) ?? "";
 
@@ -49,6 +55,13 @@ public class PropertiesAdapter
           return e ? e.value : '';
         })()
         """) ?? "";
+        obs.PrivacyPolicyUrl = await _client.EvaluateAsync<string>("""
+        (() => {
+          const e=document.querySelector('input[type="url"],#privacyPolicyUrl,input[name*="privacyPolicyUrl" i]');
+          return e?.value || '';
+        })()
+        """) ?? "";
+        obs.HasPrivacyTextChoice = await _client.EvaluateAsync<bool>("document.querySelector('#privacyPolicyText') !== null");
 
         obs.StorageDeclaration = await _checkbox.ObserveCheckedAsync("storage") ?? false;
         obs.BackupsDeclaration = await _checkbox.ObserveCheckedAsync("backups") ?? false;
@@ -72,13 +85,15 @@ public class PropertiesAdapter
             plan.AddChange("properties.privacy", observed.PrivacyAnswer, desired.Properties.Privacy, $"Set privacy answer to {desired.Properties.Privacy}");
         }
 
-        if (desired.Properties.Privacy == "No" && !string.IsNullOrEmpty(desired.Properties.PrivacyPolicyText))
+        if (desired.Properties.Privacy == "No" && observed.HasPrivacyTextChoice && !string.IsNullOrEmpty(desired.Properties.PrivacyPolicyText))
         {
             if (observed.PrivacyPolicyText.Trim() != desired.Properties.PrivacyPolicyText.Trim())
             {
                 plan.AddChange("properties.privacyPolicyText", observed.PrivacyPolicyText.Length > 20 ? observed.PrivacyPolicyText[..20] + "..." : observed.PrivacyPolicyText, "...", "Update privacy policy text");
             }
         }
+        if (desired.Properties.Privacy == "Yes" && observed.PrivacyPolicyUrl.Trim() != desired.Properties.PrivacyPolicyUrl.Trim())
+            plan.AddChange("properties.privacyPolicyUrl", observed.PrivacyPolicyUrl, desired.Properties.PrivacyPolicyUrl, "Set privacy policy URL");
 
         if (!observed.StorageDeclaration) plan.AddChange("properties.storage", false, true, "Check storage declaration");
         if (!observed.BackupsDeclaration) plan.AddChange("properties.backups", false, true, "Check backups declaration");
@@ -100,25 +115,36 @@ public class PropertiesAdapter
             await _native.SetFieldAsync(["select[name=\"privacyPolicySelection\"]"], desired.Properties.Privacy, "privacy answer");
         }
 
-        if (desired.Properties.Privacy == "No")
+        if (desired.Properties.Privacy == "No" && plan.Actions.Any(a => a.Field == "properties.privacyPolicyText"))
         {
-            await _waiter.WaitUntilAsync(async () =>
+            bool legacyShape = await _client.EvaluateAsync<bool>("document.querySelector('#privacyPolicyText') !== null");
+            if (!legacyShape)
+                throw new InvalidOperationException("The current privacy UI has no privacy-text choice. Desired-state validation must not require privacyPolicyText when privacy=No.");
+
+            await _waiter.RequireAsync(async () =>
             {
                 return await _client.EvaluateAsync<bool>("document.querySelector('#privacyPolicyText') !== null");
-            }, timeout: TimeSpan.FromSeconds(10), description: "Wait for #privacyPolicyText radio");
+            }, TimeSpan.FromSeconds(10), "Wait for #privacyPolicyText radio");
 
             await _native.SetRadioAsync("#privacyPolicyText", "provide privacy policy text");
 
-            await _waiter.WaitUntilAsync(async () =>
+            await _waiter.RequireAsync(async () =>
             {
                 return await _client.EvaluateAsync<bool>("document.querySelector('support-info textarea, textarea[aria-label=\"提供隐私策略文本\"]') !== null");
-            }, timeout: TimeSpan.FromSeconds(10), description: "Wait for privacy policy textarea");
+            }, TimeSpan.FromSeconds(10), "Wait for privacy policy textarea");
 
             await _native.SetFieldAsync([
                 "support-info textarea[aria-label=\"提供隐私策略文本\"]",
                 "textarea[aria-label=\"提供隐私策略文本\"]",
                 "support-info textarea"
             ], desired.Properties.PrivacyPolicyText, "privacy policy text");
+        }
+
+        if (desired.Properties.Privacy == "Yes" && plan.Actions.Any(a => a.Field == "properties.privacyPolicyUrl"))
+        {
+            await _waiter.RequireAsync(async () => await _client.EvaluateAsync<bool>("document.querySelector('input[type=\"url\"],#privacyPolicyUrl,input[name*=\"privacyPolicyUrl\" i]') !== null"),
+                TimeSpan.FromSeconds(15), "Wait for privacy policy URL field");
+            await _native.SetFieldAsync(["input[type=\"url\"]", "#privacyPolicyUrl", "input[name*=\"privacyPolicyUrl\" i]"], desired.Properties.PrivacyPolicyUrl, "privacy policy URL");
         }
 
         await _checkbox.SetCheckedAsync("storage", true, "storage declaration");
@@ -128,6 +154,7 @@ public class PropertiesAdapter
 
         // Save
         await _native.ClickStrictAsync([
+            "button[name=\"save_button\"]",
             "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
             "button[data-l10n-key=\"appsubmission_savebutton\"]",
             "button[uitestid=\"saveButtonProperties\"]",

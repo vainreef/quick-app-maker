@@ -21,11 +21,11 @@ public class AvailabilityAdapter
 
     public async Task<ObservedAvailability> ObserveAsync()
     {
-        await _waiter.WaitUntilAsync(async () =>
+        await _waiter.RequireAsync(async () =>
         {
             var hasMarket = await _client.EvaluateAsync<bool>("document.querySelector('input[name=\"marketSelection\"]') !== null");
             return hasMarket;
-        }, timeout: TimeSpan.FromSeconds(30), description: "Wait for availability form market controls");
+        }, TimeSpan.FromSeconds(60), "Wait for availability form market controls");
 
         var obs = new ObservedAvailability();
 

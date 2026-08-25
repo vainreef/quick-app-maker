@@ -48,7 +48,7 @@ store-automation.json
 ┌──────────────────────────────┐
 │        Browser Driver        │
 │                              │
-│       CdpClient (WS)         │  <-- .NET 10 原生驱动核心 (DOM.getDocument pierce=true,
+│       CdpClient (WS)         │  <-- .NET 10 原生驱动核心 (浅 DOM + requestNode，
 │      DOM + Shadow DOM        │      Accessibility.queryAXTree, getBoxModel, InputDriver,
 │      Accessibility Tree      │      契约式 Waiter 消除一切 Start-Sleep)
 │   Native mouse / keyboard    │
@@ -90,10 +90,10 @@ Observed State 不只是拓扑 URL，而是页面中真实的字段数据对象�
 
 ### 3.2 收敛回路与幂等性
 状态机核心运转公式：
-$$\text{Desired} \quad \xrightarrow{\text{compare}} \quad \text{Observed} \quad \xrightarrow{\text{diff}} \quad \text{Plan} \quad \xrightarrow{\text{apply}} \quad \text{Save} \quad \xrightarrow{\text{reload}} \quad \text{Re-Observe} \quad \xrightarrow{\text{Desired} == \text{Observed}} \quad \text{CONVERGED}$$
+$$\text{Desired} \to \text{Observed} \to \text{Plan} \to \text{Apply} \to \text{Cold Re-Observe} \to \text{Overview Complete} \to \text{PRODUCT\_VERIFIED}$$
 
 - **第一次运行**：发现差异并执行收敛；
-- **第二次运行**：`0 differences (already converged)`，直接输出 `CONVERGED: No action required`。
+- **第二次运行**：`0 differences` 仍需概览模块 Complete；只有产品证据通过才输出 `PRODUCT_VERIFIED`。
 
 ---
 
@@ -102,7 +102,7 @@ $$\text{Desired} \quad \xrightarrow{\text{compare}} \quad \text{Observed} \quad 
 Partner Center 的 Angular/LitElement Web Components（如 `he-select`, `he-option`）将选项内容包裹在 Shadow DOM 内，传统 `querySelectorAll` 无法获取文本。
 
 **驱动解决方案**：
-1. **Shadow 穿透**：通过 CDP 原生 `DOM.getDocument(depth: -1, pierce: true)` 穿透所有 Shadow Roots；
+1. **有界 Shadow 访问**：大 SPA 只取浅根，按目标用 `Runtime.evaluate → DOM.requestNode`，组件内部按需访问 `shadowRoot`；
 2. **Accessibility Tree 语义定位**：调用 `Accessibility.queryAXTree` 依角色与无障碍名称查找节点：
    ```csharp
    await locator.FindByRoleAndNameAsync("option", "CNY - 中国");
@@ -146,9 +146,11 @@ Observe value again & Assert(observed == desired)
 
 ---
 
-## 7. 8 阶段标准流水线（Store 0 ~ Store 7）
+## 7. 标准全自动化流水线（Store -1 ~ Store 7）
 
 ```text
+STORE -1: PRODUCT & IDENTITY     # 自动建项验重并提取 3 大 Identity 回填源码 (Invoke-EdgeStore.ps1 -Action reserve)
+    ↓
 STORE 0: STATIC PREFLIGHT        # 离线解包质检 MSIX (DisplayName/Desktop-only/Logo/1080P截图/关键字<=7)
     ↓
 STORE 1: SESSION DISCOVERY       # 启动/复用隔离 Edge 进程，验证 CDP 连接与用户登录

@@ -23,7 +23,7 @@ public class ReconcilePlan
     {
         if (!HasDifferences)
         {
-            return $"[{Phase}] 0 differences (already converged)";
+            return $"[{Phase}] 0 form differences (overview verification still required)";
         }
 
         var lines = Actions.Select(a => $"  * {a.Field}: [{a.CurrentValue}] -> [{a.DesiredValue}] ({a.Description})");

@@ -12,6 +12,7 @@ public class ListingAdapter
     private readonly Waiter _waiter;
     private readonly NativeFormAdapter _native;
     private readonly InputDriver _input;
+    private List<string> _languageGridCodes = [];
 
     public ListingAdapter(CdpClient client, DomDriver dom, Waiter waiter, NativeFormAdapter native, InputDriver input)
     {
@@ -22,12 +23,87 @@ public class ListingAdapter
         _input = input;
     }
 
+    public async Task EnterLanguageFormAsync(DesiredState desired, bool applyLanguageChanges)
+    {
+        bool form = await _client.EvaluateAsync<bool>("document.querySelector('#description-required') !== null");
+        if (form) return;
+
+        _languageGridCodes = await ReadLanguageGridCodesAsync();
+        if (_languageGridCodes.Count > 0)
+            Console.WriteLine($"[STATE] Listing language grid: {string.Join(",", _languageGridCodes)}");
+        if (applyLanguageChanges) await ConvergeLanguageGridAsync(desired);
+
+        string languageId = desired.Site.LanguageId;
+        string languageCode = desired.Site.LanguageCode;
+        string? href = await _client.EvaluateAsync<string?>($$"""
+        (() => {
+          const links=Array.from(document.querySelectorAll('a[href*="listings"]'));
+          const a=links.find(x=>(x.href||'').includes('languageid={{languageId}}')) ||
+                  links.find(x=>(x.href||'').toLowerCase().includes('languagecode={{languageCode.ToLowerInvariant()}}'));
+          return a?.href || null;
+        })()
+        """);
+        if (string.IsNullOrWhiteSpace(href))
+            throw new InvalidOperationException($"Listing page is not the {languageCode} form and its language grid has no matching row.");
+        await _waiter.NavigateAsync(href, $"listing {languageCode}");
+    }
+
+    private async Task ConvergeLanguageGridAsync(DesiredState desired)
+    {
+        var wanted = desired.Site.SupportedLanguageCodes.Count > 0
+            ? desired.Site.SupportedLanguageCodes
+            : [desired.Site.LanguageCode];
+        for (int iteration = 0; iteration < 300; iteration++)
+        {
+            var target = await _client.EvaluateAsync<LanguageToggleTarget>($$"""
+            (async () => {
+              const wanted={{JsonSerializer.Serialize(wanted.Select(x => x.ToLowerInvariant()).ToArray())}};
+              const buttons=Array.from(document.querySelectorAll('he-button[slot^="Action-"],button[slot^="Action-"]'));
+              for(const b of buttons){
+                const slot=b.getAttribute('slot')||'', id=slot.replace(/^Action-/, '');
+                const name=document.querySelector('[slot="Name-'+CSS.escape(id)+'"] a[href*="languagecode="],a[slot="Name-'+CSS.escape(id)+'"][href*="languagecode="]');
+                if(!name) continue;
+                const m=(name.href||'').match(/[?&]languagecode=([^&#]+)/i), code=m?decodeURIComponent(m[1]).toLowerCase():'';
+                const action=(b.innerText||b.textContent||'').trim().toLowerCase();
+                const active=/remove|删除/.test(action), should=wanted.includes(code);
+                if(active===should) continue;
+                b.scrollIntoView({block:'center',behavior:'instant'}); await new Promise(r=>setTimeout(r,80));
+                const r=b.getBoundingClientRect();
+                return {code,action,x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height};
+              }
+              return null;
+            })()
+            """);
+            if (target == null)
+            {
+                Console.WriteLine($"[INFO] Listing languages converged: {string.Join(",", wanted)}");
+                _languageGridCodes = wanted.Select(x => x.ToLowerInvariant()).Distinct().ToList();
+                return;
+            }
+            // Exactly one physical click, then discard the node and re-query after
+            // Lit has replaced the grid. Replaying click/mousedown/.click would
+            // toggle the language back.
+            await _input.ClickCoordinatesAsync(target.X, target.Y, $"Language {target.Code}: {target.Action}");
+            await Task.Delay(120);
+        }
+        throw new InvalidOperationException("Language grid did not converge within 300 live re-query iterations.");
+    }
+
+    private async Task<List<string>> ReadLanguageGridCodesAsync()
+    {
+        return await _client.EvaluateAsync<List<string>>("""
+        (() => Array.from(document.querySelectorAll('a[href*="languagecode="]'))
+          .map(a => { const m=(a.href||'').match(/[?&]languagecode=([^&#]+)/i); return m ? decodeURIComponent(m[1]).toLowerCase() : ''; })
+          .filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i))()
+        """) ?? [];
+    }
+
     public async Task<ObservedListing> ObserveAsync()
     {
-        await _waiter.WaitUntilAsync(async () =>
+        await _waiter.RequireAsync(async () =>
         {
             return await _client.EvaluateAsync<bool>("document.querySelector('#description-required') !== null");
-        }, timeout: TimeSpan.FromSeconds(30), description: "Wait for listing description field");
+        }, TimeSpan.FromSeconds(90), "Wait for listing form (navigation is handled separately)");
 
         var obs = new ObservedListing();
 
@@ -56,6 +132,18 @@ public class ListingAdapter
         })()
         """) ?? [];
 
+        obs.Features = await _client.EvaluateAsync<List<string>>("""
+        Array.from(document.querySelectorAll('input[id^="feature-"]')).map(x=>x.value.trim()).filter(Boolean)
+        """) ?? [];
+        obs.FormReady = true;
+        obs.LanguageCodes = _languageGridCodes.ToList();
+        obs.HasScreenshot = await SectionHasImageAsync(["屏幕截图", "screenshot", "desktop"], -1);
+        obs.RequiredScreenshotSatisfied = obs.HasScreenshot;
+        obs.HasBoxart = await SectionHasImageAsync(["1:1", "酷图"], -1);
+        obs.HasLogo300 = await SectionHasImageAsync(["300x300", "300 x 300"], -1);
+        obs.HasLogo150 = await SectionHasImageAsync(["150x150", "150 x 150"], -1);
+        obs.HasLogo71 = await SectionHasImageAsync(["71x71", "71 x 71"], -1);
+
         return obs;
     }
 
@@ -82,6 +170,22 @@ public class ListingAdapter
             }
         }
 
+        if (!desired.Values.Features.SequenceEqual(observed.Features))
+            plan.AddChange("listing.features", string.Join(" | ", observed.Features), string.Join(" | ", desired.Values.Features), "Synchronize product features");
+
+        var wantedLanguages = (desired.Site.SupportedLanguageCodes.Count > 0
+            ? desired.Site.SupportedLanguageCodes
+            : [desired.Site.LanguageCode]).Select(x => x.ToLowerInvariant()).ToHashSet();
+        var extraLanguages = observed.LanguageCodes.Where(x => !wantedLanguages.Contains(x.ToLowerInvariant())).ToList();
+        if (extraLanguages.Count > 0)
+            plan.AddChange("listing.languages", string.Join(",", observed.LanguageCodes), string.Join(",", wantedLanguages), "Remove undeclared Store languages");
+
+        if (desired.Listing.Screenshot && !observed.HasScreenshot) plan.AddChange("listing.asset.screenshot", "missing", Path.GetFileName(desired.Assets.Screenshot), "Upload required desktop screenshot");
+        if (desired.Listing.Boxart && !observed.HasBoxart) plan.AddChange("listing.asset.boxart", "missing", Path.GetFileName(desired.Assets.Boxart), "Upload boxart");
+        if (desired.Listing.Logo300 && !observed.HasLogo300) plan.AddChange("listing.asset.logo300", "missing", Path.GetFileName(desired.Assets.Logo300), "Upload 300 logo");
+        if (desired.Listing.Logo150 && !observed.HasLogo150) plan.AddChange("listing.asset.logo150", "missing", Path.GetFileName(desired.Assets.Logo150), "Upload 150 logo");
+        if (desired.Listing.Logo71 && !observed.HasLogo71) plan.AddChange("listing.asset.logo71", "missing", Path.GetFileName(desired.Assets.Logo71), "Upload 71 logo");
+
         return plan;
     }
 
@@ -98,6 +202,7 @@ public class ListingAdapter
         }
 
         // Features
+        await ConvergeFeatureFieldCountAsync(desired.Values.Features.Count);
         for (int i = 0; i < desired.Values.Features.Count; i++)
         {
             string selector = $"#feature-{i}";
@@ -105,10 +210,10 @@ public class ListingAdapter
             if (!exists)
             {
                 await ClickAddFeatureAsync();
-                await _waiter.WaitUntilAsync(async () =>
+                await _waiter.RequireAsync(async () =>
                 {
                     return await _client.EvaluateAsync<bool>($"document.querySelector('{selector}') !== null");
-                }, timeout: TimeSpan.FromSeconds(10), description: $"Wait for feature input #{i}");
+                }, TimeSpan.FromSeconds(10), $"Wait for feature input #{i}");
             }
             await _native.SetFieldAsync([selector], desired.Values.Features[i], $"feature #{i + 1}");
         }
@@ -140,25 +245,37 @@ public class ListingAdapter
 
     private async Task ClickAddFeatureAsync()
     {
-        var rect = await _client.EvaluateAsync<JsElementRect>("""
-        (() => {
-          const els = Array.from(document.querySelectorAll('button, a, he-button, span')).filter(e => {
-            const r = e.getBoundingClientRect(), s = getComputedStyle(e);
-            return (e.innerText || '').trim() === '\u6dfb\u52a0\u5176\u4ed6\u9879\u76ee' && r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
-          });
-          if (els.length === 0) return null;
-          const r = els[0].getBoundingClientRect();
-          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-          if (cx <= 0 || cy <= 0 || cx > window.innerWidth || cy > window.innerHeight) return null;
-          return { x: cx, y: cy, width: r.width, height: r.height };
-        })()
-        """);
+        await _native.ClickByTextAsync(["添加其他项目", "Add another item"], "Add product feature");
+        await Task.Delay(200);
+    }
 
-        if (rect != null)
+    private async Task ConvergeFeatureFieldCountAsync(int desiredCount)
+    {
+        for (int attempt = 0; attempt < 30; attempt++)
         {
-            await _input.ClickCoordinatesAsync(rect.X, rect.Y, "Add product feature");
-            await Task.Delay(300);
+            int count = await _client.EvaluateAsync<int>("document.querySelectorAll('input[id^=\"feature-\"]').length");
+            if (count == desiredCount) return;
+            if (count < desiredCount)
+            {
+                await ClickAddFeatureAsync();
+                continue;
+            }
+
+            var rect = await _client.EvaluateAsync<JsElementRect>("""
+            (async () => {
+              const inputs=Array.from(document.querySelectorAll('input[id^="feature-"]'));
+              const last=inputs[inputs.length-1]; if(!last) return null;
+              const index=(last.id.match(/(\d+)$/)||[])[1];
+              const b=document.querySelector('#delete-feature-'+index); if(!b) return null;
+              b.scrollIntoView({block:'center',behavior:'instant'}); await new Promise(r=>setTimeout(r,80));
+              const r=b.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height};
+            })()
+            """);
+            if (rect == null) throw new InvalidOperationException("Extra feature fields exist but their delete control was not found.");
+            await _input.ClickCoordinatesAsync(rect.X, rect.Y, "Remove extra product feature");
+            await Task.Delay(120);
         }
+        throw new InvalidOperationException($"Feature field count did not converge to {desiredCount}.");
     }
 
     private async Task SetKeywordsAsync(List<string> keywords)
@@ -189,7 +306,7 @@ public class ListingAdapter
     {
         var uploads = new[]
         {
-            new { Key = "screenshot", Path = desired.Assets.Screenshot, Enabled = desired.Listing.Screenshot, Contexts = Array.Empty<string>(), InputIndex = 0 },
+            new { Key = "screenshot", Path = desired.Assets.Screenshot, Enabled = desired.Listing.Screenshot, Contexts = new[] { "屏幕截图", "screenshot", "desktop" }, InputIndex = -1 },
             new { Key = "poster", Path = desired.Assets.Poster, Enabled = desired.Listing.Poster, Contexts = new[] { "9:16", "\u62db\u8d34\u753b" }, InputIndex = -1 },
             new { Key = "boxart", Path = desired.Assets.Boxart, Enabled = desired.Listing.Boxart, Contexts = new[] { "1:1", "\u9177\u56fe" }, InputIndex = -1 },
             new { Key = "logo300", Path = desired.Assets.Logo300, Enabled = desired.Listing.Logo300, Contexts = new[] { "300x300", "300 x 300" }, InputIndex = -1 },
@@ -209,7 +326,7 @@ public class ListingAdapter
             if (inputNodeId.HasValue)
             {
                 await _dom.SetFileInputFilesAsync(inputNodeId.Value, [up.Path]);
-                await Task.Delay(2000);
+                await _waiter.RequireAsync(() => SectionHasImageAsync(up.Contexts, up.InputIndex), TimeSpan.FromSeconds(90), $"Wait for {up.Key} preview");
             }
         }
     }
@@ -238,43 +355,34 @@ public class ListingAdapter
 
     private async Task<int?> GetFileInputNodeIdAsync(string[] contexts, int inputIndex)
     {
-        int rootId = await _dom.GetRootNodeIdAsync();
-        var allInputs = await _dom.QuerySelectorAllAsync(rootId, "input[type=\"file\"]");
-        if (allInputs.Count == 0) return null;
-
-        if (inputIndex >= 0 && inputIndex < allInputs.Count)
-        {
-            return allInputs[inputIndex];
-        }
-
-        var matchedIndex = await _client.EvaluateAsync<int?>($$"""
+        return await _dom.RequestNodeByExpressionAsync($$"""
         (() => {
           const texts = {{JsonSerializer.Serialize(contexts)}}.map(x => x.toLowerCase());
           const files = Array.from(document.querySelectorAll('input[type="file"]'));
-          for (let i = 0; i < files.length; i++) {
-            const e = files[i];
+          for (const e of files) {
             const card = e.closest('.listing-image-inner, .asset-card');
             let t = card ? (card.innerText || '') : '';
             if (!t) { let n = e; for (let k = 0; k < 12 && n; k++, n = n.parentElement) t += ' ' + (n.innerText || ''); }
             t = t.toLowerCase();
-            if (texts.some(x => t.includes(x))) return i;
+            if (texts.some(x => t.includes(x))) return e;
           }
           return null;
         })()
         """);
-
-        if (matchedIndex.HasValue && matchedIndex.Value >= 0 && matchedIndex.Value < allInputs.Count)
-        {
-            return allInputs[matchedIndex.Value];
-        }
-
-        return null;
     }
 
     public async Task VerifyAsync(DesiredState desired)
     {
         await _waiter.ReloadAsync(ignoreCache: true);
         var observed = await ObserveAsync();
+        var plan = PlanDiff(desired, observed);
+        if (plan.HasDifferences) throw new InvalidOperationException($"Listing cold-load verification failed:\n{plan}");
         await _native.AssertNoVisibleErrorsAsync();
     }
+}
+
+public sealed class LanguageToggleTarget : JsElementRect
+{
+    public string Code { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
 }

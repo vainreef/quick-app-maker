@@ -89,7 +89,7 @@ Agent 工作根目录（就是仓库 clone 所在的父目录）
 5. **【双窗口并行机制】启动构建时向用户输出友好非阻塞提示**：
    ```text
    我已开始为你全自动编写代码、生成界面、打包并进行自动化测试（大约需要 15~20 分钟）。
-   这段时间如果你想提前准备微软开发者账号，或者想提前在微软控制台测试你的应用名称是否可用，可以随时新开一个对话窗口向我提问：“我要如何创建 Partner 开发者账号？”或“如何起名验重？”，我会详细指引你完成。
+   这段时间如果你想提前准备微软开发者账号，可以随时新开一个对话窗口向我提问：“我要如何创建 Partner 开发者账号？”，我会指引你完成免费个人认证。发布时的名称验重、建项与商店提审将由工具链全自动完成。
    ```
 6. **构建主会话保持极致专注**：本会话专注于代码生成、编译、自包含 MSIX 打包、`winapp ui` 自动化黑盒测试与本地安装，绝不在同一会话里混杂交互问答，避免上下文污染与任务中断。
 
@@ -275,17 +275,17 @@ Agent 根据当前 App 增加针对性测试。
 本模块为 Agent 向用户提供微软开发者中心（Partner Center）全流程协助的标准规范。支持**独立咨询会话（窗口 2）**与**发布时刻智能断点续接**：
 
 - **详细权威操作手册**：严格查阅 [partner-center-guide.md](references/partner-center-guide.md) 及 `docs/partner-center/` 内的真实表单 DOM 快照。
-- **声明式 Edge 自动化入口 (V2)**：读取 [edge-store-automation.md](references/edge-store-automation.md)，使用 `toolchain/edge-store-cli/Invoke-EdgeStore.ps1`（底层由 .NET 10 C# 驱动）。采用 **CDP Shadow DOM 穿透 (`pierce=true`)** 与 **Accessibility Tree (`queryAXTree`)** 语义化定位，严禁硬编码绝对坐标，基于 DOM 盒模型派发原生物理输入。
-- **独立咨询会话（窗口 2）指引规范**：
+- **声明式 Edge 自动化入口 (V2)**：先读取 [Agent 运行契约](../../docs/partner-center/Agent-运行契约.md) 和 [可靠性重构](../../docs/partner-center/Edge-Store-可靠性重构.md)，再使用唯一正式入口 `toolchain/edge-store-cli/Invoke-EdgeStore.ps1`。`apps/Project/edge-store-cli-fast` 只是一轮旧诊断副本，不执行其中的 DLL。大 SPA 禁止 `DOM.getDocument(depth:-1,pierce:true)`；采用浅根、局部 `DOM.requestNode`、组件 Shadow Root 与 Accessibility Tree 语义化定位，严禁硬编码绝对坐标。
+- **独立咨询会话与自动化建项规范**：
   1. 当用户新开窗口提问“如何创建 Partner 账号 / 如何起名验重”时，Agent 专注提供咨询服务；
   2. 指引用户通过 Xbox 应用注册避开真人验证码异常，选择免费「个人开发者」并完成身份证照片上传；
-  3. **控制台名称前置验重**：指导用户在 Partner Center 点击「+ 新产品」→「MSIX 或 PWA 应用」，输入名称点击「检查可用性」。若重名当场换名，确认可用后点击「保留产品名称」（3 个月有效期）；
-  4. 指导用户在「产品管理」→「产品标识」中提取 3 项核心参数：`Package Identity Name`、`Publisher ID`、`PublisherDisplayName`。
+  3. **全新产品全自动建项**：用户完成首次登录后，Agent 直接调用 `Invoke-EdgeStore.ps1 -Action reserve -AppName "..." -Manifest build/edge-store.json` 自动在 Partner Center 完成产品创建、名称可用性检查、预留名称并自动抓取 3 大 Identity 回填到 `Package.appxmanifest` 与 `edge-store.json`，严禁让用户手动执行控制台 5 步！
 - **发布时刻的断点智能续接状态机**：
-  - 当用户在构建主会话（窗口 1）试用满意并表达上架意向时，Agent 启动发布链条 8 阶段流水线（Store 0 ~ Store 7）：
+  - 当用户在构建主会话（窗口 1）试用满意并表达上架意向时，Agent 启动发布链条标准流水线：
     ```text
+    STORE -1: 自动建项验重 (Invoke-EdgeStore.ps1 -Action reserve 自动预留名称并提取 3 大 Identity)
     STORE 0: 离线静态质检 (MSIX 解包检查 DisplayName、Desktop-only 依赖、Logo/1080P 截图、<=7 关键词)
-    STORE 1: 建立隔离 Edge 会话 (用户完成登录/MFA，保持 profile 隔离)
+    STORE 1: 建立隔离 Edge 会话 (用户完成首次登录/MFA，保持 profile 隔离)
     STORE 2: 动态 DOM 探测 (从概览页读取 live submissionId 与 6 大表单实时 href)
     STORE 3: 生成差异收敛计划 (DesiredState vs 字段级 ObservedState -> 计算精确 Diff)
     STORE 4: 逐表原生交互收敛 (HeSelect 语义点击 / 原生表单修改 / 保存)
@@ -293,27 +293,31 @@ Agent 根据当前 App 增加针对性测试。
     STORE 6: 概览页全貌校验 (确认 6 大表单全部呈现绿色勾选已完成)
     STORE 7: 显式双确认提交审核 (-Submit -ConfirmSubmit 触发最终提审)
     ```
-  - **断点续接与幂等性**：若页面状态已与目标一致，自动收敛为 `0 changes -> CONVERGED: No action required`。
+  - **断点续接与幂等性**：表单字段相等只是中间证据；冷加载回读并且概览模块明确完成后，才记录 `PRODUCT_VERIFIED`。单表续跑不得重跑 Store 0 或其他表。
 
 ## 10. Package and publish for Microsoft Store
 
 物料与包身份就绪后，执行商店正式发布流程：
 
-1. **构建商店发布包**：
+1. **全新应用自动建项与身份回填**：
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -KeepOpen
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName <AppName> -Manifest .\<app>\build\edge-store.json
+   ```
+2. **构建商店发布包**：
    ```powershell
    dotnet publish -c Release -r win-x64 -o ./publish
    New-Item -ItemType Directory -Force ./store-package | Out-Null
    winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
    ```
-2. **清理权限声明与多设备依赖**：
+3. **清理权限声明与多设备依赖**：
    - 移除 manifest 中模板自带的未用特权（如 `systemAIModels`）；
    - **删除 `Windows.Universal` 依赖，确保仅声明 `Windows.Desktop`**（杜绝 Mobile/Xbox 设备全列 rank 1 报错）。
-3. **命令行 Edge 声明式状态收敛**：
+4. **命令行 Edge 声明式状态收敛**：
    - 先执行 Store 0 静态预检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest <store-automation.json>`
-   - 启动会话：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -Manifest <store-automation.json> -KeepOpen`
    - 逐表执行并验证持久化：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest <store-automation.json> -Apply -KeepOpen`
    - 默认选择 `Manual` 发布模式，保留人工发布控制；自动填写提交选项中的 `runFullTrust` 500 字合规用途说明。
-4. **最终提交**：
+5. **最终提交**：
    - 概览页六项均完成后，只有显式 `-Apply -Submit -ConfirmSubmit` 才点击「提交到应用商店」；
    - 记录 CLI 退出码、阶段 checkpoint、页面标题和最终 URL。
 

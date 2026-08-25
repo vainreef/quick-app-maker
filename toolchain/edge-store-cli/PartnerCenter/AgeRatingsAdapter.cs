@@ -22,11 +22,28 @@ public class AgeRatingsAdapter
 
     public async Task<ObservedAgeRatings> ObserveAsync()
     {
-        await _waiter.WaitUntilAsync(async () =>
+        bool summary = await _client.EvaluateAsync<bool>("""
+        (() => {
+          const text=(document.body?.innerText||'');
+          return /\/ageratings\/summary/i.test(location.href) || /分级\s*ID|当前分级|rating\s*id/i.test(text);
+        })()
+        """);
+        if (summary)
+        {
+            return new ObservedAgeRatings
+            {
+                InputMode = "questionnaire",
+                ApplicationType = "2558",
+                QuestionnaireCompleted = true,
+                IsCompleted = true
+            };
+        }
+
+        await _waiter.RequireAsync(async () =>
         {
             var hasMode = await _client.EvaluateAsync<bool>("document.querySelector('input[name=\"inputMode\"]') !== null");
             return hasMode;
-        }, timeout: TimeSpan.FromSeconds(30), description: "Wait for age ratings inputMode");
+        }, TimeSpan.FromSeconds(45), "Wait for age ratings questionnaire or completed summary");
 
         var obs = new ObservedAgeRatings();
 
@@ -44,12 +61,11 @@ public class AgeRatingsAdapter
         })()
         """) ?? "";
 
-        obs.IsCompleted = await _client.EvaluateAsync<bool>("""
-        (() => {
-          const btn = document.querySelector('he-button[data-l10n-key="AppSubmission_AgeRating_SaveButton"], button[data-l10n-key="AppSubmission_AgeRating_SaveButton"]');
-          return btn ? !btn.disabled : false;
-        })()
-        """);
+        // A save button being enabled only proves that this questionnaire can be
+        // submitted; it is not proof that the product's age-rating module is
+        // complete. Completion is assigned only by the summary-page branch above
+        // and by the final overview verifier.
+        obs.IsCompleted = false;
 
         return obs;
     }
@@ -57,6 +73,8 @@ public class AgeRatingsAdapter
     public ReconcilePlan PlanDiff(DesiredState desired, ObservedAgeRatings observed)
     {
         var plan = new ReconcilePlan { Phase = "ageRatings" };
+
+        if (observed.IsCompleted) return plan;
 
         if (observed.InputMode != "questionnaire")
         {
@@ -122,10 +140,10 @@ public class AgeRatingsAdapter
 
     private async Task SetAgeAnswerAsync(string questionId, string answerText)
     {
-        await _waiter.WaitUntilAsync(async () =>
+        await _waiter.RequireAsync(async () =>
         {
             return await _client.EvaluateAsync<bool>($"document.querySelector('[role=\"radiogroup\"][aria-labelledby=\"question#{questionId}\"]') !== null");
-        }, timeout: TimeSpan.FromSeconds(15), description: $"Wait for age rating question #{questionId}");
+        }, TimeSpan.FromSeconds(15), $"Wait for age rating question #{questionId}");
 
         var rect = await _client.EvaluateAsync<JsElementRect>($$"""
         (() => {
@@ -152,10 +170,19 @@ public class AgeRatingsAdapter
             await _input.ClickCoordinatesAsync(rect.X, rect.Y, $"Age question #{questionId} -> {answerText}");
             await Task.Delay(100);
         }
+        else
+        {
+            throw new InvalidOperationException($"Question #{questionId} exists but answer [{answerText}] has no unique visible radio target.");
+        }
     }
 
     public async Task VerifyAsync(DesiredState desired)
     {
+        await _waiter.ReloadAsync(ignoreCache: true);
+        var observed = await ObserveAsync();
+        var plan = PlanDiff(desired, observed);
+        if (plan.HasDifferences)
+            throw new InvalidOperationException($"Age ratings cold-load verification failed:\n{plan}");
         await _native.AssertNoVisibleErrorsAsync();
     }
 }

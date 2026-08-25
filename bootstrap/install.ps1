@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
+    [string]$RepoRoot = '',
     [string]$GitPath = ''
 )
 
@@ -9,7 +9,14 @@ $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
 $env:WINAPP_CLI_TELEMETRY_OPTOUT = '1'
 
-$manifestPath = Join-Path $PSScriptRoot 'toolchain.json'
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
+if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $RepoRoot = Split-Path -Parent $scriptDir
+}
+
+$manifestPath = Join-Path $scriptDir 'toolchain.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) {
     throw "Toolchain manifest is missing: $manifestPath"
 }
@@ -18,7 +25,7 @@ $toolchain = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $toolchainVersion = $toolchain.release
 $cacheRoot = Join-Path $env:LOCALAPPDATA "Vainreef\QuickAppMaker\cache\$toolchainVersion"
 $logsRoot = Join-Path $cacheRoot 'logs'
-$workersRoot = Join-Path $PSScriptRoot 'workers'
+$workersRoot = Join-Path $scriptDir 'workers'
 
 New-Item -ItemType Directory -Force -Path $cacheRoot, $logsRoot | Out-Null
 

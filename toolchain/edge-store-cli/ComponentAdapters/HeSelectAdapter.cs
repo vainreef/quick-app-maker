@@ -79,11 +79,11 @@ public class HeSelectAdapter
         }
 
         // 1b. Open dropdown and wait for aria-expanded === true
-        await _waiter.WaitUntilAsync(async () =>
+        await _waiter.RequireAsync(async () =>
         {
             string ready = await _client.EvaluateAsync<string>("document.readyState") ?? "";
             return ready == "complete";
-        }, timeout: TimeSpan.FromSeconds(10), description: $"Wait for document ready before opening [{label}]");
+        }, TimeSpan.FromSeconds(10), $"Wait for document ready before opening [{label}]");
 
         bool dropdownOpen = false;
         for (int attempt = 0; attempt < 4 && !dropdownOpen; attempt++)

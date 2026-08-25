@@ -10,6 +10,9 @@ public class DesiredState
     [JsonPropertyName("productName")]
     public string ProductName { get; set; } = string.Empty;
 
+    [JsonPropertyName("submissionId")]
+    public string SubmissionId { get; set; } = string.Empty;
+
     [JsonPropertyName("site")]
     public SiteConfig Site { get; set; } = new();
 
@@ -45,6 +48,9 @@ public class SiteConfig
 
     [JsonPropertyName("languageCode")]
     public string LanguageCode { get; set; } = "zh-cn";
+
+    [JsonPropertyName("supportedLanguageCodes")]
+    public List<string> SupportedLanguageCodes { get; set; } = [];
 }
 
 public class ValuesConfig
@@ -72,6 +78,9 @@ public class PropertiesConfig
 
     [JsonPropertyName("privacyPolicyText")]
     public string PrivacyPolicyText { get; set; } = string.Empty;
+
+    [JsonPropertyName("privacyPolicyUrl")]
+    public string PrivacyPolicyUrl { get; set; } = string.Empty;
 }
 
 public class PricingConfig

@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Vainreef.EdgeStore.Cdp;
+using Vainreef.EdgeStore.ComponentAdapters;
 using Vainreef.EdgeStore.Orchestration;
+using Vainreef.EdgeStore.PartnerCenter;
 using Vainreef.EdgeStore.State;
 
 namespace Vainreef.EdgeStore;
@@ -10,6 +12,8 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        Console.InputEncoding = System.Text.Encoding.UTF8;
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         string action = "run";
         string phase = "all";
         string manifestPath = "";
@@ -20,6 +24,8 @@ public class Program
         bool confirmSubmit = false;
         bool reloadVerify = true;
         bool keepOpen = false;
+
+        string appName = "";
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -43,7 +49,14 @@ public class Program
                     break;
                 case "--product-id":
                 case "-productid":
+                case "-id":
                     if (i + 1 < args.Length) productId = args[++i];
+                    break;
+                case "--app-name":
+                case "-appname":
+                case "-name":
+                case "-n":
+                    if (i + 1 < args.Length) appName = args[++i];
                     break;
                 case "--state-dir":
                 case "-statedir":
@@ -78,9 +91,33 @@ public class Program
             ? Path.GetFullPath(stateDir)
             : Path.Combine(toolRoot, "state");
 
+        // Status and stop do not require a manifest file
+        if (action is "status" or "stop")
+        {
+            var fallbackDesired = new DesiredState();
+            var fallbackCheckpoint = new StoreCheckpoint();
+            var statusOrchestrator = new StoreOrchestrator(fallbackDesired, stateRoot, fallbackCheckpoint, false, false, false);
+            if (action == "stop")
+            {
+                Console.WriteLine("[INFO] Stopping Edge session...");
+                statusOrchestrator.StopSession();
+                Console.WriteLine("[PASS] Stopped.");
+                return 0;
+            }
+            return await statusOrchestrator.PrintStatusAsync();
+        }
+
         if (string.IsNullOrWhiteSpace(manifestPath))
         {
             manifestPath = Path.Combine(toolRoot, "examples", "store-automation.json");
+            if (!File.Exists(manifestPath))
+            {
+                manifestPath = Path.Combine(appRoot, "examples", "store-automation.json");
+            }
+            if (!File.Exists(manifestPath))
+            {
+                manifestPath = Path.Combine(appRoot, "..", "..", "..", "examples", "store-automation.json");
+            }
         }
 
         if (!File.Exists(manifestPath))
@@ -112,6 +149,11 @@ public class Program
             desired.ProductId = productId;
         }
 
+        if (!string.IsNullOrWhiteSpace(appName))
+        {
+            desired.ProductName = appName;
+        }
+
         // Check if markdown listing file exists and load it
         if (!string.IsNullOrWhiteSpace(desired.ListingMarkdown))
         {
@@ -121,15 +163,28 @@ public class Program
 
             if (File.Exists(mdPath))
             {
-                ImportMarkdownListing(desired, mdPath);
+                ListingMarkdownImporter.Import(desired, mdPath);
+            }
+            else if (action is "preflight" or "run")
+            {
+                Console.WriteLine($"[ERROR] listingMarkdown was configured but not found: {mdPath}");
+                return 2;
+            }
+        }
+
+        if (action is "preflight" or "run")
+        {
+            var validationErrors = DesiredStateValidator.Validate(desired, strict: true);
+            if (validationErrors.Count > 0)
+            {
+                Console.WriteLine("[ERROR] Desired state is incomplete or contradictory:");
+                foreach (string error in validationErrors) Console.WriteLine("  - " + error);
+                return 2;
             }
         }
 
         Directory.CreateDirectory(stateRoot);
-        var checkpoint = new StoreCheckpoint
-        {
-            ProductId = desired.ProductId
-        };
+        var checkpoint = LoadCheckpoint(stateRoot, desired.ProductId);
 
         var orchestrator = new StoreOrchestrator(desired, stateRoot, checkpoint, apply, submit, confirmSubmit, reloadVerify, keepOpen);
 
@@ -150,10 +205,17 @@ public class Program
                     return 0;
 
                 case "status":
-                    Console.WriteLine("[INFO] Checking Edge Store session status...");
-                    var (livePid, livePort) = orchestrator.GetSessionInfo();
-                    Console.WriteLine($"PID: {livePid}, Port: {livePort}");
-                    return 0;
+                    return await orchestrator.PrintStatusAsync();
+
+                case "inspect":
+                    return await orchestrator.InspectAsync();
+
+                case "verify":
+                    return await orchestrator.VerifyAsync();
+
+                case "reserve":
+                case "identity":
+                    return await HandleReserveOrIdentityAsync(desired, manifestPath, baseDir, stateRoot, action == "reserve", appName);
 
                 case "stop":
                     Console.WriteLine("[INFO] Stopping Edge session...");
@@ -177,6 +239,130 @@ public class Program
         }
     }
 
+    private static async Task<int> HandleReserveOrIdentityAsync(DesiredState desired, string manifestPath, string baseDir, string stateRoot, bool isReserve, string appName)
+    {
+        var conn = await CdpConnection.StartOrReuseAsync(stateRoot);
+        string wsUrl = await conn.GetTargetWebSocketUrlAsync();
+
+        await using var client = new CdpClient();
+        await client.ConnectAsync(new Uri(wsUrl));
+
+        var waiter = new Waiter(client);
+        var dom = new DomDriver(client);
+        var ax = new AxLocator(client, dom);
+        var input = new InputDriver(client, ax);
+        var native = new NativeFormAdapter(client, input);
+        var prodManager = new ProductManager(client, waiter, native);
+
+        string effectiveAppName = !string.IsNullOrWhiteSpace(appName) ? appName : desired.ProductName;
+        if (string.IsNullOrWhiteSpace(effectiveAppName))
+        {
+            throw new InvalidOperationException("Product name must be provided via --app-name or in manifest productName.");
+        }
+
+        ProductIdentityResult result;
+        if (isReserve)
+        {
+            Console.WriteLine($"[INFO] Creating and reserving new product [{effectiveAppName}] in Partner Center...");
+            result = await prodManager.CreateAndReserveProductAsync(desired.Site.BaseUrl, effectiveAppName);
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(desired.ProductId) || desired.ProductId == "PENDING")
+            {
+                throw new InvalidOperationException("ProductId must be specified for identity scraping action.");
+            }
+            Console.WriteLine($"[INFO] Scraping Identity for product [{desired.ProductId}]...");
+            result = await prodManager.ScrapeIdentityAsync(desired.Site.BaseUrl, desired.ProductId);
+        }
+
+        // Backfill into Package.appxmanifest and manifest JSON
+        BackfillIdentity(baseDir, manifestPath, desired, result, effectiveAppName);
+        return 0;
+    }
+
+    private static void BackfillIdentity(string baseDir, string manifestPath, DesiredState desired, ProductIdentityResult result, string appName)
+    {
+        // 1. Update manifest JSON
+        try
+        {
+            desired.ProductId = result.ProductId;
+            desired.ProductName = appName;
+            string json = JsonSerializer.Serialize(desired, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(manifestPath, json);
+            Console.WriteLine($"[PASS] Updated store manifest: {manifestPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Failed to write manifest JSON: {ex.Message}");
+        }
+
+        // 2. Search and update Package.appxmanifest
+        try
+        {
+            var manifestFiles = Directory.GetFiles(baseDir, "Package.appxmanifest", SearchOption.AllDirectories)
+                .Concat(Directory.Exists(Path.Combine(baseDir, "..")) ? Directory.GetFiles(Path.Combine(baseDir, ".."), "Package.appxmanifest", SearchOption.AllDirectories) : [])
+                .Distinct()
+                .ToList();
+
+            foreach (var mf in manifestFiles)
+            {
+                string xml = File.ReadAllText(mf);
+                // Update Identity Name and Publisher
+                xml = Regex.Replace(xml, @"<Identity\s+Name=""[^""]*""\s+Publisher=""[^""]*""",
+                    $"<Identity Name=\"{result.IdentityName}\" Publisher=\"{result.Publisher}\"");
+                // Update DisplayName
+                xml = Regex.Replace(xml, @"<DisplayName>[^<]*</DisplayName>",
+                    $"<DisplayName>{appName}</DisplayName>");
+                xml = Regex.Replace(xml, @"DisplayName=""[^""]*""",
+                    $"DisplayName=\"{appName}\"");
+                // Update PublisherDisplayName
+                if (!string.IsNullOrWhiteSpace(result.PublisherDisplayName))
+                {
+                    xml = Regex.Replace(xml, @"<PublisherDisplayName>[^<]*</PublisherDisplayName>",
+                        $"<PublisherDisplayName>{result.PublisherDisplayName}</PublisherDisplayName>");
+                }
+                File.WriteAllText(mf, xml);
+                Console.WriteLine($"[PASS] Backfilled credentials into Package.appxmanifest: {mf}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Could not auto-backfill Package.appxmanifest: {ex.Message}");
+        }
+    }
+
+    private static StoreCheckpoint LoadCheckpoint(string stateRoot, string productId)
+    {
+        string path = Path.Combine(stateRoot, "checkpoint.json");
+        try
+        {
+            if (File.Exists(path))
+            {
+                var existing = JsonSerializer.Deserialize<StoreCheckpoint>(File.ReadAllText(path));
+                if (existing != null && string.Equals(existing.ProductId, productId, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (existing.SchemaVersion < 4)
+                    {
+                        // Old checkpoints called a phase converged after the adapter
+                        // returned, including dry-run and unverified saves. Preserve
+                        // only routing data; discard every legacy completion claim.
+                        existing.SchemaVersion = 4;
+                        existing.PhaseStatuses.Clear();
+                        existing.ConvergedPhases.Clear();
+                        existing.PhaseEvidence.Clear();
+                    }
+                    return existing;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Ignoring unreadable checkpoint: {ex.Message}");
+        }
+        return new StoreCheckpoint { ProductId = productId };
+    }
+
     private static void ResolvePaths(DesiredState state, string baseDir)
     {
         if (state.Assets == null) return;
@@ -197,40 +383,4 @@ public class Program
         return Path.GetFullPath(Path.Combine(baseDir, path));
     }
 
-    private static void ImportMarkdownListing(DesiredState state, string mdPath)
-    {
-        string text = File.ReadAllText(mdPath);
-
-        var shortDescMatch = Regex.Match(text, @"##\s*Short Description\s*\n+([\s\S]*?)(?=\n##|$)", RegexOptions.IgnoreCase);
-        if (shortDescMatch.Success && !string.IsNullOrWhiteSpace(shortDescMatch.Groups[1].Value))
-        {
-            state.Values.ShortDescription = shortDescMatch.Groups[1].Value.Trim();
-        }
-
-        var descMatch = Regex.Match(text, @"##\s*Description\s*\n+([\s\S]*?)(?=\n##|$)", RegexOptions.IgnoreCase);
-        if (descMatch.Success && !string.IsNullOrWhiteSpace(descMatch.Groups[1].Value))
-        {
-            state.Values.Description = descMatch.Groups[1].Value.Trim();
-        }
-
-        var featMatch = Regex.Match(text, @"##\s*Features\s*\n+([\s\S]*?)(?=\n##|$)", RegexOptions.IgnoreCase);
-        if (featMatch.Success)
-        {
-            var items = Regex.Matches(featMatch.Groups[1].Value, @"^[-*]\s*(.+)$", RegexOptions.Multiline)
-                             .Select(m => m.Groups[1].Value.Trim())
-                             .Where(s => !string.IsNullOrWhiteSpace(s))
-                             .ToList();
-            if (items.Count > 0) state.Values.Features = items;
-        }
-
-        var kwMatch = Regex.Match(text, @"##\s*Keywords\s*\n+([\s\S]*?)(?=\n##|$)", RegexOptions.IgnoreCase);
-        if (kwMatch.Success)
-        {
-            var items = Regex.Matches(kwMatch.Groups[1].Value, @"^[-*]\s*(.+)$", RegexOptions.Multiline)
-                             .Select(m => m.Groups[1].Value.Trim())
-                             .Where(s => !string.IsNullOrWhiteSpace(s))
-                             .ToList();
-            if (items.Count > 0) state.Values.Keywords = items;
-        }
-    }
 }

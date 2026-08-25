@@ -35,35 +35,30 @@
 
 ---
 
-## 阶段二：控制台建项与提取核心包身份
+## 阶段二：全自动建项与提取核心包身份 (Store -1)
 
-### 第 6 步：进入 Partner Center 控制台仪表板
-- **入口网址**：`https://partner.microsoft.com/zh-cn/dashboard/home`
-- 💡 **实测避坑点**：Partner Center 首页如果打开后一片空白（前端常见加载 Bug），点击左上角**三条线（汉堡菜单）→ 点击「应用和游戏」**即可正常加载控制台。
+本阶段由 Edge Store CLI 驱动全自动完成，**严禁向用户提出任何控制台操作要求或输出手动点击步骤**。Agent 只需执行命令：
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName "<应用名称>" -Manifest .\<app>\build\edge-store.json
+```
 
-### 第 7 步：创建新产品（保留应用名称）
-1. 在「应用和游戏 | 概述」页面，点击右上角 **「+ 新产品」** 下拉菜单；
-2. 选择第 1 项：**「MSIX 或 PWA 应用」**（`data-automation-id="create-new-Application"`）；
-3. 输入想要发布的应用名称（例如 `旧时光` 或 `OldTimes`），点击“检查可用性”；
-4. 确认名称可用后，点击 **「保留产品名称 (Reserve product name)」**；
-5. ⚠️ **规则提醒**：保留名称后应用处于草稿状态，**必须在 3 个月内提交至应用商店**，否则名称会自动失效释放。
-
-### 第 8 步：提取产品标识（Product Identity）回填工程
-进入该产品的「应用程序概述」页面：
-1. 展开左侧导航菜单 **「产品管理」→「产品标识 (Product Identity)」**；
-2. 页面会生成微软官方分配的专属核心凭据：
-   ```xml
-   Package/Identity/Name:         Vainreef.OldTimes (示例)
-   Package/Identity/Publisher:    CN=311E7A53-AF43-454B-821E-5554DC1F27F5 (示例)
-   Package/Properties/PublisherDisplayName: Vainreef (示例)
-   ```
-3. **Agent 核心动作**：Agent 将这 3 项参数准确回填至项目源码的 `Package.appxmanifest`，确保打包生成的 MSIX 拥有合法的商店官方身份。
+驱动内部 CDP 自动化执行标准（仅供驱动内部实现参考）：
+1. 自动导航至 Partner Center 控制台，在 DOM 定位 `+ 新产品` (`[data-automation-id="create-new-Application"]`)；
+2. 自动填入应用名称，触发 `检查可用性` 校验并断言通过；
+3. 自动点击 `保留产品名称 (Reserve product name)` 完成建项；
+4. 自动跳转至 `/identity` 提取 `Package/Identity/Name`、`Package/Identity/Publisher` 与 `PublisherDisplayName`；
+5. 自动将 3 项参数回填至项目源码 `Package.appxmanifest` 与 `edge-store.json`。
 
 ---
 
-## 阶段三：商店 6 大表单逐项填报指引（Agent 辅助填表核心）
+## 阶段三：商店 6 大表单全自动声明式填报 (Store 0~7)
 
-在产品的「应用程序概述」页点击 **「开始提交 (Start Submission)」**（概览页 DOM `a[name=princingAndAvailability]` 等链接会自动包含实时有效的 `submissionId`），依次走完以下 6 个表单模块：
+本阶段由 Edge Store CLI 编排器全自动执行，**严禁人工在网页中逐项填报**。Agent 只需执行：
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+```
+
+编排器将全自动根据 `edge-store.json` 声明式收敛以下 6 大表单模块：
 
 ---
 

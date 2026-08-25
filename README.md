@@ -1,5 +1,7 @@
 # Vainreef Quick App Maker
 
+> Agent 执行发布自动化前先读取 `AGENTS.md`、`docs/partner-center/Agent-运行契约.md` 和 `docs/partner-center/Edge-Store-可靠性重构.md`。`apps/Project/edge-store-cli-fast` 不是正式源码入口。
+
 > **让自然语言想法在 Windows 上全自动蜕变为真实的 WinUI 3 现代桌面应用，并直通 Microsoft Store 微软应用商店。**  
 > 一键自动化工具链准备 · 8层渐进式需求访谈 · 5大一次性写对黄金铁律 · 双窗口并行与名称前置验重 · 商店6大表单全套指引
 
@@ -105,10 +107,10 @@ quick-app-maker/
 │   ├── EdgeStore.Cli.csproj                 # C# .NET 10 控制台项目
 │   ├── Program.cs                           # 命令行入口与参数解析
 │   ├── Orchestration/                       # Store 0 ~ Store 7 全流程编排器
-│   ├── Cdp/                                 # CdpClient, DomDriver (pierce=true), AxLocator, Waiter
+│   ├── Cdp/                                 # CdpClient, shallow DomDriver/requestNode, PageInspector, Waiter
 │   ├── ComponentAdapters/                   # LitElement / Angular (HeSelect, HeCheckbox) 专属适配器
 │   ├── PartnerCenter/                       # 6 大提审表单业务适配器 (Observe/Diff/Apply/ReloadVerify)
-│   ├── State/                               # 强类型 DesiredState / 字段级 ObservedState / ReconcilePlan
+│   ├── Models/                              # 强类型 DesiredState / 字段级 ObservedState / ReconcilePlan / PageState
 │   ├── Validate-EdgeStoreCli.ps1             # 工程与配置预检
 │   ├── README.md                            # V2 架构文档、Store 0~7 流水线与退出码约定
 │   └── examples/store-automation.json       # 纯声明式 Desired State 配置文件样例
@@ -123,7 +125,9 @@ quick-app-maker/
 │       ├── 页面快照-年龄分级.html
 │       ├── 页面快照-程序包.html
 │       ├── 页面快照-Store一览-管理语言.html
-│       └── 页面快照-提交选项.html
+│       ├── 页面快照-提交选项.html
+│       ├── Agent-运行契约.md                  # Agent 每次执行必须遵守的发布运行规则
+│       └── Edge-Store-可靠性重构.md            # 40 类问题的根因与证据链设计
 └── apps/                                    # 💻 用户本地作品工作区 (已加入 .gitignore，绝不上传)
 ```
 
@@ -146,19 +150,24 @@ quick-app-maker/
 * **【铁律 4】严禁操作 `HKLM:` 注册表与 `Cert:\LocalMachine\`**：证书只导入 `CurrentUser\TrustedPeople`，彻底杜绝 UAC 管理员提权弹窗打扰用户。
 * **【铁律 5】国内 NuGet 还原极速源**：依赖还原强制指定国内 Azure CDN 源 `https://nuget.azure.cn/v3/index.json`。
 
-### 3. 【体验与协同支柱】双窗口并行与控制台名称前置验重
-* **窗口 1（构建主会话）**：需求确认后启动构建，输出一句轻量提示后**专心推进代码编写、MSIX 自包含打包与 `winapp ui` 自动化黑盒测试**，不混杂问答。
-* **窗口 2（独立咨询会话）**：利用 30 分钟构建空窗期，用户新开窗口提问“如何创建 Partner 账号 / 如何起名？”，Agent 读取本地 `partner-center-guide.md`，指导用户：
-  * 通过 Xbox 应用免验证码注册，开通免费个人开发者；
-  * **控制台名称前置验重**：在控制台点击 `+ 新产品 -> MSIX 或 PWA 应用`，输入名称点击 **「检查可用性」**。若重名当场换名，确认可用后立即预留，拿到 3 大 `Product Identity` 参数，**从源头杜绝下游重命名推倒重来**！
+### 3. 【体验与协同支柱】双轨并行与自动化建项验重
+* **构建主干**：需求确认后启动构建，专心推进代码编写、MSIX 自包含打包与 `winapp ui` 自动化黑盒测试。
+* **全新产品建项与验重**：发布全新应用时，通过 `Invoke-EdgeStore.ps1 -Action reserve -AppName "应用名称" -Manifest build/edge-store.json` 自动在控制台完成 `+ 新产品 -> MSIX 或 PWA -> 检查可用性 -> 保留产品名称 -> 自动提取 3 大 Identity 并回填 Package.appxmanifest`，0 次打扰用户。
 
-### 4. 【交付与发布支柱】声明式状态收敛 & Store 0~7 流水线
+### 4. 【交付与发布支柱】声明式状态收敛 & Store 全流程自动化流水线
 * **首版交付心智**：第一版安装到电脑后，Agent 热情邀请用户试用：“已装在电脑上，随时可以打开把玩，哪里不顺手随时告诉我，我们继续修改直到你满意为止”，**严禁首版主动推销上架**。
-* **声明式状态收敛**：当用户满意并提出上架时，启动 Store 0~7 标准流水线：
-  * **Store 0 静态质检**：解包检查 MSIX 的 DisplayName、Desktop-only 依赖、Logo/1080P 截图及 $\le 7$ 个关键词；
-  * **Store 1~3 动态发现与差异计算**：实时从概览页 DOM 读取当前有效 submissionId 与 6 大表单实时 href，比对 Desired State 与 Observed State；
-  * **Store 4~5 物理交互与 F5 刷新验证**：基于元素中心派发 CDP 原生鼠标事件（驱动 Angular `he-select` 等组件），保存后执行 F5 Reload 确保服务端持久化接收；
-  * **Store 6~7 概览总检与双确认提交**：确认 6 项均变绿勾后，经显式 `-Submit -ConfirmSubmit` 提交微软商店全球上线！
+* **声明式状态收敛标准执行流**：
+  * **场景 A：全新应用上架**：
+    1. 启动会话：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -KeepOpen`（用户完成首次登录）。
+    2. 自动建项验重：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName "应用名称" -Manifest build/edge-store.json`（自动建项、预留、提取 Identity 并回填清单）。
+    3. 重新打包：`winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix`
+    4. 离线质检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest build/edge-store.json`
+    5. 全自动收敛：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest build/edge-store.json -Apply -KeepOpen`
+    6. 显式提交：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest build/edge-store.json -Apply -Submit -ConfirmSubmit`
+  * **场景 B：已有应用更新 / 单表断点续跑**：
+    1. 快速探针：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action inspect -Manifest build/edge-store.json`
+    2. 单表执行：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase <properties/listing/packages> -Manifest build/edge-store.json -Apply -KeepOpen`
+    3. 全局核验：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action verify -Manifest build/edge-store.json`
 
 ---
 

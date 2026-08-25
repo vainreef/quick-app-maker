@@ -10,6 +10,11 @@ public class CdpClient : IAsyncDisposable
     private readonly ClientWebSocket _ws = new();
     private readonly ConcurrentDictionary<int, TaskCompletionSource<JsonDocument>> _pendingRequests = new();
     private readonly CancellationTokenSource _cts = new();
+    private readonly SemaphoreSlim _sendGate = new(1, 1);
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
     private Task? _receiveLoopTask;
     private int _nextId = 1;
 
@@ -17,6 +22,8 @@ public class CdpClient : IAsyncDisposable
 
     public async Task ConnectAsync(Uri webSocketUrl, CancellationToken cancellationToken = default)
     {
+        _ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(10);
+        _ws.Options.KeepAliveTimeout = TimeSpan.FromSeconds(10);
         await _ws.ConnectAsync(webSocketUrl, cancellationToken);
         _receiveLoopTask = Task.Run(ReceiveLoopAsync, _cts.Token);
 
@@ -45,12 +52,30 @@ public class CdpClient : IAsyncDisposable
             ["params"] = parameters ?? new { }
         };
 
-        string json = JsonSerializer.Serialize(requestObj);
-        byte[] bytes = Encoding.UTF8.GetBytes(json);
-        await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-
         var actualTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var timeoutCts = new CancellationTokenSource(actualTimeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, _cts.Token);
+
+        try
+        {
+            string json = JsonSerializer.Serialize(requestObj);
+            byte[] bytes = Encoding.UTF8.GetBytes(json);
+            await _sendGate.WaitAsync(linkedCts.Token);
+            try
+            {
+                await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, linkedCts.Token);
+            }
+            finally
+            {
+                _sendGate.Release();
+            }
+        }
+        catch
+        {
+            _pendingRequests.TryRemove(id, out _);
+            throw;
+        }
+
         using (timeoutCts.Token.Register(() => tcs.TrySetCanceled()))
         {
             try
@@ -90,7 +115,7 @@ public class CdpClient : IAsyncDisposable
             {
                 if (remoteObj.TryGetProperty("value", out var val))
                 {
-                    return val.Deserialize<T>();
+                    return val.Deserialize<T>(JsonOptions);
                 }
             }
         }
@@ -131,6 +156,7 @@ public class CdpClient : IAsyncDisposable
             {
                 kvp.Value.TrySetException(ex);
             }
+            _pendingRequests.Clear();
         }
     }
 
@@ -140,9 +166,10 @@ public class CdpClient : IAsyncDisposable
         var chunks = SplitJsonObjects(rawText);
         foreach (var chunk in chunks)
         {
+            JsonDocument? doc = null;
             try
             {
-                var doc = JsonDocument.Parse(chunk);
+                doc = JsonDocument.Parse(chunk);
                 if (doc.RootElement.TryGetProperty("id", out var idProp) && idProp.TryGetInt32(out int id))
                 {
                     if (_pendingRequests.TryRemove(id, out var tcs))
@@ -155,11 +182,19 @@ public class CdpClient : IAsyncDisposable
                         else
                         {
                             tcs.TrySetResult(doc);
+                            doc = null; // ownership transferred to the awaiting request
                         }
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CDP-PROTOCOL] Dropped malformed incoming frame: {ex.Message}");
+            }
+            finally
+            {
+                doc?.Dispose(); // event frames and late responses are not retained
+            }
         }
     }
 
@@ -234,6 +269,7 @@ public class CdpClient : IAsyncDisposable
             catch { }
         }
         _ws.Dispose();
+        _sendGate.Dispose();
         _cts.Dispose();
     }
 }

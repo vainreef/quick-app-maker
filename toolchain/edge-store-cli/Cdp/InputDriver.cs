@@ -24,13 +24,20 @@ public class InputDriver
 
     public async Task ClickCoordinatesAsync(double x, double y, string label = "")
     {
+        if (!double.IsFinite(x) || !double.IsFinite(y))
+            throw new InvalidOperationException($"Click coordinates for [{label}] are not finite: ({x},{y}).");
+
         int ix = (int)Math.Round(x);
         int iy = (int)Math.Round(y);
 
         if (ix <= 0 || iy <= 0)
         {
-            throw new InvalidOperationException($"Refusing to click invalid coordinates ({ix},{iy}) for [{label}] — element layout is not ready or coordinates are out of viewport.");
+            throw new InvalidOperationException($"Click geometry for [{label}] is invalid ({ix},{iy}). The locator returned an empty/unmapped rectangle; this is not a viewport diagnosis.");
         }
+
+        var viewport = await _client.EvaluateAsync<ViewportSize>("({ width: window.innerWidth, height: window.innerHeight })");
+        if (viewport == null || ix >= viewport.Width || iy >= viewport.Height)
+            throw new InvalidOperationException($"Click target [{label}] is outside the viewport: ({ix},{iy}), viewport={viewport?.Width ?? 0}x{viewport?.Height ?? 0}. The element must be scrolled and re-measured.");
 
         await _client.SendAsync("Input.dispatchMouseEvent", new
         {
@@ -89,4 +96,10 @@ public class InputDriver
         });
         await Task.Delay(50);
     }
+}
+
+public sealed class ViewportSize
+{
+    public int Width { get; set; }
+    public int Height { get; set; }
 }
