@@ -33,6 +33,8 @@ public class HeSelectAdapter
 
     public async Task SetValueAsync(string hostSelector, string optionText, string label = "")
     {
+        Ops.Select(label, optionText);
+        Ops.Publish("EVAL", $"hostSelector={hostSelector}");
         string current = await ObserveValueAsync(hostSelector);
         if (string.Equals(current, optionText, StringComparison.OrdinalIgnoreCase))
         {
@@ -177,18 +179,18 @@ public class HeSelectAdapter
             throw new InvalidOperationException($"Dropdown [{label}] could not be opened after retries");
         }
 
-        // 2. Wait for option to become available in AXTree or DOM
+        // 2. Wait for option to become available in shadow DOM (options render inside he-select shadow root)
         ResolvedNode? optionNode = null;
         bool opened = await _waiter.WaitUntilAsync(async () =>
         {
-            optionNode = await _locator.FindByRoleAndNameAsync("option", optionText);
-            if (optionNode != null) return true;
-
             var jsOption = await _client.EvaluateAsync<JsElementRect>($$"""
             (async () => {
-              const target = {{JsonSerializer.Serialize(optionText)}}.toLowerCase();
-              const opts = Array.from(document.querySelectorAll('he-option, [role="option"]')).filter(e => {
-                const t = (e.innerText || e.getAttribute('label') || e.getAttribute('value') || '').toLowerCase();
+              const target = ({{JsonSerializer.Serialize(optionText)}}).toLowerCase().replace(/\s+/g, ' ');
+              const allRoots=[document];
+              for(let i=0;i<allRoots.length;i++){ try{ for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); }catch(_){} }
+              const deepAll=(s)=>{ const o=[],seen=new Set(); for(const r of allRoots){ try{ for(const e of r.querySelectorAll(s)) if(!seen.has(e)){ seen.add(e); o.push(e);} } catch(_){} } return o; };
+              const opts = deepAll('he-option,[role="option"],li[role="option"],[role="listbox"] [role="option"]').filter(e => {
+                const t = ((e.innerText || e.getAttribute('label') || e.getAttribute('value') || '')).replace(/\s+/g,' ').toLowerCase();
                 const r = e.getBoundingClientRect();
                 return t.includes(target) && r.width > 0 && r.height > 0;
               });

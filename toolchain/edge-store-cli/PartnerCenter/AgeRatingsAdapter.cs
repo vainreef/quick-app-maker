@@ -22,6 +22,17 @@ public class AgeRatingsAdapter
 
     public async Task<ObservedAgeRatings> ObserveAsync()
     {
+        // Wait until either the summary page (redirected, questionnaire done) or the
+        // edit questionnaire is on screen. The /ageratings URL redirects to
+        // /summary after completion, and that redirect can land AFTER a cold observe.
+        await _waiter.RequireAsync(async () =>
+        {
+            bool summary = await _client.EvaluateAsync<bool>("location.href ? location.href.indexOf('/ageratings/summary') >= 0 : false");
+            var hasMode = await _client.EvaluateAsync<bool>("document.querySelector('input[name=\"inputMode\"]') !== null");
+            return summary || hasMode;
+        }, TimeSpan.FromSeconds(45), "Wait for age ratings questionnaire or completed summary");
+
+        // Re-check for the summary page now that the redirect has settled.
         bool summary = await _client.EvaluateAsync<bool>("""
         (() => {
           const text=(document.body?.innerText||'');
@@ -38,12 +49,6 @@ public class AgeRatingsAdapter
                 IsCompleted = true
             };
         }
-
-        await _waiter.RequireAsync(async () =>
-        {
-            var hasMode = await _client.EvaluateAsync<bool>("document.querySelector('input[name=\"inputMode\"]') !== null");
-            return hasMode;
-        }, TimeSpan.FromSeconds(45), "Wait for age ratings questionnaire or completed summary");
 
         var obs = new ObservedAgeRatings();
 
@@ -84,6 +89,14 @@ public class AgeRatingsAdapter
         if (observed.ApplicationType != "2558")
         {
             plan.AddChange("ageRatings.applicationType", observed.ApplicationType, "2558", "Select All Other Application Types (2558)");
+        }
+
+        // The questionnaire is not complete until the answers are saved. Even when
+        // input mode / app type already match, force an apply so the 9 answers,
+        // terms and save run (ApplyChangesAsync is idempotent).
+        if (!plan.HasDifferences)
+        {
+            plan.AddChange("ageRatings.complete", "pending", "complete", "Complete IARC questionnaire answers");
         }
 
         return plan;
@@ -142,21 +155,20 @@ public class AgeRatingsAdapter
     {
         await _waiter.RequireAsync(async () =>
         {
-            return await _client.EvaluateAsync<bool>($"document.querySelector('[role=\"radiogroup\"][aria-labelledby=\"question#{questionId}\"]') !== null");
+            return await _client.EvaluateAsync<bool>($"document.querySelector('input[name=\"question#{questionId}\"]') !== null");
         }, TimeSpan.FromSeconds(15), $"Wait for age rating question #{questionId}");
 
         var rect = await _client.EvaluateAsync<JsElementRect>($$"""
         (() => {
-          const group = document.querySelector('[role="radiogroup"][aria-labelledby="question#{{questionId}}"]');
-          if (!group) return null;
           const target = {{JsonSerializer.Serialize(answerText)}};
-          const radios = Array.from(group.querySelectorAll('input[type="radio"]')).filter(e => {
-            const label = e.parentElement?.innerText || e.closest('label')?.innerText || '';
+          const radios = Array.from(document.querySelectorAll('input[type="radio"][name="question#{{questionId}}"]')).filter(e => {
+            const label = (e.closest('label')?.querySelector('.response-text')?.innerText || e.closest('label')?.innerText || e.value || '').replace(/\s+/g, '').trim();
             return label.includes(target) || e.value === target;
           });
           if (radios.length !== 1) return null;
           const e = radios[0];
-          const targetEl = (e.getBoundingClientRect().width <= 0) ? (e.closest('label') || e.parentElement) : e;
+          const targetEl = e.closest('label') || e;
+          targetEl.scrollIntoView({ block: 'center', behavior: 'instant' });
           const r = targetEl.getBoundingClientRect();
           if (r.width <= 0 || r.height <= 0) return null;
           const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -172,7 +184,19 @@ public class AgeRatingsAdapter
         }
         else
         {
-            throw new InvalidOperationException($"Question #{questionId} exists but answer [{answerText}] has no unique visible radio target.");
+            string diag = await _client.EvaluateAsync<string>($$"""
+            (() => {
+              const target = {{JsonSerializer.Serialize(answerText)}};
+              const radios = Array.from(document.querySelectorAll('input[type="radio"][name="question#{{questionId}}"]'));
+              const filtered = radios.filter(e => {
+                const label = (e.closest('label')?.querySelector('.response-text')?.innerText || e.closest('label')?.innerText || e.value || '').replace(/\s+/g, '').trim();
+                return label.includes(target) || e.value === target;
+              });
+              const details = radios.map(e => ({val:e.value, label:(e.closest('label')?.querySelector('.response-text')?.innerText||'').replace(/\s+/g,'').trim(), hit: ((e.closest('label')?.querySelector('.response-text')?.innerText||'').replace(/\s+/g,'').trim()).includes(target)}));
+              return JSON.stringify({target, count:radios.length, filteredCount:filtered.length, details});
+            })()
+            """) ?? "{}";
+            throw new InvalidOperationException($"Question #{questionId} exists but answer [{answerText}] has no unique visible radio target. Diag={diag}");
         }
     }
 

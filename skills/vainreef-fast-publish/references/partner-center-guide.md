@@ -86,8 +86,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
      - 主类别：根据应用性质选择（如：`生产率 Productivity` 或 `实用工具 + 工具 Utilities`）；
      - 子类别：选择对应的细分项；
   2. **隐私策略 (Privacy Policy)**：
-     - 第一个下拉框选择 **「否，我的产品不使用任何个人信息」**；
-     - 下方选择 **「提供隐私策略文本」**，直接在文本框填写应用自身的隐私声明文字（无需外部域名）；
+     - **推荐模式 A（纯离线应用/无用户数据收集，最快通过）**：
+       - 下拉框选择 **「否，我的产品不使用任何个人信息」**；
+       - ⚠️ **实测铁律**：选「否」时下方**绝不存在任何输入框或文本域**，切勿试图寻找或填写不存在的 textarea，直接保存即可。
+     - **模式 B（声明使用个人信息或需提供合规声明文本）**：
+       - 下拉框选择 **「是，我的产品使用个人信息」**；
+       - 下方单选框必须点击 **「提供隐私策略文本」**，此时页面会动态展开 `<textarea>`，填入本地隐私政策声明文本后，“保存”按钮才会高亮激活。
   3. **产品声明 (Product Declarations)**：
      - 勾选：`storage`（本地数据存储）、`windows`、`backups`（本地备份支持）；
      - ⚠️ **避坑警示**：若应用未接入端侧 AI 模型，**绝对不要勾选 `usesGenAI`**，防止被审核要求提供 AI 演示与合规证明；
@@ -101,25 +105,28 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 ### 表单 3：年龄分级 (Age Ratings)
 - **页面 URL**：`.../submissions/<submission-id>/ageratings`
 - **Agent 推荐填报标准**：
-  1. **调查表模式**：选择 **「我已准备好填写 IARC 调查表」**；
+  1. **调查表模式**：选择 **「我已准备好填写 IARC 调查表」**（或通用问卷模式）；
   2. **应用类型**：选择 **「其他所有应用类型 (All Other Application Types，value=2558)」**（切勿选游戏或社交通信类，避免冗余问卷）；
   3. **物理介质分发**：选择 **「否 (No)」**；
-  4. **后续 9 项敏感内容问卷**（暴力、粗俗言语、色情、恐怖、毒品、位置共享、用户交流、数字商品、新闻教育等）：**全部选择「否」**；
-  5. **保存与继续**：系统自动计算各分级机构评定后，**必须勾选 IARC 使用条款同意框**，点击 **「保存草稿」**，随后点击 **「继续」** 完成该模块。
+  4. **后续 9 项敏感内容问卷**（#1152-#1197，暴力、粗俗言语、色情、恐怖、毒品、位置共享、用户交流、数字商品、新闻教育等）：**全部选择「否」**；
+  5. **预览与条款**：点击 **「预览分级」** 进入 `/summary` 汇总页，**必须勾选 IARC 使用条款同意框**，点击 **「保存」** 完成该模块。
 
 ---
 
 ### 表单 4：程序包 (Packages)
 - **页面 URL**：`.../submissions/<submission-id>/packages`
 - **Agent 推荐填报标准**：
-  1. **构建商店包**：Agent 执行本地打包命令，生成合规的 `.msix` 发布包：
+  1. **构建商店包与资源质检**：Agent 执行本地打包，必须确保 `Assets/*.png`（StoreLogo、Square150x150 等）完整拷贝入发布目录：
      ```powershell
      dotnet publish -c Release -r win-x64 -o ./publish
+     # 确保 Assets 完整打包，避免 Partner Center 报图像缺失
+     if (Test-Path ./Assets) { Copy-Item -Recurse -Force ./Assets ./publish/ }
      New-Item -ItemType Directory -Force ./store-package | Out-Null
      winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
      ```
-  2. **上传程序包**：在 `#pkg_upload` 区域拖拽或选择生成的 `.msix` 文件；
-  3. **设备系列可用性 (Device family availability)**：
+  2. **上传程序包**：驱动通过 Shadow DOM 穿透自动绑定 `.msix` 文件；
+  3. **排障与保存铁律**：页面上**只能保留唯一一行状态为 `Validated` 的有效包**；若有历史残留的 `Analyzing` 或 `Error` 行，必须先点击 Delete / Cancel 清理干净；刷新页面（冷加载）确认 Save 按钮高亮后点击保存。
+  4. **设备系列可用性 (Device family availability)**：
      - 必须且仅勾选：**「Windows 10/11 Desktop」**（取消勾选 Mobile/Xbox/Team/MixedReality）；
      - 勾选：**「让 Microsoft 决定是否向未来的设备系列提供此应用」**；
   4. **避坑提示**：

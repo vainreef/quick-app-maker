@@ -302,9 +302,11 @@ Agent 根据当前 App 增加针对性测试。
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -KeepOpen
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName <AppName> -Manifest .\<app>\build\edge-store.json
    ```
-2. **构建商店发布包**：
+2. **构建商店发布包（含 Assets 图标资源质检）**：
    ```powershell
    dotnet publish -c Release -r win-x64 -o ./publish
+   # 确保 Assets 图标完整拷贝，杜绝 Partner Center 接受验证时报图像缺失错误
+   if (Test-Path ./Assets) { Copy-Item -Recurse -Force ./Assets ./publish/ }
    New-Item -ItemType Directory -Force ./store-package | Out-Null
    winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
    ```

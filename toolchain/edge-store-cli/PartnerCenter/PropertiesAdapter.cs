@@ -63,10 +63,10 @@ public class PropertiesAdapter
         """) ?? "";
         obs.HasPrivacyTextChoice = await _client.EvaluateAsync<bool>("document.querySelector('#privacyPolicyText') !== null");
 
-        obs.StorageDeclaration = await _checkbox.ObserveCheckedAsync("storage") ?? false;
-        obs.BackupsDeclaration = await _checkbox.ObserveCheckedAsync("backups") ?? false;
-        obs.WindowsDeclaration = await _checkbox.ObserveCheckedAsync("windows") ?? false;
-        obs.UsesGenAi = await _checkbox.ObserveCheckedAsync("usesGenAI") ?? false;
+        obs.StorageDeclaration = await _checkbox.ObserveCheckedAsync("storage-checkbox") ?? false;
+        obs.BackupsDeclaration = await _checkbox.ObserveCheckedAsync("backups-checkbox") ?? false;
+        obs.WindowsDeclaration = await _checkbox.ObserveCheckedAsync("windows-checkbox") ?? false;
+        obs.UsesGenAi = await _checkbox.ObserveCheckedAsync("usesGenAI-checkbox") ?? false;
 
         return obs;
     }
@@ -85,15 +85,16 @@ public class PropertiesAdapter
             plan.AddChange("properties.privacy", observed.PrivacyAnswer, desired.Properties.Privacy, $"Set privacy answer to {desired.Properties.Privacy}");
         }
 
-        if (desired.Properties.Privacy == "No" && observed.HasPrivacyTextChoice && !string.IsNullOrEmpty(desired.Properties.PrivacyPolicyText))
+        // Privacy policy text/URL fields ONLY exist when privacy answer is "Yes"
+        // (uses personal info). When "No", there is no extra field below and none
+        // may be touched.
+        if (desired.Properties.Privacy == "Yes")
         {
-            if (observed.PrivacyPolicyText.Trim() != desired.Properties.PrivacyPolicyText.Trim())
-            {
+            if (observed.HasPrivacyTextChoice && observed.PrivacyPolicyText.Trim() != desired.Properties.PrivacyPolicyText.Trim())
                 plan.AddChange("properties.privacyPolicyText", observed.PrivacyPolicyText.Length > 20 ? observed.PrivacyPolicyText[..20] + "..." : observed.PrivacyPolicyText, "...", "Update privacy policy text");
-            }
+            if (observed.PrivacyPolicyUrl.Trim() != desired.Properties.PrivacyPolicyUrl.Trim())
+                plan.AddChange("properties.privacyPolicyUrl", observed.PrivacyPolicyUrl, desired.Properties.PrivacyPolicyUrl, "Set privacy policy URL");
         }
-        if (desired.Properties.Privacy == "Yes" && observed.PrivacyPolicyUrl.Trim() != desired.Properties.PrivacyPolicyUrl.Trim())
-            plan.AddChange("properties.privacyPolicyUrl", observed.PrivacyPolicyUrl, desired.Properties.PrivacyPolicyUrl, "Set privacy policy URL");
 
         if (!observed.StorageDeclaration) plan.AddChange("properties.storage", false, true, "Check storage declaration");
         if (!observed.BackupsDeclaration) plan.AddChange("properties.backups", false, true, "Check backups declaration");
@@ -147,10 +148,10 @@ public class PropertiesAdapter
             await _native.SetFieldAsync(["input[type=\"url\"]", "#privacyPolicyUrl", "input[name*=\"privacyPolicyUrl\" i]"], desired.Properties.PrivacyPolicyUrl, "privacy policy URL");
         }
 
-        await _checkbox.SetCheckedAsync("storage", true, "storage declaration");
-        await _checkbox.SetCheckedAsync("backups", true, "backups declaration");
-        await _checkbox.SetCheckedAsync("windows", true, "windows declaration");
-        await _checkbox.SetCheckedAsync("usesGenAI", false, "usesGenAI declaration");
+        await _checkbox.SetCheckedAsync("storage-checkbox", true, "storage declaration");
+        await _checkbox.SetCheckedAsync("backups-checkbox", true, "backups declaration");
+        await _checkbox.SetCheckedAsync("windows-checkbox", true, "windows declaration");
+        await _checkbox.SetCheckedAsync("usesGenAI-checkbox", false, "usesGenAI declaration");
 
         // Save
         await _native.ClickStrictAsync([

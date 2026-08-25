@@ -30,20 +30,21 @@ public sealed class PageInspector
             return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden';
           };
           const has = s => deepAll(s).some(visible);
+          const hasAny = s => deepAll(s).length > 0;
           const url = location.href || '';
           const text = (document.body && document.body.innerText || '').replace(/\u00a0/g,' ').trim();
           const signals = {
             signIn: /login\.microsoftonline|login\.live\.com|signin/i.test(url),
-            shellOnly: text.length < 80 && !has('input,textarea,select,button,a[href*="/submissions/"]'),
+            shellOnly: text.length < 80 && !hasAny('input,textarea,select,button,a[href*="/submissions/"]'),
             submissionLinks: deepAll('a[href*="/submissions/"]').length >= 2,
-            availability: has('input[name="marketSelection"],#saveButtonPricing'),
-            properties: has('select[name="CategorySelect"],input[name="privacyPolicySelection"]'),
-            ageQuestionnaire: has('input[name="inputMode"],[name="question#1109"]'),
+            availability: hasAny('input[name="marketSelection"],#saveButtonPricing'),
+            properties: hasAny('select[name="CategorySelect"],input[name="privacyPolicySelection"]'),
+            ageQuestionnaire: hasAny('input[name="inputMode"],[name="question#1109"]'),
             ageSummary: /\/ageratings\/summary/i.test(url) || /分级\s*ID|当前分级|rating\s*id/i.test(text),
-            packages: /\/packages(?:[/?#]|$)/i.test(url) && (has('input[type="file"]') || /Validated|验证|程序包/i.test(text)),
-            listingGrid: has('submission-listing-summary,a[href*="listings?languageid="],he-data-grid'),
-            listingForm: has('#description-required,textarea[name="description"],button[name="save_button"]') && /\/listings/i.test(url),
-            options: /\/options(?:[/?#]|$)/i.test(url) && has('input#radioReleaseDate_manual,input#radioReleaseDate_asap,textarea'),
+            packages: /\/packages(?:[/?#]|$)/i.test(url) && (hasAny('input[type="file"]') || /Validated|验证|程序包/i.test(text)),
+            listingGrid: hasAny('submission-listing-summary,a[href*="listings?languageid="],he-data-grid'),
+            listingForm: hasAny('#description-required,textarea[name="description"],button[name="save_button"]') && /\/listings/i.test(url),
+            options: /\/options(?:[/?#]|$)/i.test(url) && hasAny('input#radioReleaseDate_manual,input#radioReleaseDate_asap,textarea'),
             modal: has('[role="dialog"],[aria-modal="true"]'),
             certification: /正在认证|in certification|certification in progress/i.test(text),
             fatal: has('.error-page,[data-automation-id="error-page"]') || /something went wrong|出现问题/i.test(text)

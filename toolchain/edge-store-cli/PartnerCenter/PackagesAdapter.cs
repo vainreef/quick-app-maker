@@ -72,13 +72,27 @@ public sealed class PackagesAdapter
         string fileName = Path.GetFileName(desired.Assets.Msix);
         if (plan.Actions.Any(a => a.Field == "packages.msix"))
         {
-            // Query the live control at the moment of use. Lit/Angular can replace
-            // or reorder file inputs after every render.
-            int? input = await _dom.RequestNodeByExpressionAsync("""
-            (() => Array.from(document.querySelectorAll('input[type="file"]')).find(e => !e.disabled) || null)()
-            """);
-            if (!input.HasValue) throw new InvalidOperationException("No live package file input is present.");
-            await _dom.SetFileInputFilesAsync(input.Value, [desired.Assets.Msix]);
+            // Query the live control at the moment of use. The upload input is a
+            // hidden native input (often inside a shadow component); resolve its
+            // objectId by shadow-piercing Runtime.evaluate and set files via
+            // objectId (DOM.requestNode can fail on these hidden/shadow inputs).
+            string? fileInputObj = null;
+            var inputDeadline = DateTime.UtcNow.AddSeconds(40);
+            while (DateTime.UtcNow < inputDeadline)
+            {
+                fileInputObj = await _dom.GetObjectIdByExpressionAsync("""
+                (() => {
+                  const roots=[document];
+                  for(let i=0;i<roots.length;i++){ try{ for(const e of roots[i].querySelectorAll('*')) if(e.shadowRoot) roots.push(e.shadowRoot); }catch(_){} }
+                  for(const r of roots){ const f=Array.from(r.querySelectorAll('input[type="file"]')).find(e => !e.disabled); if(f) return f; }
+                  return null;
+                })()
+                """);
+                if (!string.IsNullOrWhiteSpace(fileInputObj)) break;
+                await Task.Delay(1000);
+            }
+            if (string.IsNullOrWhiteSpace(fileInputObj)) throw new InvalidOperationException("No live package file input is present.");
+            await _dom.SetFileInputFilesByObjectIdAsync(fileInputObj, [desired.Assets.Msix]);
         }
 
         await _waiter.RequireAsync(async () =>

@@ -16,6 +16,7 @@ public class NativeFormAdapter
 
     public async Task SetFieldAsync(string[] selectors, string value, string label = "")
     {
+        Ops.Type(label.Length > 0 ? "field [" + label + "]" : $"field {string.Join(",", selectors)}", value);
         var result = await _client.EvaluateAsync<JsOperationResult>($$"""
         (() => {
           const selectors = {{JsonSerializer.Serialize(selectors)}};
@@ -25,8 +26,9 @@ public class NativeFormAdapter
             return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
           };
           let found = [], seen = new Set();
+          const qsa = s => { try { return Array.from(document.querySelectorAll(s)); } catch { return []; } };
           for (const selector of selectors) {
-            for (const e of document.querySelectorAll(selector)) {
+            for (const e of qsa(selector)) {
               if (visible(e) && !seen.has(e)) { seen.add(e); found.push(e); }
             }
           }
@@ -52,10 +54,12 @@ public class NativeFormAdapter
         {
             throw new InvalidOperationException($"Failed to set field [{label}]: {result?.Detail} (matched={result?.Count ?? 0})");
         }
+        Ops.Publish("TYPE-OK", $"field [{label}] = \"{value}\"");
     }
 
     public async Task SetRadioAsync(string selector, string label = "")
     {
+        Ops.Publish("EVAL", $"select radio [{label}] via {selector}");
         JsElementRect? rect = null;
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
@@ -99,6 +103,7 @@ public class NativeFormAdapter
 
     public async Task ClickStrictAsync(string[] selectors, string label = "")
     {
+        Ops.Click(label, string.Join(",", selectors));
         JsElementRect? rect = null;
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
@@ -111,8 +116,9 @@ public class NativeFormAdapter
                 const r = e.getBoundingClientRect(), s = getComputedStyle(e);
                 return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && !e.disabled;
               };
+              const qsa = s => { try { return Array.from(document.querySelectorAll(s)); } catch { return []; } };
               for (const selector of selectors) {
-                for (const e of document.querySelectorAll(selector)) {
+                for (const e of qsa(selector)) {
                   if (visible(e) && !seen.has(e)) {
                     seen.add(e);
                     found.push(e);
@@ -142,8 +148,54 @@ public class NativeFormAdapter
         await _input.ClickCoordinatesAsync(rect.X, rect.Y, label: $"Click [{label}]");
     }
 
+    public async Task ClickOptionByDeepTextAsync(string[] prefixTexts, string label = "")
+    {
+        Ops.Click(label, string.Join(",", prefixTexts));
+        JsElementRect? rect = null;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            rect = await _client.EvaluateAsync<JsElementRect>($$"""
+            (async () => {
+              const prefixes = {{JsonSerializer.Serialize(prefixTexts)}};
+              const allRoots=[document];
+              for(let i=0;i<allRoots.length;i++){
+                try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){}
+              }
+              const deepAll = (selector) => {
+                const out=[], seen=new Set();
+                for(const root of allRoots){
+                  try { for(const e of root.querySelectorAll(selector)) if(!seen.has(e)){ seen.add(e); out.push(e); } } catch(_){}
+                }
+                return out;
+              };
+              const visible = e => { const r=e.getBoundingClientRect(), s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && !e.disabled; };
+              const el = deepAll('button,he-button,a,[role="button"],li,div[role="option"],he-menu-item')
+                      .find(e => {
+                        if (!visible(e)) return false;
+                        const t = ((e.innerText||e.getAttribute('aria-label')||'') + ' ').trim().replace(/\s+/g,' ');
+                        return prefixes.some(p => t.startsWith(p));
+                      });
+              if (!el) return null;
+              el.scrollIntoView({ block: 'center', behavior: 'instant' });
+              await new Promise(res => setTimeout(res, 200));
+              const r = el.getBoundingClientRect();
+              if (r.width <= 0 || r.height <= 0) return null;
+              const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+              if (cx <= 0 || cy <= 0 || cx > window.innerWidth || cy > window.innerHeight) return null;
+              return { x: cx, y: cy, width: r.width, height: r.height };
+            })()
+            """);
+            if (rect != null) break;
+            await Task.Delay(300);
+        }
+        if (rect == null) throw new InvalidOperationException($"Cannot find single visible option for [{label}]");
+        await _input.ClickCoordinatesAsync(rect.X, rect.Y, label: $"Select [{label}]");
+    }
+
     public async Task ClickByTextAsync(string[] texts, string label = "")
     {
+        Ops.Click("by text [" + label + "]", string.Join(",", texts));
         var rect = await _client.EvaluateAsync<JsElementRect>($$"""
         (async () => {
           const wanted={{JsonSerializer.Serialize(texts)}}.map(x=>x.trim().toLowerCase());
@@ -165,6 +217,7 @@ public class NativeFormAdapter
 
     public async Task ClickDialogButtonAsync(string[] texts, string label = "")
     {
+        Ops.Click("dialog button [" + label + "]", string.Join(",", texts));
         var rect = await _client.EvaluateAsync<JsElementRect>($$"""
         (async () => {
           const wanted={{JsonSerializer.Serialize(texts)}}.map(x=>x.trim().toLowerCase());

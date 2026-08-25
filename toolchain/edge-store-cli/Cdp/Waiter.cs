@@ -18,12 +18,14 @@ public class Waiter
         var nextProgress = started.AddSeconds(5);
         Exception? firstException = null;
 
+        Ops.Wait(description);
         while (DateTime.UtcNow < deadline)
         {
             try
             {
                 if (await predicate())
                 {
+                    Ops.WaitOk(description);
                     return true;
                 }
             }
@@ -32,19 +34,20 @@ public class Waiter
                 if (firstException == null)
                 {
                     firstException = ex;
-                    Console.WriteLine($"[WAIT-ERR] {description}: {ex.Message}");
+                    Ops.Publish("WAIT-ERR", $"{description}: {ex.Message}");
                 }
             }
 
             if (DateTime.UtcNow >= nextProgress)
             {
-                Console.WriteLine($"[WAIT] {description}: {(DateTime.UtcNow - started).TotalSeconds:0}s/{actualTimeout.TotalSeconds:0}s");
+                Ops.Publish("WAIT", $"{description}: {(DateTime.UtcNow - started).TotalSeconds:0}s/{actualTimeout.TotalSeconds:0}s");
                 nextProgress = DateTime.UtcNow.AddSeconds(5);
             }
 
             await Task.Delay(actualInterval);
         }
 
+        Ops.Publish("WAIT-TIMEOUT", $"{description} did not become true within {actualTimeout.TotalSeconds:0}s.");
         return false;
     }
 
@@ -84,6 +87,7 @@ public class Waiter
 
     public async Task NavigateAsync(string url, string label = "", bool allowOverviewRedirect = false)
     {
+        Ops.Nav(url + (label.Length > 0 ? "  (" + label + ")" : ""));
         await _client.SendAsync("Page.navigate", new { url });
         string pathOnly = url.Split('?')[0];
         await RequireAsync(async () =>
@@ -97,7 +101,12 @@ public class Waiter
 
     public async Task ReloadAsync(bool ignoreCache = true)
     {
-        await _client.SendAsync("Page.reload", new { ignoreCache });
-        await Task.Delay(800);
+        // F5 (Page.reload) leaves the Partner Center SPA as a blank shell. Use a
+        // cold navigation to the current URL instead, which re-bootstraps the route
+        // and forces a fresh server read (real persistence proof).
+        string current = await _client.EvaluateAsync<string>("location.href") ?? "";
+        Ops.Publish("NAV", "cold reload -> " + current);
+        await _client.SendAsync("Page.navigate", new { url = current });
+        await Task.Delay(1500);
     }
 }

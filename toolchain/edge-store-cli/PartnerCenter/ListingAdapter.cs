@@ -322,10 +322,10 @@ public class ListingAdapter
             bool hasImage = await SectionHasImageAsync(up.Contexts, up.InputIndex);
             if (hasImage) continue;
 
-            int? inputNodeId = await GetFileInputNodeIdAsync(up.Contexts, up.InputIndex);
-            if (inputNodeId.HasValue)
+            string? inputObjId = await GetFileInputObjectIdAsync(up.Contexts, up.InputIndex);
+            if (!string.IsNullOrWhiteSpace(inputObjId))
             {
-                await _dom.SetFileInputFilesAsync(inputNodeId.Value, [up.Path]);
+                await _dom.SetFileInputFilesByObjectIdAsync(inputObjId, [up.Path]);
                 await _waiter.RequireAsync(() => SectionHasImageAsync(up.Contexts, up.InputIndex), TimeSpan.FromSeconds(90), $"Wait for {up.Key} preview");
             }
         }
@@ -335,8 +335,13 @@ public class ListingAdapter
     {
         return await _client.EvaluateAsync<bool>($$"""
         (() => {
+          const AllFileInputs = () => {
+            const roots=[document];
+            for(let i=0;i<roots.length;i++){ try{ for(const e of roots[i].querySelectorAll('*')) if(e.shadowRoot) roots.push(e.shadowRoot); }catch(_){} }
+            const out=[]; for(const r of roots){ out.push(...Array.from(r.querySelectorAll('input[type="file"]'))); } return out;
+          };
           const texts = {{JsonSerializer.Serialize(contexts)}}.map(x => x.toLowerCase());
-          const files = Array.from(document.querySelectorAll('input[type="file"]'));
+          const files = AllFileInputs();
           const candidates = {{inputIndex}} >= 0 ? [files[{{inputIndex}}]].filter(Boolean) : files;
           for (const input of candidates) {
             const card = input.closest('.listing-image-inner, .asset-card');
@@ -353,18 +358,23 @@ public class ListingAdapter
         """);
     }
 
-    private async Task<int?> GetFileInputNodeIdAsync(string[] contexts, int inputIndex)
+    private async Task<string?> GetFileInputObjectIdAsync(string[] contexts, int inputIndex)
     {
-        return await _dom.RequestNodeByExpressionAsync($$"""
+        return await _dom.GetObjectIdByExpressionAsync($$"""
         (() => {
+          const AllFileInputs = () => {
+            const roots=[document];
+            for(let i=0;i<roots.length;i++){ try{ for(const e of roots[i].querySelectorAll('*')) if(e.shadowRoot) roots.push(e.shadowRoot); }catch(_){} }
+            const out=[]; for(const r of roots){ out.push(...Array.from(r.querySelectorAll('input[type="file"]'))); } return out;
+          };
           const texts = {{JsonSerializer.Serialize(contexts)}}.map(x => x.toLowerCase());
-          const files = Array.from(document.querySelectorAll('input[type="file"]'));
+          const files = AllFileInputs();
           for (const e of files) {
             const card = e.closest('.listing-image-inner, .asset-card');
             let t = card ? (card.innerText || '') : '';
             if (!t) { let n = e; for (let k = 0; k < 12 && n; k++, n = n.parentElement) t += ' ' + (n.innerText || ''); }
             t = t.toLowerCase();
-            if (texts.some(x => t.includes(x))) return e;
+            if ({{inputIndex}} >= 0 || texts.some(x => t.includes(x))) return e;
           }
           return null;
         })()

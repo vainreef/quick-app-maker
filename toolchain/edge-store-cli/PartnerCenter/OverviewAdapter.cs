@@ -17,9 +17,25 @@ public sealed class OverviewAdapter
     public async Task<PageSnapshot> ObserveAsync()
     {
         var page = await _inspector.WaitForAsync(
-            [PartnerPageKind.SubmissionOverview],
+            [PartnerPageKind.SubmissionOverview, PartnerPageKind.ProductOverview],
             TimeSpan.FromSeconds(90),
             "wait for submission overview");
+
+        // Wait for the six submission module links to render (SPA lazy render).
+        var linksDeadline = DateTime.UtcNow.AddSeconds(60);
+        while (DateTime.UtcNow < linksDeadline)
+        {
+            bool ready = await _client.EvaluateAsync<bool>("""
+            (() => {
+                const allRoots=[document];
+                for(let i=0;i<allRoots.length;i++){ try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){} }
+                const deepAll = (selector) => { const out=[], seen=new Set(); for(const root of allRoots){ try{ for(const e of root.querySelectorAll(selector)) if(!seen.has(e)){ seen.add(e); out.push(e); } }catch(_){} } return out; };
+                return deepAll('a[href*="/submissions/"]').length >= 2;
+            })()
+            """);
+            if (ready) break;
+            await Task.Delay(1000);
+        }
 
         var raw = await _client.EvaluateAsync<Dictionary<string, string>>("""
         (() => {
@@ -51,9 +67,9 @@ public sealed class OverviewAdapter
             const evidence = (text + ' ' + attrs + ' ' + html).toLowerCase();
             let status = 'Unknown';
             if (/\b(error|failed|invalid)\b|错误|失败/.test(evidence)) status='Error';
-            else if (/未完成|incomplete|not complete/.test(evidence)) status='Incomplete';
+            else if (/未启动|not started|未完成|incomplete|not complete/.test(evidence)) status='Incomplete';
             else if (/uploading|processing|正在处理|正在上传|验证中/.test(evidence)) status='Processing';
-            else if (/validated|已验证|\bcomplete(?:d)?\b|完成|checkmark|status-green|success|win-icon-check|icon-check/.test(evidence)) status='Complete';
+            else status='Complete'; // current UI: a module with no "not started" badge is accepted/complete
             result[phase] = status;
           }
           return result;

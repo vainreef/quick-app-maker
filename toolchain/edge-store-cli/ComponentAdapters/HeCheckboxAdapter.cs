@@ -20,6 +20,7 @@ public sealed class HeCheckboxAdapter
 
     public async Task SetCheckedAsync(string textOrIdentifier, bool wantChecked, string label = "")
     {
+        Ops.Check(label, wantChecked);
         var probe = await ProbeAsync(textOrIdentifier, scroll: true)
             ?? throw new InvalidOperationException($"Checkbox [{label}] probe returned no result.");
         if (probe.Count == 0) return; // optional declaration is absent in this UI shape

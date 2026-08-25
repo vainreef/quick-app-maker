@@ -141,7 +141,7 @@ public sealed class StoreOrchestrator
             submissionId = result.SubmissionId;
         }
 
-        string overviewUrl = $"{_desired.Site.BaseUrl.TrimEnd('/')}/{_desired.ProductId}/submissions/{submissionId}/overview";
+        string overviewUrl = $"{_desired.Site.BaseUrl.TrimEnd('/')}/{_desired.ProductId}/overview";
         await waiter.NavigateAsync(overviewUrl, "Overview Verification");
         var overview = await overviewAdapter.ObserveAsync();
         Console.WriteLine(JsonSerializer.Serialize(overview, JsonIndented));
@@ -244,7 +244,11 @@ public sealed class StoreOrchestrator
         async Task<PageSnapshot> WaitPhaseStateAsync(string phase, string operation)
         {
             var page = await inspector.WaitForAsync(ExpectedKinds(phase), TimeSpan.FromSeconds(90), operation);
-            if (page.Kind == PartnerPageKind.SubmissionOverview)
+            // Only a real overview page counts as a "redirected to overview". During
+            // SPA load a phase URL (e.g. /availability) can be transiently classified
+            // as SubmissionOverview because of nav links; do not treat that as a
+            // redirect or the overview-verify will read modules from the wrong page.
+            if (page.Kind == PartnerPageKind.SubmissionOverview && page.Url.Contains("/overview"))
             {
                 var overview = await overviewAdapter.ObserveAsync();
                 if (overview.Modules.GetValueOrDefault(phase) != ModuleCompletion.Complete)

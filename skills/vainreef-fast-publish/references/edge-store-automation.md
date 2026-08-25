@@ -161,9 +161,21 @@ STORE 3: PLAN                    # 对比目标配置与当前表单状态生成
     ↓
 STORE 4: FORM RECONCILIATION     # 逐表执行 (HeSelect 语义点击 / 原生表单修改 / 保存)
     ↓
-STORE 5: RELOAD VERIFICATION     # 强制 F5 刷新页面二次读取，验证服务端真正持久化
+STORE 5: RELOAD VERIFICATION     # 显式 URL 导航冷加载页面二次读取，验证服务端真正持久化
     ↓
-STORE 6: SUBMISSION INTEGRITY    # 概览页确认 6 大模块均显示绿色已完成状态
+STORE 6: SUBMISSION INTEGRITY    # 概览页确认 6 大模块均达到 Complete 状态 (无未启动徽章)
     ↓
 STORE 7: EXPLICIT SUBMIT         # 必须显式传入 -Submit -ConfirmSubmit 触发终审
 ```
+
+---
+
+## 8. 原地急救与排障诊断动作 (Diagnostic Actions)
+
+当特定表单因网络波动、历史冲突包或微前端偶发异常受阻时，驱动提供了 7 大原地急救指令，避免盲目重跑全流程：
+
+- **`dumpdom`**：清洗并导出结构化控制台 DOM 快照（`dom-dump-LIVE.html`），快速排查控件选择器；
+- **`answerno`**：在当前年龄分级页原地选择 9 道“否”题并完成条款签署；
+- **`fixpackage` / `canceluploads`**：清理死锁的 `Analyzing` 上传行或冲突包，刷新后重新绑定文件；
+- **`fixprivacy`**：原地修复并保存属性页隐私策略；
+- **`filloptions`**：原地填写提交选项全信任说明并保存。

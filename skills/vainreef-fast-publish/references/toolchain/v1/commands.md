@@ -197,6 +197,53 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 - 现象: 硬编码 submissionId 导致 URL 404
 - Fix: 每次自动化运行均从产品概览页 DOM 动态探测最新有效 submissionId 与表单 href
 
+#### 54. dotnet publish 默认不拷贝 Assets 导致 MSIX 缺图验证失败
+- Environment: WinUI 3 打包与 Partner Center 上传
+- 现象: 商店接受验证报错：无法找到 appxManifest.xml 中指定的图像 Assets\StoreLogo.png
+- Root cause: Content 项在发布时默认不进入 publish 根目录
+- Fix: 打包前强制执行 `Copy-Item -Recurse -Force ./Assets ./publish/`
+
+#### 55. 概览页已通过模块无文字徽标，未完成模块显示「未启动」
+- Environment: 新版 Partner Center 应用程序概述
+- 现象: OverviewAdapter 一直寻找 Complete/完成 关键字，最终报 Unknown 死锁
+- Root cause: 新版已通过模块 `<app-module-status>` 主机为空；未完成模块显式包含 `<he-badge>未启动</he-badge>`
+- Fix: 无徽标即判定为 Complete；含「未启动」判定为 Incomplete
+
+#### 56. 属性页 Privacy = "No" 绝无隐私文本输入框
+- Environment: Partner Center 属性表单
+- 现象: 选“否”后尝试填写 `#privacyPolicyText` 抛异常
+- Root cause: 选“否”时页面根本不渲染文本框，只有选“是”并点击「提供隐私策略文本」单选框后才动态插入 textarea
+- Fix: Privacy = "No" 时严禁计划或填写任何文本框
+
+#### 57. 复选框禁止使用模糊文本包含匹配
+- Environment: Partner Center 属性与表单
+- 现象: `windows` 匹配到 6 个复选框导致歧义报错
+- Root cause: 页面存在多个包含 "windows" 文本的复选框
+- Fix: 优先采用 `name` 属性（如 `'windows-checkbox'`、`'storage-checkbox'`）精准定位
+
+#### 58. 文件上传 input 隐藏于 Shadow DOM 内
+- Environment: Partner Center 程序包与资产上传
+- 现象: 常规 querySelector 找不到 `input[type=file]`
+- Root cause: 文件输入控件被 Web Components 的 shadowRoot 深度封装且不可见
+- Fix: 使用 `Runtime.evaluate` 获取 `RemoteObjectId`，通过 `DOM.describeNode` + `DOM.setFileInputFiles` 绑定
+
+#### 59. 程序包多行冲突导致保存按钮被禁用
+- Environment: Partner Center 程序包表单
+- 现象: 上传后 Save 按钮长期处于 disabled=true，或处于 Analyzing 已暂停状态
+- Root cause: 存在历史残留的 Analyzing 或 Error 包行
+- Fix: 清理所有错误/重复行，仅保留唯一 Validated 行，并冷加载刷新页面使 Save 按钮激活
+
+#### 60. F5 刷新 (Page.reload) 导致 SPA 丢失路由变成空白壳
+- Environment: Partner Center 二次持久化验证
+- 现象: F5 后页面变成只有搜索框的空壳或跳转到登录骨架屏
+- Fix: 使用显式 URL 导航冷加载（`Page.navigate -> location.href`）
+
+#### 61. 声明式自动化变更需先更新 Desired State JSON
+- Environment: Agent 交互与 CLI 执行
+- 现象: 用户要求修改线上配置，但 Agent 直接运行 CLI 导致 0 差异空转退出
+- Root cause: CLI 依据本地 JSON 与页面比对，未修改 JSON 时差异为 0
+- Fix: 用户提出新需求时，必须首先修改本地 `edge-store.json` 文件再运行收敛
+
 ---
 
 ## 适用范围（对"大多数 Win11 电脑"的成立性）
@@ -215,3 +262,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 | 51 he-select 原生物理点击 | 是 | Angular 响应式表单机制 |
 | 52 JS 中文 Unicode 转义 | 是 | CDP 参数传递编码规则 |
 | 53 动态 Submission ID 发现 | 是 | Partner Center 草稿生命周期 |
+| 54 Assets 图标必须显式拷贝 | 是 | MSIX 静态资源规则 |
+| 55 概览页无徽标即完成 | 是 | Partner Center SPA 最新架构 |
+| 56 隐私 No/Yes 动态表单联动 | 是 | Partner Center 属性表单逻辑 |
+| 57 复选框 name 属性精准定位 | 是 | LitElement 控件规则 |
+| 58 Shadow DOM ObjectId 上传 | 是 | CDP Web Components 上传规范 |
+| 59 冲突包清理与冷刷新激活 | 是 | Partner Center 上传提审规则 |
+| 60 显式导航替代 F5 冷加载 | 是 | SPA 路由生命周期规则 |
+| 61 变更配置前置更新 JSON | 是 | 声明式状态收敛铁律 |

@@ -20,46 +20,52 @@ public class ProductManager
 
     public async Task<ProductIdentityResult> CreateAndReserveProductAsync(string baseUrl, string appName)
     {
-        string appsUrl = $"{baseUrl.TrimEnd('/')}/apps-and-games";
+        string appsUrl = Regex.Replace(baseUrl.TrimEnd('/'), @"/products$", "") + "/apps-and-games/overview";
         Console.WriteLine($"[INFO] Navigating to Partner Center Apps & Games dashboard: {appsUrl}");
         await _waiter.NavigateAsync(appsUrl, "Apps and Games Overview", allowOverviewRedirect: true);
 
         // Click '+ 新产品' -> 'MSIX 或 PWA 应用'
         Console.WriteLine("[INFO] Locating '+ 新产品' (Create New Application) menu...");
-        bool clickedNew = await _client.EvaluateAsync<bool>("""
-        (() => {
-            const btn = document.querySelector('[data-automation-id="create-new-Application"]') ||
-                        Array.from(document.querySelectorAll('button, he-button, a')).find(e => {
-                            const t = (e.innerText || '').trim();
-                            return t.includes('新建产品') || (t.includes('新产品') && t.length < 15);
+        bool clickedNew = false;
+        var clickDeadline = DateTime.UtcNow.AddSeconds(30);
+        while (!clickedNew && DateTime.UtcNow < clickDeadline)
+        {
+            clickedNew = await _client.EvaluateAsync<bool>("""
+            (() => {
+                const allRoots=[document];
+                for(let i=0;i<allRoots.length;i++){
+                  try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){}
+                }
+                const deepAll = (selector) => {
+                  const out=[], seen=new Set();
+                  for(const root of allRoots){
+                    try { for(const e of root.querySelectorAll(selector)) if(!seen.has(e)){ seen.add(e); out.push(e); } } catch(_){}
+                  }
+                  return out;
+                };
+                const visible = e => { const r=e.getBoundingClientRect(), s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden'; };
+                const btn = deepAll('[data-automation-id="create-new-Application"],[data-automation-id="create-new-application"],[uitestid="createNewApplicationButton"]')
+                        .concat(deepAll('button,he-button,a,[role="button"]'))
+                        .find(e => {
+                          if (!visible(e)) return false;
+                          const t = (((e.innerText||'') + ' ' + (e.getAttribute('aria-label')||'') + ' ' + (e.getAttribute('title')||''))).trim();
+                          return /新建产品|新产品/.test(t) && t.length < 25;
                         });
-            if (btn) {
-                btn.scrollIntoView({ block: 'center', inline: 'center' });
-                btn.click();
-                return true;
-            }
-            return false;
-        })()
-        """);
+                if (btn) { btn.scrollIntoView({ block: 'center', inline: 'center' }); btn.click(); return true; }
+                return false;
+            })()
+            """);
+            if (!clickedNew) await Task.Delay(700);
+        }
 
         if (!clickedNew)
         {
-            // Try expanding dropdown first if needed
-            await _native.ClickStrictAsync([
-                "button[data-automation-id=\"create-new-product\"]",
-                "he-button[data-automation-id=\"create-new-product\"]",
-                "button:has-text(\"+ 新产品\")",
-                "button:has-text(\"新产品\")"
-            ], "Open '+ 新产品' menu");
-            await Task.Delay(500);
-
-            await _native.ClickStrictAsync([
-                "[data-automation-id=\"create-new-Application\"]",
-                "button[data-automation-id=\"create-new-Application\"]",
-                "a[data-automation-id=\"create-new-Application\"]",
-                "a:has-text(\"MSIX 或 PWA\")"
-            ], "Select 'MSIX 或 PWA 应用'");
+            throw new InvalidOperationException("Could not locate and click the '+ 新产品' (Create New Application) button on the Apps & Games overview page.");
         }
+
+        // Choose 'MSIX 或 PWA 应用' from the type dropdown that opened
+        Console.WriteLine("[INFO] Selecting 'MSIX 或 PWA 应用' product type...");
+        await _native.ClickOptionByDeepTextAsync(["MSIX 或 PWA 应用"], "MSIX 或 PWA 应用");
 
         // Wait for product name text field
         Console.WriteLine($"[INFO] Entering product name [{appName}]...");
@@ -82,12 +88,7 @@ public class ProductManager
 
         // Click '检查可用性' (Check availability)
         Console.WriteLine("[INFO] Checking name availability...");
-        await _native.ClickStrictAsync([
-            "button[data-l10n-key=\"CheckAvailability\"]",
-            "button[uitestid=\"checkAvailabilityButton\"]",
-            "button:has-text(\"检查可用性\")",
-            "he-button:has-text(\"检查可用性\")"
-        ], "Check availability button");
+        await _native.ClickOptionByDeepTextAsync(["检查可用性"], "检查可用性");
 
         // Wait for availability confirmation text
         Console.WriteLine("[INFO] Waiting for availability confirmation...");
@@ -99,12 +100,7 @@ public class ProductManager
 
         // Click '保留产品名称' (Reserve product name)
         Console.WriteLine("[INFO] Clicking '保留产品名称' (Reserve product name)...");
-        await _native.ClickStrictAsync([
-            "button[data-l10n-key=\"ReserveName\"]",
-            "button[uitestid=\"reserveProductNameButton\"]",
-            "button:has-text(\"保留产品名称\")",
-            "he-button:has-text(\"保留产品名称\")"
-        ], "Reserve product name button");
+        await _native.ClickOptionByDeepTextAsync(["保留产品名称"], "保留产品名称");
 
         // Wait for navigation to overview / product management
         Console.WriteLine("[INFO] Waiting for product reservation to complete and overview page to load...");
@@ -134,25 +130,49 @@ public class ProductManager
         Console.WriteLine($"[INFO] Navigating to Product Identity page: {identityUrl}");
         await _waiter.NavigateAsync(identityUrl, "Product Identity Page");
 
-        // Wait for identity data rows to render
+        // Wait for identity rows AND for the value cells to render (values render slightly after the labels)
         await _waiter.RequireAsync(async () =>
         {
             string body = await _client.EvaluateAsync<string>("document.body ? document.body.innerText : ''") ?? "";
             return (body.Contains("Package/Identity/Name") || body.Contains("Package/Identity/Publisher")) &&
                    !body.Contains("Skip to main content\n\n");
-        }, TimeSpan.FromSeconds(30), "Wait for Identity table values to load");
+        }, TimeSpan.FromSeconds(30), "Wait for Identity table labels to load");
+
+        {
+            var idDeadline = DateTime.UtcNow.AddSeconds(45);
+            while (DateTime.UtcNow < idDeadline)
+            {
+                bool hasValue = await _client.EvaluateAsync<bool>("""
+                (() => {
+                    const rows = Array.from(document.querySelectorAll('table.app-identity tr'));
+                    for (const r of rows) {
+                        const tds = Array.from(r.children).filter(c => c.tagName === 'TD');
+                        if (tds.length >= 2) {
+                            const val = (tds[tds.length-1].innerText || '').trim();
+                            if (val) return true;
+                        }
+                    }
+                    return false;
+                })()
+                """);
+                if (hasValue) break;
+                await Task.Delay(1200);
+            }
+        }
 
         var result = await _client.EvaluateAsync<ProductIdentityResult>("""
         (() => {
             function getValByLabel(label) {
-                const trs = Array.from(document.querySelectorAll('tr, .row, [role="row"], div.field'));
+                const trs = Array.from(document.querySelectorAll('tr'));
                 for (const tr of trs) {
-                    const t = tr.innerText || '';
-                    if (t.includes(label)) {
-                        const code = tr.querySelector('code, .value, td:last-child, span.selectable');
-                        if (code) return (code.innerText || '').trim();
-                        const parts = t.split(/[:\t\n]+/).map(s => s.trim()).filter(Boolean);
-                        if (parts.length >= 2) return parts[parts.length - 1];
+                    const tds = Array.from(tr.children).filter(c => c.tagName === 'TD');
+                    if (tds.length >= 2) {
+                        const lab = (tds[0].innerText || '').trim();
+                        if (!lab) continue;
+                        const normalized = lab.replace(/\s+/g, ' ').trim();
+                        if (normalized === label || normalized.endsWith(label)) {
+                            return (tds[tds.length - 1].innerText || '').trim();
+                        }
                     }
                 }
                 return '';
@@ -165,11 +185,10 @@ public class ProductManager
                 productId: pid,
                 identityName: getValByLabel('Package/Identity/Name'),
                 publisher: getValByLabel('Package/Identity/Publisher'),
-                publisherDisplayName: getValByLabel('PublisherDisplayName') || getValByLabel('Package/Properties/PublisherDisplayName')
+                publisherDisplayName: getValByLabel('Package/Properties/PublisherDisplayName') || getValByLabel('PublisherDisplayName')
             };
         })()
         """);
-
         if (result == null || string.IsNullOrWhiteSpace(result.IdentityName) || string.IsNullOrWhiteSpace(result.Publisher))
         {
             throw new InvalidOperationException("Failed to scrape Product Identity credentials from Partner Center.");

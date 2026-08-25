@@ -24,6 +24,7 @@ public class InputDriver
 
     public async Task ClickCoordinatesAsync(double x, double y, string label = "")
     {
+        Ops.Click(label, $"coords=({x:0},{y:0})");
         if (!double.IsFinite(x) || !double.IsFinite(y))
             throw new InvalidOperationException($"Click coordinates for [{label}] are not finite: ({x},{y}).");
 
@@ -70,12 +71,14 @@ public class InputDriver
 
     public async Task InsertTextAsync(string text)
     {
+        Ops.Publish("TYPE", "input.insertText: " + text);
         await _client.SendAsync("Input.insertText", new { text });
         await Task.Delay(50);
     }
 
     public async Task PressKeyAsync(string key, string code = "Enter", int virtualKeyCode = 13)
     {
+        Ops.Publish("KEY", $"key '{key}' ({code})");
         await _client.SendAsync("Input.dispatchKeyEvent", new
         {
             type = "keyDown",

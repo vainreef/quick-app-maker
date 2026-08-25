@@ -112,6 +112,27 @@ public class DomDriver
             files = files.Select(Path.GetFullPath).ToArray()
         });
     }
+
+    public async Task<string?> GetObjectIdByExpressionAsync(string expression)
+    {
+        var response = await _client.SendAsync("Runtime.evaluate", new
+        {
+            expression,
+            returnByValue = false,
+            awaitPromise = true
+        });
+        var remote = response.RootElement.GetProperty("result").GetProperty("result");
+        return remote.TryGetProperty("objectId", out var objectId) ? objectId.GetString() : null;
+    }
+
+    public async Task SetFileInputFilesByObjectIdAsync(string objectId, string[] files)
+    {
+        await _client.SendAsync("DOM.setFileInputFiles", new
+        {
+            objectId,
+            files = files.Select(Path.GetFullPath).ToArray()
+        });
+    }
 }
 
 public record BoxModel(double CenterX, double CenterY, int Width, int Height);

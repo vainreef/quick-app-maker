@@ -100,6 +100,7 @@ Unknown 也不通过。缺少完成证据和明确失败同样会阻止 checkpoi
 | 业务规则 | 14、15、16、20、21、22 | 条件校验、双语 Markdown、正向非空、supportedLanguageCodes |
 | CLI/流程 | 30、31、32、33、34、35、36、39 | inspect/status、参数兼容、单表直达、preflight 独立、一次进程、提交固定三步 |
 | 编码/诊断 | 28、2、27 | C#/PowerShell UTF-8、WAIT 心跳、首个谓词异常、checkpoint evidence |
+| 实战进阶 | 41、42、43、44、45 | Overview 无 badge 即完成判定、Privacy=No 免文本框联动、Shadow DOM ObjectId 文件绑定、MSIX Assets 拷贝前置质检、7 大原地急救诊断动作 (dumpdom/answerno/fixpackage/canceluploads) |
 
 ## 命令语义
 
@@ -107,6 +108,9 @@ Unknown 也不通过。缺少完成证据和明确失败同样会阻止 checkpoi
 - `launch`：启动/复用隔离浏览器并等待登录。
 - `inspect`：只读当前页面，不导航。
 - `status`：会话、checkpoint、当前页面状态。
+- `dumpdom`：清洗并导出结构化控制台 DOM 快照（`dom-dump-LIVE.html`），剥离无用标签，保留控件与状态。
+- `answerno`：原地秒选 9 道年龄分级题、勾选条款并保存（不刷新不跳转）。
+- `fixpackage` / `canceluploads`：清理死锁/冲突包并重新上传/激活保存按钮。
 - `run -Phase X`：只执行 X；有 checkpoint submissionId 时直接进入该表。
 - `run -Phase all`：明确执行六表；不再被描述成登录检查。
 - 不带 `-Apply` 发现差异返回 4，不写完成。
