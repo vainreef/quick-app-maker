@@ -282,5 +282,4 @@ Write-Host "WinAppCLI: $winAppVersion"
 Write-Host "WinUI template: $templateVersion"
 Write-Host "WORKSPACE_ROOT: $workspaceRoot"
 Write-Host "NOTE: 所有 App 项目、.cache/ 工具缓存与临时文件均放置于当前工作目录，严禁写入系统临时目录。"
-Write-Host '仓库目录只读：不修改仓库内容，不 git add/commit/push'
 Write-Host 'NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery'

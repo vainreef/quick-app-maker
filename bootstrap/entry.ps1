@@ -115,7 +115,6 @@ Write-Step "Repository ready: $head"
 Write-Step "Git executable: $git"
 Write-Step "Workspace root: $workspaceRoot"
 Write-Step "NOTE: 所有 App 项目、.cache/ 工具缓存与临时文件均放置于当前工作目录。"
-Write-Step "仓库目录只读：不修改仓库内容，不 git add/commit/push"
 
 $installerScript = Join-Path $Destination 'bootstrap\install.ps1'
 if (-not (Test-Path -LiteralPath $installerScript)) {

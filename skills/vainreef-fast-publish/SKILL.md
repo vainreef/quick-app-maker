@@ -50,17 +50,15 @@ Bootstrap 当前准备：
 
 ```text
 Agent 工作根目录（就是仓库 clone 所在的父目录）
-├── quick-app-maker/     ← clone 下来的仓库：只读 skill，Agent 不改、不 commit、不 push
+├── quick-app-maker/     ← 核心工具链与 Skill 知识库
 ├── <app-slug>/          ← 每个 App 的项目目录（与仓库同级！）
 ├── 其他 app/
 └── 临时测试、下载、脚本等   ← 也放这里
 ```
 
 1. **所有文件读写与命令操作绝对限定在 Agent 工作根目录（WORKSPACE_ROOT）内**：新项目、README、临时测试、安装包、脚本、工具缓存（`.cache/`），全部必须在当前工作目录下新建文件夹或文件进行读写。**绝对禁止往系统临时目录（`$env:TEMP`、`/tmp`）、系统应用数据目录（`%LOCALAPPDATA%`）、系统盘根目录（`C:\temp`）或用户根目录（`C:\Users\<user>\...`）读写任何文件**——这会当场触发沙箱安全确认拦截或权限弹窗打断用户！
-2. **仓库目录只读（含行尾符保护）**：clone 下来的 `quick-app-maker/` 对 Agent 是 skill 参考，**不修改其内容、不 git add/commit/push**。修改仓库内容由外部主控（Mac 端）负责。**读取仓库文件时禁止用会改写行尾符（CRLF/LF）或加 BOM 的编辑器/命令**——实测多次因读取动作把仓库文件从 LF 改成 CRLF，`git status` 出现大量假 modified。发现行尾符噪音时：`git -C <repo> checkout -- .` 还原即可，不要手动"修复"。
-3. **禁止任何 git 推送**：Agent 不需要、也没有权限 push。git 操作最多是 `git pull` 获取最新 skill 知识；push/commit 一律不做（需要凭据，会弹窗打断用户）。
-4. **验证数据落盘不要直接读打包应用的 LocalState**：`C:\Users\<user>\AppData\Local\Packages\<PFN>\LocalState\` 在 Agent 工作根目录之外且受 MSIX 保护，直接 `Get-Content` 会触发权限确认框（实测第四轮踩过）。**正确做法**：用 `winapp ui search` 查 UI 是否显示新数据；或让应用把状态日志写到工作根目录内（如 `<app-slug>/logs/`）；或通过应用自身导出/打印。任何需要读 `C:\Users\...` 路径的操作先想替代方案，不要直接读。
-5. 工作根目录的判定：`quick-app-maker` 仓库目录的父目录即是工作根目录。
+2. **验证数据落盘不要直接读打包应用的 LocalState**：`C:\Users\<user>\AppData\Local\Packages\<PFN>\LocalState\` 在 Agent 工作根目录之外且受 MSIX 保护，直接 `Get-Content` 会触发权限确认框（实测第四轮踩过）。**正确做法**：用 `winapp ui search` 查 UI 是否显示新数据；或让应用把状态日志写到工作根目录内（如 `<app-slug>/logs/`）；或通过应用自身导出/打印。任何需要读 `C:\Users\...` 路径的操作先想替代方案，不要直接读。
+3. **工作根目录的判定**：`quick-app-maker` 仓库目录的父目录（或执行脚本时的当前工作目录）即是工作根目录。严禁跨出此目录读写任何外部文件。
 
 ## 1. Discover the app
 
@@ -111,7 +109,7 @@ docs/windows-smoke-test.md
 - 命令参数、退出码、日志位置和实测坑点读取 `commands.md`。
 - 标记为“待实测”的命令先在当前 Windows 环境运行，以真实输出为准。
 - 实测发现新的稳定规律时，补充命令、环境、错误原文和解决步骤。
-- **每轮开始前先 `git pull --ff-only`** 获取最新 skill 知识（只读操作，允许）；若 `commands.md` 有外部主控刚合并的新内容，以仓库为准。
+- **每轮开始前先 `git pull --ff-only`** 获取最新 skill 知识；若 `commands.md` 有新内容，以仓库为准。
 
 ## 3. Create the project
 
@@ -335,25 +333,19 @@ Agent 根据当前 App 增加针对性测试。
 - 新发现的 Windows 坑点及复现条件。
 - Store 人工确认项。
 
-## 12. Record findings locally（Agent 只记录，不 push）
+## 12. Record findings and update knowledge base
 
-**Agent 不做任何 git 写操作**（add/commit/push 全部禁止，需要凭据会弹窗打断用户，且仓库是只读 skill）。
-
-每轮结束后，Agent 在**工作根目录**里写一份本轮技术记录：
+每轮结束后，Agent 在**工作根目录**里记录本轮技术经验（包括新发现的 Windows 坑点、新验证可行的命令与退出码），并可直接同步更新知识库：
 
 ```text
 <工作根目录>/round-notes/round-N.md
 ```
 
-内容包括（只写**通用技术经验**，不写具体 App 名/源码/会话内容）：
+内容包括：
 
 - 新发现的 Windows 坑点（按 commands.md 的格式：Environment / Command / Error text / Root cause / Fix / Retest result）。
 - 新验证可行的命令、参数组合和退出码。
-- 设计/流程层面的教训。
-
-**修改仓库文档（commands.md / SKILL.md / windows-smoke-test.md）由外部主控负责**：主控会读取 `round-notes/` 和会话日志，把通用经验合并进仓库文档并推送。Agent 不要自己改仓库内容，也不要 commit/push。
-
-两轮实测教训：实机经验此前要么没记录、要么直接改仓库却因无凭据 push 失败（弹窗打断用户）。正确路径：Agent 记录到 `round-notes/`，主控合并回仓库。
+- 设计/流程层面的教训与经验沉淀。
 
 ## References
 

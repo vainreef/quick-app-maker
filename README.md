@@ -69,7 +69,6 @@ NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery
 ```
 
 * **工作目录铁律（绝对红线）**：严禁往任何系统目录、用户全局目录或系统临时目录（如 `$env:TEMP`、`%LOCALAPPDATA%`、`C:\Users\...`、`C:\temp`）写入或读取任何文件！所有新项目目录 `<app-slug>/`、`README.md`、临时测试、工具缓存（`.cache/`）、安装包必须全部放在当前工作目录（`WORKSPACE_ROOT`）内。
-* **仓库只读保护**：`quick-app-maker/` 是只读 Skill 知识库，**Agent 禁止任何 git add/commit/push 操作**。
 
 ### 第三步：开工前更新知识库并进入需求访谈
 ```powershell
