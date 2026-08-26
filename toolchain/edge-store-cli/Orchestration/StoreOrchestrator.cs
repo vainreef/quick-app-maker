@@ -197,16 +197,12 @@ public sealed class StoreOrchestrator
         var hrefs = new Dictionary<string, string>();
         if (string.IsNullOrWhiteSpace(submissionId)) submissionId = _desired.SubmissionId;
 
-        // Full runs discover once. Targeted runs use the persisted ID and go
-        // directly to their phase; discovery is a fallback only when no ID exists.
-        if (targetPhase == "all" || string.IsNullOrWhiteSpace(submissionId))
-        {
-            Log("INFO", "Discovering the active submission once...");
-            var discovery = new SubmissionDiscovery(client, waiter, native);
-            var result = await discovery.DiscoverAsync(_desired.Site.BaseUrl, _desired.ProductId, autoCreateIfMissing: _apply);
-            submissionId = result.SubmissionId;
-            hrefs = result.Hrefs;
-        }
+        // Always discover active submission and live hrefs to avoid stale URLs or navigation drift
+        Log("INFO", "Discovering active submission and live module routes...");
+        var discovery = new SubmissionDiscovery(client, waiter, native);
+        var result = await discovery.DiscoverAsync(_desired.Site.BaseUrl, _desired.ProductId, autoCreateIfMissing: _apply);
+        submissionId = result.SubmissionId;
+        hrefs = result.Hrefs;
         if (string.IsNullOrWhiteSpace(submissionId)) throw new InvalidOperationException("No active submission ID was found.");
         _checkpoint.SubmissionId = submissionId;
         SaveCheckpoint();
@@ -221,7 +217,7 @@ public sealed class StoreOrchestrator
                 "properties" => root + "/properties",
                 "ageRatings" => root + "/ageratings",
                 "packages" => root + "/packages",
-                "listing" => root + "/listings",
+                "listing" => root + "/managelanguages?producttype=app",
                 "options" => root + "/options",
                 _ => $"{b}/{_desired.ProductId}/overview"
             };

@@ -169,6 +169,15 @@ public class Program
                 case "dumpdom":
                     return await DomDumpCommand.ExecuteAsync(stateRoot, baseDir);
 
+                case "probelanguages":
+                    return await ProbeLanguagesCommand.ExecuteAsync(stateRoot);
+
+                case "cleanlanguages":
+                    return await LanguageGridCleanerCommand.ExecuteAsync(desired, stateRoot);
+
+                case "filllisting":
+                    return await FillListingCommand.ExecuteAsync(desired, stateRoot);
+
                 case "cleanpackages":
                     return await PackageCleanerCommand.ExecuteAsync(desired, stateRoot);
 

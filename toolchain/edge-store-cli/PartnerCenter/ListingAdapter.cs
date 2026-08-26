@@ -25,7 +25,7 @@ public class ListingAdapter
 
     public async Task EnterLanguageFormAsync(DesiredState desired, bool applyLanguageChanges)
     {
-        bool form = await _client.EvaluateAsync<bool>("document.querySelector('#description-required') !== null");
+        bool form = await _client.EvaluateAsync<bool>("document.querySelector('#description-required, textarea#description, textarea[name=\"description\"], #shortDescription') !== null");
         if (form) return;
 
         _languageGridCodes = await ReadLanguageGridCodesAsync();
@@ -37,9 +37,11 @@ public class ListingAdapter
         string languageCode = desired.Site.LanguageCode;
         string? href = await _client.EvaluateAsync<string?>($$"""
         (() => {
-          const links=Array.from(document.querySelectorAll('a[href*="listings"]'));
-          const a=links.find(x=>(x.href||'').includes('languageid={{languageId}}')) ||
-                  links.find(x=>(x.href||'').toLowerCase().includes('languagecode={{languageCode.ToLowerInvariant()}}'));
+          const links = Array.from(document.querySelectorAll('a[href*="listings"], a[href*="managelanguages"], a[href*="languagecode="], a[href*="languageid="]'));
+          const a = links.find(x => (x.href||'').includes('languageid={{languageId}}')) ||
+                    links.find(x => (x.href||'').toLowerCase().includes('languagecode={{languageCode.ToLowerInvariant()}}')) ||
+                    links.find(x => (x.innerText||'').includes('中文') || (x.innerText||'').includes('Chinese') || (x.innerText||'').includes('English')) ||
+                    links.find(x => (x.href||'').includes('/listings/'));
           return a?.href || null;
         })()
         """);

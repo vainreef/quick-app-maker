@@ -59,10 +59,10 @@ toolchain/edge-store-cli/EdgeStore.Cli.csproj
 - 每次 Lit/Angular 动作后重新查询节点；不缓存节点、文件 input 索引或坐标。
 - 每个 toggle 只发一次物理 click；不混合 mousedown、mouseup、click 和 `.click()`。
 - 文件上传使用 `DOM.describeNode` + `DOM.setFileInputFiles` 穿透 Shadow DOM，且 MSIX 必须包含完整 Assets。
-- 文件名出现只代表文件名出现；包必须达到唯一 `Validated`。
-- 同名 Error 包或重复包阻止新上传；清理完毕后必须冷加载刷新页面使“保存”按钮激活。
-- 语言网格按 `Action-{id}` 和 `Name-{id}` 配对，目标语言由 `supportedLanguageCodes` 声明。
-- 遇到未知表单阻塞时，优先执行 `-Action dumpdom` 提取清晰结构化 DOM，或调用针对性急救指令（`answerno`、`fixpackage`、`canceluploads`、`fixprivacy`），禁止盲目全表重跑。
+- 文件名出现只代表文件名出现；包必须达到唯一 `Validated` 且退回概览页确权显示完成。
+- **模块化架构与指令集**：CLI 入口 `Program.cs` 保持在 300 行以内，各阶段独立封装于 `Commands/`（`preflight`, `launch`, `step`, `discover`, `inspect`, `dumpdom`, `cleanpackages`, `cleanlanguages`, `filllisting`, `verify`, `stop`）。
+- **语言列表管理铁律**：进入 Store 一览若遇多语言网格（Manage Languages），必须通过组件级批量删除非目标语言并在 `managelanguages` 底部点击「保存」，严禁单项慢速轮询导致超时。
+- **导航安全铁律**：严禁通过模糊锚点 `a[href*="/overview"]` 导航回概览页（防止误跳外部 Learn 文档），必须使用绝对构造的 `${baseUrl}/${productId}/overview` 控制台 URL 强制跳转。
 
 ## 退出和报告
 
