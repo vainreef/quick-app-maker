@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace Vainreef.EdgeStore.Cdp;
@@ -11,6 +12,122 @@ public class CdpConnection
     public bool StartedByUs { get; private set; }
     public string ProfilePath { get; private set; } = string.Empty;
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct STARTUPINFO
+    {
+        public int cb;
+        public string? lpReserved;
+        public string? lpDesktop;
+        public string? lpTitle;
+        public int dwX;
+        public int dwY;
+        public int dwXSize;
+        public int dwYSize;
+        public int dwXCountChars;
+        public int dwYCountChars;
+        public int dwFillAttribute;
+        public int dwFlags;
+        public short wShowWindow;
+        public short cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput;
+        public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROCESS_INFORMATION
+    {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public int dwProcessId;
+        public int dwThreadId;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool CreateProcess(
+        string? lpApplicationName,
+        string lpCommandLine,
+        IntPtr lpProcessAttributes,
+        IntPtr lpThreadAttributes,
+        bool bInheritHandles,
+        uint dwCreationFlags,
+        IntPtr lpEnvironment,
+        string? lpCurrentDirectory,
+        ref STARTUPINFO lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
+    private static Process StartProcessOnDefaultDesktop(string exePath, string arguments)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            var si = new STARTUPINFO
+            {
+                cb = Marshal.SizeOf<STARTUPINFO>(),
+                lpDesktop = @"WinSta0\Default",
+                wShowWindow = 3 /* SW_SHOWMAXIMIZED */,
+                dwFlags = 1 /* STARTF_USESHOWWINDOW */
+            };
+            string cmdLine = $"\"{exePath}\" {arguments}";
+            uint flags = 0x00000200 /* CREATE_NEW_PROCESS_GROUP */;
+            if (CreateProcess(null, cmdLine, IntPtr.Zero, IntPtr.Zero, false, flags, IntPtr.Zero, null, ref si, out var pi))
+            {
+                CloseHandle(pi.hThread);
+                CloseHandle(pi.hProcess);
+                return Process.GetProcessById(pi.dwProcessId);
+            }
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = exePath,
+            Arguments = arguments,
+            UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Maximized
+        };
+        return Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to launch Microsoft Edge.");
+    }
+
+    private static void LaunchViaTaskScheduler(string exePath, string arguments, string stateRoot)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            try
+            {
+                string batPath = Path.Combine(stateRoot, "launch-edge.bat");
+                File.WriteAllText(batPath, $"@start \"\" \"{exePath}\" {arguments}\r\n");
+
+                var psiCreate = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    Arguments = $"/create /tn \"EdgeStoreSession\" /tr \"{batPath}\" /sc once /st 23:59 /f",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using (var p = Process.Start(psiCreate)) p?.WaitForExit(5000);
+
+                var psiRun = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    Arguments = "/run /tn \"EdgeStoreSession\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using (var pRun = Process.Start(psiRun)) pRun?.WaitForExit(5000);
+                return;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SESSION] Task scheduler launch failed, falling back: {ex.Message}");
+            }
+        }
+
+        StartProcessOnDefaultDesktop(exePath, arguments);
+    }
+
     public static async Task<CdpConnection> StartOrReuseAsync(string stateRoot, string? customProfilePath = null, string? customEdgePath = null)
     {
         var conn = new CdpConnection();
@@ -18,24 +135,22 @@ public class CdpConnection
         string portFile = Path.Combine(stateRoot, "edge.port");
 
         // Try reusing existing Edge process
-        if (File.Exists(pidFile) && File.Exists(portFile))
+        if (File.Exists(portFile))
         {
             try
             {
-                int savedPid = int.Parse(File.ReadAllText(pidFile).Trim());
                 int savedPort = int.Parse(File.ReadAllText(portFile).Trim());
-                var proc = Process.GetProcessById(savedPid);
-                if (!proc.HasExited)
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                var versionResp = await http.GetStringAsync($"http://127.0.0.1:{savedPort}/json/version");
+                if (!string.IsNullOrEmpty(versionResp))
                 {
-                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-                    var versionResp = await http.GetStringAsync($"http://127.0.0.1:{savedPort}/json/version");
-                    if (!string.IsNullOrEmpty(versionResp))
+                    conn.Port = savedPort;
+                    if (File.Exists(pidFile) && int.TryParse(File.ReadAllText(pidFile).Trim(), out int savedPid))
                     {
-                        conn.Port = savedPort;
-                        conn.EdgeProcess = proc;
-                        conn.StartedByUs = false;
-                        return conn;
+                        try { conn.EdgeProcess = Process.GetProcessById(savedPid); } catch { }
                     }
+                    conn.StartedByUs = false;
+                    return conn;
                 }
             }
             catch (Exception ex)
@@ -53,18 +168,11 @@ public class CdpConnection
         Directory.CreateDirectory(conn.ProfilePath);
 
         string edgeExe = ResolveEdgeExecutable(customEdgePath);
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = edgeExe,
-            Arguments = $"--user-data-dir=\"{conn.ProfilePath}\" --remote-debugging-port={conn.Port} --remote-debugging-address=127.0.0.1 --remote-allow-origins=* --no-first-run --no-default-browser-check --start-maximized https://partner.microsoft.com/zh-cn/dashboard/home",
-            UseShellExecute = true
-        };
+        string edgeArgs = $"--user-data-dir=\"{conn.ProfilePath}\" --remote-debugging-port={conn.Port} --remote-debugging-address=127.0.0.1 --remote-allow-origins=* --no-first-run --no-default-browser-check --start-maximized https://partner.microsoft.com/zh-cn/dashboard/home";
 
-        conn.EdgeProcess = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to launch Microsoft Edge.");
+        LaunchViaTaskScheduler(edgeExe, edgeArgs, stateRoot);
         conn.StartedByUs = true;
 
-        File.WriteAllText(pidFile, conn.EdgeProcess.Id.ToString());
         File.WriteAllText(portFile, conn.Port.ToString());
 
         // Wait for DevTools endpoint to become ready

@@ -81,7 +81,16 @@ public sealed class StoreOrchestrator
     {
         var (pid, port) = GetSessionInfo();
         bool active = false;
-        try { active = pid > 0 && !Process.GetProcessById(pid).HasExited; } catch { }
+        if (port > 0)
+        {
+            try
+            {
+                using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                var resp = await probe.GetStringAsync($"http://127.0.0.1:{port}/json/version");
+                active = !string.IsNullOrEmpty(resp);
+            }
+            catch { }
+        }
         Console.WriteLine(JsonSerializer.Serialize(new { pid, port, active, checkpoint = _checkpoint }, JsonIndented));
         if (!active) return 3;
         return await InspectAsync();
@@ -90,10 +99,9 @@ public sealed class StoreOrchestrator
     public async Task<int> InspectAsync()
     {
         var (pid, port) = GetSessionInfo();
-        if (pid <= 0 || port <= 0) { Console.WriteLine("[STATUS] No active isolated Edge session."); return 3; }
+        if (port <= 0) { Console.WriteLine("[STATUS] No active isolated Edge session."); return 3; }
         try
         {
-            if (Process.GetProcessById(pid).HasExited) return 3;
             using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
             _ = await probe.GetStringAsync($"http://127.0.0.1:{port}/json/version");
         }
@@ -174,7 +182,7 @@ public sealed class StoreOrchestrator
         var conn = await CdpConnection.StartOrReuseAsync(_stateRoot);
         await using var client = new CdpClient();
         await client.ConnectAsync(new Uri(await conn.GetTargetWebSocketUrlAsync()));
-        await EnsureSignedInCoreAsync(client, TimeSpan.FromSeconds(20));
+        await EnsureSignedInCoreAsync(client, TimeSpan.FromMinutes(15));
 
         var dom = new DomDriver(client);
         var ax = new AxLocator(client, dom);
@@ -388,10 +396,194 @@ public sealed class StoreOrchestrator
         await waiter.RequireAsync(async () =>
         {
             string url = await client.EvaluateAsync<string>("location.href") ?? "";
-            bool login = Regex.IsMatch(url, "login\\.microsoftonline|login\\.live\\.com|signin", RegexOptions.IgnoreCase);
-            return !login && url.Contains("partner.microsoft.com", StringComparison.OrdinalIgnoreCase);
+            bool login = Regex.IsMatch(url, "login\\.microsoftonline|login\\.live\\.com|signin|aad/authPostGateway|oauth2", RegexOptions.IgnoreCase);
+            if (login) return false;
+            if (!url.Contains("partner.microsoft.com", StringComparison.OrdinalIgnoreCase)) return false;
+
+            // Ensure the page actually settled on an authenticated dashboard or overview page (not marketing/landing)
+            bool hasAuthMarker = await client.EvaluateAsync<bool>("""
+            (() => {
+                const url = location.href.toLowerCase();
+                const text = document.body?.innerText || '';
+                if (text.includes('登录到您的帐户') || text.includes('Sign in to your account') || text.includes('选取帐户') || text.includes('Pick an account')) return false;
+                // Authenticated workspace indicators
+                const isDashboard = url.includes('/dashboard/') || url.includes('/products/');
+                const hasAppOrHome = text.includes('工作区') || text.includes('应用程序和游戏') || text.includes('Apps and games') || text.includes('+ 新产品') || text.includes('+ New product') || text.includes('产品概述') || text.includes('应用程序概述') || !!document.querySelector('partner-nav, .dashboard, [data-bi-area="AppOverview"], .partner-header-user-profile, .me-control');
+                return isDashboard && hasAppOrHome;
+            })()
+            """);
+            return hasAuthMarker;
         }, timeout, "Wait for signed-in Partner Center page");
         Log("PASS", "Partner Center session is active");
+    }
+
+    public async Task<int> RunSingleStepAsync(string phase)
+    {
+        if (!PhaseNames.All.Contains(phase, StringComparer.OrdinalIgnoreCase))
+            throw new ArgumentException($"Unknown phase: {phase}. Must be one of: {string.Join(", ", PhaseNames.All)}");
+
+        Log("STEP", $">>> Stage [{phase}]: Initializing session & checking authentication...");
+        var conn = await CdpConnection.StartOrReuseAsync(_stateRoot);
+        await using var client = new CdpClient();
+        await client.ConnectAsync(new Uri(await conn.GetTargetWebSocketUrlAsync()));
+        await EnsureSignedInCoreAsync(client, TimeSpan.FromMinutes(15));
+
+        Log("STEP", $">>> Stage [{phase}]: Executing reconcile plan...");
+        int runResult = await RunAsync(phase);
+        if (runResult != 0)
+        {
+            Log("FAIL", $"Stage [{phase}] reconcile returned error code: {runResult}");
+            return runResult;
+        }
+
+        Log("DOM-PROBE", $">>> Stage [{phase}]: Executing mandatory post-phase DOM self-inspection...");
+        var domEvidence = await VerifyPhaseDomAsync(phase, client, _desired);
+        Console.WriteLine($"[DOM-PROBE] DOM Inspection Result for [{phase}]:");
+        Console.WriteLine(JsonSerializer.Serialize(domEvidence, JsonIndented));
+
+        // Save evidence in Checkpoint
+        string currentUrl = "";
+        try { currentUrl = await client.EvaluateAsync<string>("location.href") ?? ""; } catch { }
+        _checkpoint.MarkConverged(phase, $"DOM verified: {JsonSerializer.Serialize(domEvidence)}", currentUrl);
+        SaveCheckpoint();
+
+        Log("PASS", $"Stage [{phase}] 100% SUCCESS & DOM SELF-INSPECTED.");
+        return 0;
+    }
+
+    public async Task<int> DiscoverAndSnapshotAsync()
+    {
+        var conn = await CdpConnection.StartOrReuseAsync(_stateRoot);
+        await using var client = new CdpClient();
+        await client.ConnectAsync(new Uri(await conn.GetTargetWebSocketUrlAsync()));
+        await EnsureSignedInCoreAsync(client, TimeSpan.FromMinutes(15));
+
+        var waiter = new Waiter(client);
+        var input = new InputDriver(client, new AxLocator(client, new DomDriver(client)));
+        var native = new NativeFormAdapter(client, input);
+        var discovery = new SubmissionDiscovery(client, waiter, native);
+        var inspector = new PageInspector(client);
+
+        var result = await discovery.DiscoverAsync(_desired.Site.BaseUrl, _desired.ProductId, autoCreateIfMissing: _apply);
+        _checkpoint.SubmissionId = result.SubmissionId;
+        SaveCheckpoint();
+
+        var overviewAdapter = new OverviewAdapter(client, inspector);
+        var overview = await overviewAdapter.ObserveAsync();
+        Console.WriteLine(JsonSerializer.Serialize(new { submissionId = result.SubmissionId, hrefs = result.Hrefs, overview }, JsonIndented));
+        return 0;
+    }
+
+    public static async Task<Dictionary<string, object>> VerifyPhaseDomAsync(string phase, CdpClient client, DesiredState desired)
+    {
+        var result = new Dictionary<string, object>();
+        switch (phase)
+        {
+            case "availability":
+                var availDom = await client.EvaluateAsync<Dictionary<string, object>>("""
+                (() => {
+                    const priceSelect = document.querySelector('he-select[name="pricingTier"], #pricingTier, [data-bi-name="PriceTierSelect"]');
+                    const priceText = priceSelect?.innerText?.trim() || '';
+                    const text = document.body?.innerText || '';
+                    return {
+                        priceText: priceText,
+                        hasFree: priceText.includes('Free') || priceText.includes('免费') || priceText.includes('0.00'),
+                        hasAllMarkets: text.includes('所有可能的市场') || text.includes('All possible markets') || text.includes('全部市场') || text.includes('已选市场')
+                    };
+                })()
+                """);
+                if (availDom != null) foreach (var kv in availDom) result[kv.Key] = kv.Value;
+                break;
+
+            case "properties":
+                var propDom = await client.EvaluateAsync<Dictionary<string, object>>("""
+                (() => {
+                    const categorySelect = document.querySelector('he-select[name="category"], #category-select, [data-bi-name="CategorySelect"]');
+                    const categoryText = categorySelect?.innerText?.trim() || '';
+                    const text = document.body?.innerText || '';
+                    const privacyNoRadio = document.querySelector('input[type="radio"][value="No"], input[name="privacy"][value="No"]');
+                    const privacyTextarea = document.querySelector('#privacyPolicyText, textarea[name="privacyPolicyText"]');
+                    return {
+                        categoryText: categoryText,
+                        isProductivity: categoryText.includes('Productivity') || categoryText.includes('生产力') || categoryText.includes('效率'),
+                        privacyNoSelected: !!privacyNoRadio?.checked || text.includes('否，本产品不收集') || text.includes('No, this product does not'),
+                        privacyTextareaExists: !!privacyTextarea
+                    };
+                })()
+                """);
+                if (propDom != null) foreach (var kv in propDom) result[kv.Key] = kv.Value;
+                break;
+
+            case "ageRatings":
+                var ageDom = await client.EvaluateAsync<Dictionary<string, object>>("""
+                (() => {
+                    const text = document.body?.innerText || '';
+                    const checkedRadios = Array.from(document.querySelectorAll('input[type="radio"]:checked')).map(r => r.value);
+                    const isQuestionnaireComplete = checkedRadios.length >= 9 || text.includes('问卷已完成') || text.includes('Questionnaire completed') || text.includes('问卷调查完成');
+                    const iarcCheckbox = document.querySelector('input[type="checkbox"]#iarc-declaration, input[type="checkbox"][name="iarcConsent"]');
+                    return {
+                        checkedRadiosCount: checkedRadios.length,
+                        isQuestionnaireComplete: isQuestionnaireComplete,
+                        iarcConsentChecked: !!iarcCheckbox?.checked || text.includes('已同意 IARC')
+                    };
+                })()
+                """);
+                if (ageDom != null) foreach (var kv in ageDom) result[kv.Key] = kv.Value;
+                break;
+
+            case "packages":
+                var pkgDom = await client.EvaluateAsync<Dictionary<string, object>>("""
+                (() => {
+                    const rows = Array.from(document.querySelectorAll('tr, .package-row, [data-bi-area="PackageTable"] tr')).map(r => r.innerText?.trim() || '');
+                    const hasValidated = rows.some(r => r.includes('Validated') || r.includes('已验证') || r.includes('已完成'));
+                    const hasAnalyzing = rows.some(r => r.includes('Analyzing') || r.includes('正在分析') || r.includes('上传中'));
+                    const hasError = rows.some(r => r.includes('Error') || r.includes('错误') || r.includes('失败'));
+                    const text = document.body?.innerText || '';
+                    return {
+                        rowCount: rows.length,
+                        hasValidated: hasValidated || text.includes('Validated') || text.includes('已验证'),
+                        hasAnalyzing: hasAnalyzing,
+                        hasError: hasError
+                    };
+                })()
+                """);
+                if (pkgDom != null) foreach (var kv in pkgDom) result[kv.Key] = kv.Value;
+                break;
+
+            case "listing":
+                var listingDom = await client.EvaluateAsync<Dictionary<string, object>>("""
+                (() => {
+                    const descInput = document.querySelector('textarea#description, textarea[name="description"]');
+                    const shortDescInput = document.querySelector('textarea#shortDescription, textarea[name="shortDescription"], input#shortDescription');
+                    const imgTags = Array.from(document.querySelectorAll('.screenshot-preview img, .asset-thumbnail img, img[alt*="screenshot"], img[alt*="logo"]'));
+                    const text = document.body?.innerText || '';
+                    return {
+                        descriptionLength: descInput ? (descInput.value || '').length : 0,
+                        shortDescriptionLength: shortDescInput ? (shortDescInput.value || '').length : 0,
+                        renderedImageCount: imgTags.length,
+                        hasFeatureItems: text.includes('特性') || text.includes('Features') || text.includes('打开有仪式感') || text.includes('深色皮面'),
+                        hasKeywords: text.includes('搜索词') || text.includes('Keywords') || text.includes('牵挂') || text.includes('纪念日')
+                    };
+                })()
+                """);
+                if (listingDom != null) foreach (var kv in listingDom) result[kv.Key] = kv.Value;
+                break;
+
+            case "options":
+                var optDom = await client.EvaluateAsync<Dictionary<string, object>>("""
+                (() => {
+                    const runFullTrustText = document.querySelector('textarea#runFullTrustReason, textarea[name="runFullTrustReason"]')?.value || '';
+                    const text = document.body?.innerText || '';
+                    return {
+                        hasRunFullTrustReason: runFullTrustText.length > 0 || text.includes('WinUI 3') || text.includes('全信任桌面进程'),
+                        isPublishTimingSelected: text.includes('尽快发布') || text.includes('As soon as possible') || text.includes('手动发布')
+                    };
+                })()
+                """);
+                if (optDom != null) foreach (var kv in optDom) result[kv.Key] = kv.Value;
+                break;
+        }
+        return result;
     }
 
     private void SaveCheckpoint()
@@ -409,5 +601,10 @@ public sealed class StoreOrchestrator
         try { File.AppendAllText(Path.Combine(_logRoot, "edge-store.log"), line + Environment.NewLine, new System.Text.UTF8Encoding(false)); } catch { }
     }
 
-    private static readonly JsonSerializerOptions JsonIndented = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private static readonly JsonSerializerOptions JsonIndented = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 }

@@ -107,25 +107,43 @@ explorer.exe "shell:AppsFolder\<PFN>!App"
 - **同版本号禁止覆盖安装（0x80073CFB）**：改代码后重装要么先卸载旧包，要么递增 manifest 的 `Version`。
 - 从安装目录直接启动 exe 也能验证（runFullTrust），但用 `shell:AppsFolder` 更接近用户真实启动路径。
 
-## 7. Store Automation Pipeline (Store 0 ~ 7)
+## 7. Store Automation Pipeline (Store 0 ~ 10 多阶段离散执行与 DOM 自检)
 
-使用仓库内置的声明式 Edge Store CLI：
+使用仓库内置的声明式 Edge Store CLI，**严格按阶段独立推进，每步必须检查 DOM 自检验收证据**：
 
 ```powershell
-# 1. 语法与配置校验
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Validate-EdgeStoreCli.ps1 -Strict
-
-# 2. Store 0 离线静态质检 (MSIX 清单/设备依赖/物料尺寸)
+# 阶段 0: 离线静态质检 (MSIX 清单/设备依赖/物料尺寸/字数限制)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest .\<app>\build\edge-store.json
 
-# 3. 启动隔离 Edge 会话
+# 阶段 1: 启动独立常驻 Edge 会话并在桌面确权
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -Manifest .\<app>\build\edge-store.json -KeepOpen
 
-# 4. 单表填报或全流程收敛 (含 F5 刷新二次验证)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -ReloadVerify -KeepOpen
+# 阶段 2: 动态探测 active submissionId 与 6 大表单实时 href 并建立 DOM 基线
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action discover -Manifest .\<app>\build\edge-store.json
 
-# 5. 显式双确认提交审核
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -Submit -ConfirmSubmit
+# 阶段 3: 定价与可用性离散步进 + DOM 探针自检
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase availability -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+
+# 阶段 4: 应用属性离散步进 + DOM 探针自检
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase properties -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+
+# 阶段 5: 年龄分级问卷离散步进 + DOM 探针自检
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase ageRatings -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+
+# 阶段 6: 程序包上传与云端 Validated 轮询 + DOM 探针自检
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase packages -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+
+# 阶段 7: 应用商店一览 (文本/特性/关键词/截图/Logo) + DOM 探针自检
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase listing -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+
+# 阶段 8: 提交选项 (发布时机/runFullTrust) + DOM 探针自检
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase options -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+
+# 阶段 9: 概览页 6 大模块冷加载全绿勾总检
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action verify -Manifest .\<app>\build\edge-store.json
+
+# 阶段 10: 显式双确认提交审核
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action submit -ConfirmSubmit -Manifest .\<app>\build\edge-store.json
 ```
 
 ---
@@ -259,6 +277,43 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
      - **严禁要求用户关闭 UAC、关闭 Defender 或修改 `EnableLUA=0`！**
      - 使用底层 Win32 API `CreateProcess` 显式指定 `STARTUPINFO.lpDesktop = @"WinSta0\Default"` 启动非提权中间进程至用户桌面，再由该进程调用 `ShellExecuteEx("runas")`，系统即可正常切入 `WinSta0\Winlogon` 安全桌面弹出原生 UAC 确认框。
 
+#### 63. PowerShell `Start-Process -Wait` 调用 `dotnet build` 因 MSBuild 节点重用句柄继承导致进程假死
+- Environment: PowerShell 5.1 / Windows 10/11 / .NET SDK 10 MSBuild
+- 现象: 执行脚本调用 `Start-Process -FilePath dotnet -ArgumentList "build ... -c Release" -NoNewWindow -PassThru -Wait` 时，控制台显示 `Build succeeded. Time Elapsed 00:00:44.13`，编译早已 100% 成功，但脚本却永久卡住不向下继续执行。
+- Root cause:
+  1. .NET MSBuild 默认开启了编译服务器节点重用机制（Node Reuse / `VBCSCompiler.exe` 后台守护进程）；
+  2. 当通过 `Start-Process -NoNewWindow -Wait` 启动时，子进程的 stdout/stderr 标准管道句柄被驻留后台的 MSBuild worker 进程继承并保持打开状态；
+  3. PowerShell 的 `-Wait` 阻塞机制等待所有管道句柄彻底关闭，因此即使主 `dotnet` 进程早已退出，整个会话依然被永久卡死。
+- Fix:
+  1. 避免使用 `Start-Process ... -NoNewWindow -Wait` 来调用编译器；改为在 PowerShell 中直接调用操作符 `& $dotnet.Source build $projectPath -c Release --nologo -v q /p:UseSharedCompilation=false`；
+  2. 添加 `/p:UseSharedCompilation=false` 参数彻底禁止 MSBuild 派生驻留后台的共享编译服务器进程，消除句柄继承隐患。
+
+#### 65. Windows 自动化浏览器进程与终端生命周期强绑定导致关终端即闪退（Job Object 诛连清理与 Task Scheduler 系统外壳脱钩机制）
+- Environment: Windows 10/11 / PowerShell / Edge CDP 自动化提审
+- 现象: 脚本启动 Edge 浏览器后，只要用户手动关闭终端、取消任务或脚本正常退出，屏幕上的 Edge 浏览器窗口就会瞬间连带关闭闪退，无法保留窗口查看或登录。
+- Root cause:
+  1. Windows 终端与任务运行器默认将派生子进程纳入同一个 Job Object，并配置了 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`；
+  2. 终端或命令退出时，Windows 内核发送 `TerminateJobObject` 强行株连杀死整个进程树；
+  3. 受限 Job Object 下调用 `CREATE_BREAKAWAY_FROM_JOB` 会被系统拒绝返回 `0x5 (ERROR_ACCESS_DENIED)`。
+- Fix:
+  1. 使用 Windows 任务计划程序（`schtasks.exe /create ...` + `schtasks.exe /run ...`）由系统服务 `svchost.exe` 脱钩启动 Edge；
+  2. 结合 `STARTUPINFO.lpDesktop = @"WinSta0\Default"` + `SW_SHOWMAXIMIZED` 确保窗口在前台主屏幕最大化呈现；
+  3. 自动化驱动仅通过 CDP 端口（`http://127.0.0.1:58567`）热插拔连接，实现关终端、关 IDE 浏览器永远常驻不闪退。
+
+#### 68. .NET 10 System.Text.Json 默认非 ASCII 字符 Unicode 转义导致输出 `\uXXXX` 乱码感
+- Environment: .NET 10 CLI 控制台输出 / 中文 Windows
+- 现象: 所有控制台输出和快照中的中文按钮和标题被转义为 `\u5220\u9664`、`\u63D0\u4EA4` 等不可读字符串。
+- Root cause: `System.Text.Json` 默认启用了严格的 `JavaScriptEncoder.Default`（仅允许基本 ASCII 字符）。
+- Fix: 在 `JsonSerializerOptions` 中显式指定宽松非转义编码器：`Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping`。
+
+#### 69. 概览页模块状态与子页面中间态混淆假收敛（包提交阶段“云端 Validated”不等于“模块完成”，必须退回概览页 DOM 呈现“完成”为唯一真值）
+- Environment: Microsoft Partner Center 商店提审 / 程序包与 6 大模块表单
+- 现象: 自动化脚本检测到 MSIX 在子页面表格显示 `Validated` 便误判为该阶段完成；但实际由于重复行冲突或未点击保存草稿，概览页上该模块依然是「未完成」甚至「未启动」。
+- Root cause: 混淆了“云端二进制包体静态分析通过（Package Validated）”与“该表单在概览草稿中成功持久化（Module Complete）”。
+- Fix:
+  1. 阶段前置探测：进入任何阶段前，必须先在概览页 DOM 读取真实基线；
+  2. 阶段后置闭环验收：离开任何阶段后，必须冷加载导航回概览页，DOM 探针切实检测到该模块显示为「完成」（且无「未完成」/「未启动」等异常徽标），才允许放行并进入下一阶段！
+
 ---
 
 ## 适用范围（对"大多数 Win11 电脑"的成立性）
@@ -286,3 +341,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 | 60 显式导航替代 F5 冷加载 | 是 | SPA 路由生命周期规则 |
 | 61 变更配置前置更新 JSON | 是 | 声明式状态收敛铁律 |
 | 62 Win32 Desktop 隔离与提权桥接 | 是 | Windows USER32 桌面安全模型 |
+| 63 MSBuild 节点重用句柄阻塞假死 | 是 | .NET CLI / PowerShell 管道与进程模型 |
+| 65 Task Scheduler 浏览器脱钩常驻 | 是 | Windows 任务计划与 Job Object 进程生命周期解耦 |
+| 68 JSON 中文非转义宽松编码 | 是 | .NET 10 System.Text.Json 跨平台输出规范 |
+| 69 概览页 DOM 绿勾唯一真值闭环 | 是 | Partner Center 阶段验收与状态收敛铁律 |
+

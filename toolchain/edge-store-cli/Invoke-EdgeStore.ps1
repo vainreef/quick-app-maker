@@ -1,11 +1,11 @@
-﻿<#
+<#
 .SYNOPSIS
     Vainreef Edge Store CLI - Ultra-thin Direct PowerShell Launcher for .NET 10 Driver
 #>
 
 [CmdletBinding()]
 param(
-    [ValidateSet('preflight', 'launch', 'inspect', 'dumpdom', 'answerno', 'fixpackage', 'filloptions', 'waitpackage', 'canceluploads', 'fixprivacy', 'reserve', 'identity', 'run', 'status', 'verify', 'stop')]
+    [ValidateSet('preflight', 'launch', 'step', 'discover', 'inspect', 'dumpdom', 'cleanpackages', 'answerno', 'fixpackage', 'filloptions', 'waitpackage', 'canceluploads', 'fixprivacy', 'reserve', 'identity', 'run', 'status', 'verify', 'stop')]
     [string]$Action = 'run',
     [ValidateSet('all', 'availability', 'properties', 'ageRatings', 'packages', 'listing', 'options')]
     [string]$Phase = 'all',
@@ -71,12 +71,21 @@ if (-not (Test-Path -LiteralPath $dllPath)) {
     $dllPath = Join-Path $toolRoot 'bin\Debug\net10.0\EdgeStore.Cli.dll'
 }
 
-# Build if DLL does not exist yet
-if (-not (Test-Path -LiteralPath $dllPath)) {
-    Write-Host "[INFO] Building Edge Store CLI..."
-    $build = Start-Process -FilePath $dotnet.Source -ArgumentList "build `"$projectPath`" -c Release --nologo -v q" -NoNewWindow -PassThru -Wait
-    if ($build.ExitCode -ne 0) {
-        Write-Error "Edge Store CLI build failed with exit code $($build.ExitCode)."
+# 智能感知：如果 DLL 不存在，或者有任意 .cs 源码修改时间晚于 DLL，则自动增量编译
+$needsBuild = -not (Test-Path -LiteralPath $dllPath)
+if (-not $needsBuild) {
+    $dllTime = (Get-Item -LiteralPath $dllPath).LastWriteTimeUtc
+    $latestSource = Get-ChildItem -Path $toolRoot -Filter "*.cs" -Recurse | Where-Object { $_.FullName -notmatch '\\obj\\' -and $_.FullName -notmatch '\\bin\\' } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+    if ($latestSource -and $latestSource.LastWriteTimeUtc -gt $dllTime) {
+        $needsBuild = $true
+    }
+}
+
+if ($needsBuild) {
+    Write-Host "[INFO] Detected source code changes. Auto-rebuilding Edge Store CLI..."
+    & $dotnet.Source build $projectPath -c Release --nologo -v q /p:UseSharedCompilation=false
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Edge Store CLI build failed with exit code $LASTEXITCODE."
         exit 1
     }
     $dllPath = Join-Path $toolRoot 'bin\Release\net10.0\EdgeStore.Cli.dll'
@@ -91,7 +100,7 @@ $forwardArgs.Add($Phase)
 
 if (-not [string]::IsNullOrWhiteSpace($Manifest)) {
     $forwardArgs.Add("--manifest")
-    $forwardArgs.Add($Manifest)
+    $forwardArgs.Add([System.IO.Path]::GetFullPath($Manifest))
 }
 
 if (-not [string]::IsNullOrWhiteSpace($ProductId)) {
@@ -104,7 +113,7 @@ if (-not [string]::IsNullOrWhiteSpace($AppName)) {
     $forwardArgs.Add($AppName)
 }
 
-$effectiveStateDir = if (-not [string]::IsNullOrWhiteSpace($StateDir)) { $StateDir } else { Join-Path $toolRoot 'state' }
+$effectiveStateDir = if (-not [string]::IsNullOrWhiteSpace($StateDir)) { [System.IO.Path]::GetFullPath($StateDir) } else { Join-Path $toolRoot 'state' }
 $forwardArgs.Add("--state-dir")
 $forwardArgs.Add($effectiveStateDir)
 

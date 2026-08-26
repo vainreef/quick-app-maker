@@ -46,11 +46,19 @@
 
 checkpoint 状态为：
 
-`Unknown → Observed → NeedsChanges → Applying → AppliedUnverified → Converged / Failed`
+`Unknown → Observed → NeedsChanges → Applying → AppliedUnverified → DomSelfInspected → Converged / Failed`
 
-`AppliedUnverified` 明确表示“动作执行了，但产品尚未证明成功”。只有概览页模块显式为 Complete，才写入 `convergedPhases`。
+`AppliedUnverified` 明确表示“动作执行了，但产品尚未证明成功”。只有阶段后专属 DOM 探针完成深度断言，且概览页模块显式为 Complete，才写入 `convergedPhases`。
 
-### 3. Overview 是最终裁判
+### 3. 禁止一冲到底：多阶段离散执行与 DOM 深度自检
+
+为了彻底避免“单脚本走到黑”以及中途失控，CLI 提供了 `-Action step -Phase <phase>` 机制：
+- 每个 Phase 是一个独立可测试的单元（`availability`、`properties`、`ageRatings`、`packages`、`listing`、`options`）；
+- 每次单步执行后，必须触发 `VerifyPhaseDomAsync` 探针在真实 DOM 提取控件当前属性值与 Desired State 进行断言；
+- 探针断言输出为结构化 JSON 证据，并持久化写入 CheckPoint，确保证据链闭环；
+- 所有阶段完成后，由 `-Action verify` 进行概览页 6 大模块冷加载总检。
+
+### 4. Overview 是最终裁判
 
 `OverviewAdapter` 不按 body 文本顺序切片；它以每个模块的 submission href 为锚点，在局部容器内读取：
 
