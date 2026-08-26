@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Vainreef Edge Store CLI - Ultra-thin Direct PowerShell Launcher for .NET 10 Driver
 #>

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$RepoRoot = '',
     [string]$GitPath = ''
@@ -283,7 +283,7 @@ $templateInstallProcess = $null
 if (-not $templateReady) {
     Write-Step 'Starting WinUI template install'
     $script = Join-Path $workersRoot 'install-winui-template.ps1'
-    $arguments = "-PackagePath `"$templatePackage`" -LogPath `"$(Join-Path $logsRoot 'winui-install.log')`""
+    $arguments = "-PackagePath `"$templatePackage`" -DotNetPath `"$dotnetExe`" -LogPath `"$(Join-Path $logsRoot 'winui-install.log')`""
     $templateInstallProcess = Start-ScriptProcess -ScriptPath $script -Arguments $arguments
 }
 
@@ -307,7 +307,7 @@ if ($templateInstallProcess) {
         $retryDownload = Start-DownloadProcess -Id 'winui-template-retry' -Url $templateUrl -OutputPath $templatePackage -LogName 'winui-download-retry.log'
         Wait-ProcessWithFeedback -Process $retryDownload -Name 'WinUI template retry download' -PartialPath "$templatePackage.part"
         $retryScript = Join-Path $workersRoot 'install-winui-template.ps1'
-        $retryArguments = "-PackagePath `"$templatePackage`" -LogPath `"$(Join-Path $logsRoot 'winui-install-retry.log')`""
+        $retryArguments = "-PackagePath `"$templatePackage`" -DotNetPath `"$dotnetExe`" -LogPath `"$(Join-Path $logsRoot 'winui-install-retry.log')`""
         $retryInstall = Start-ScriptProcess -ScriptPath $retryScript -Arguments $retryArguments
         Wait-ProcessWithFeedback -Process $retryInstall -Name 'WinUI template retry install'
     }

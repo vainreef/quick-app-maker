@@ -1,19 +1,50 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PackagePath,
-    [Parameter(Mandatory = $true)][string]$LogPath
+    [Parameter(Mandatory = $true)][string]$LogPath,
+    [string]$DotNetPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
 
-$dotnet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $LogPath) | Out-Null
 
-if (-not (Test-Path -LiteralPath $dotnet)) {
+$dotnet = $null
+if ($DotNetPath -and (Test-Path -LiteralPath $DotNetPath)) {
+    $dotnet = (Resolve-Path -LiteralPath $DotNetPath).Path
+}
+if (-not $dotnet -and $env:DOTNET_ROOT) {
+    $envDotNet = Join-Path $env:DOTNET_ROOT 'dotnet.exe'
+    if (Test-Path -LiteralPath $envDotNet) { $dotnet = $envDotNet }
+}
+if (-not $dotnet) {
+    $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
+    $repoRoot = Split-Path -Parent $scriptDir
+    $workspaceRoot = if (Test-Path -LiteralPath (Join-Path $repoRoot '.git')) { Split-Path -Parent $repoRoot } else { $repoRoot }
+    $wsDotNet = Join-Path $workspaceRoot 'dotnet\dotnet.exe'
+    if (Test-Path -LiteralPath $wsDotNet) { $dotnet = (Resolve-Path -LiteralPath $wsDotNet).Path }
+}
+if (-not $dotnet) {
+    $cmd = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+    if ($cmd) { $dotnet = $cmd.Source }
+}
+if (-not $dotnet) {
+    $sysDotNet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
+    if (Test-Path -LiteralPath $sysDotNet) { $dotnet = $sysDotNet }
+}
+
+if (-not $dotnet -or -not (Test-Path -LiteralPath $dotnet)) {
     "[$(Get-Date -Format o)] FAIL dotnet executable missing" | Set-Content -LiteralPath $LogPath -Encoding UTF8
     exit 1
+}
+
+$dotnetRoot = Split-Path -Parent $dotnet
+$env:DOTNET_ROOT = $dotnetRoot
+$env:DOTNET_MULTILEVEL_LOOKUP = '0'
+if ($env:PATH -notlike "*$dotnetRoot*") {
+    $env:PATH = "$dotnetRoot;$env:PATH"
 }
 
 "[$(Get-Date -Format o)] START winui template install" | Set-Content -LiteralPath $LogPath -Encoding UTF8

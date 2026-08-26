@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Destination = '',
     [string]$Branch = 'main'
@@ -25,9 +25,7 @@ function Write-Step {
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $Message"
 }
 
-function Find-Git {
-    if (Test-Path -LiteralPath $minGitExe) { return $minGitExe }
-
+function Find-SystemGit {
     $command = Get-Command git.exe -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
 
@@ -50,9 +48,13 @@ if ([string]::IsNullOrWhiteSpace($Destination)) {
     }
 }
 
-$git = Find-Git
-if (-not $git) {
-    Write-Step "MinGit $gitVersion (portable) missing; downloading from npmmirror"
+$git = $null
+if (Test-Path -LiteralPath $minGitExe) {
+    $git = (Resolve-Path -LiteralPath $minGitExe).Path
+    Write-Step "Workspace MinGit ready: $git"
+}
+else {
+    Write-Step "MinGit $gitVersion (portable, zero-UAC) missing; downloading from npmmirror"
     if (-not (Test-Path -LiteralPath $gitArchive)) {
         $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
         if ($curl) {
@@ -61,23 +63,37 @@ if (-not $git) {
             & $curl.Source --silent --show-error -L --fail --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 1800 -o $gitArchive $gitUrl
             $curlExitCode = $LASTEXITCODE
             $ErrorActionPreference = $previousErrorPreference
-            if ($curlExitCode -ne 0) { throw "MinGit download failed with exit code $curlExitCode" }
+            if ($curlExitCode -ne 0) {
+                Write-Step "MinGit download via curl failed (exit $curlExitCode), falling back to Invoke-WebRequest"
+                Invoke-WebRequest -UseBasicParsing -Uri $gitUrl -OutFile $gitArchive
+            }
         }
         else {
             Invoke-WebRequest -UseBasicParsing -Uri $gitUrl -OutFile $gitArchive
         }
     }
 
-    Write-Step "Extracting MinGit (portable, zero-UAC) to $minGitDir"
-    New-Item -ItemType Directory -Force -Path $minGitDir | Out-Null
-    Expand-Archive -LiteralPath $gitArchive -DestinationPath $minGitDir -Force
-    $git = $minGitExe
-}
-else {
-    Write-Step "Git ready: $(& $git --version)"
+    if (Test-Path -LiteralPath $gitArchive) {
+        Write-Step "Extracting MinGit (portable, zero-UAC) to $minGitDir"
+        New-Item -ItemType Directory -Force -Path $minGitDir | Out-Null
+        Expand-Archive -LiteralPath $gitArchive -DestinationPath $minGitDir -Force
+        if (Test-Path -LiteralPath $minGitExe) {
+            $git = (Resolve-Path -LiteralPath $minGitExe).Path
+        }
+    }
+
+    if (-not $git) {
+        Write-Step "Workspace MinGit extraction incomplete; checking system Git as fallback"
+        $git = Find-SystemGit
+    }
 }
 
 if (-not $git -or -not (Test-Path -LiteralPath $git)) { throw 'Git executable was not found after bootstrap' }
+
+$gitCmdDir = Split-Path -Parent $git
+if ($env:PATH -notlike "*$gitCmdDir*") {
+    $env:PATH = "$gitCmdDir;$env:PATH"
+}
 
 if (Test-Path -LiteralPath (Join-Path $Destination '.git')) {
     Write-Step "Repository already exists: $Destination"
