@@ -37,9 +37,10 @@ Bootstrap 当前准备：
 | 项目 | 默认工具 |
 | --- | --- |
 | 平台 | Windows x64 |
-| Runtime | .NET 10 SDK |
+| VCS | MinGit 2.47.1 绿色免安装版 (npmmirror 镜像, 零 UAC 提权) |
+| Runtime | .NET 10 SDK 官方 Binaries 绿色免安装版 (零 UAC 提权, 零写C盘) |
 | UI 起点 | WinUI 3 C# template |
-| 构建 | `dotnet` CLI |
+| 构建 | `dotnet` CLI (挂载工作区 DOTNET_ROOT) |
 | 包工具 | `winapp` CLI |
 | 默认包格式 | MSIX |
 | 默认发布目标 | Microsoft Store |
@@ -49,8 +50,10 @@ Bootstrap 当前准备：
 ## 工作目录规则（绝对禁止违反）
 
 ```text
-Agent 工作根目录（就是仓库 clone 所在的父目录）
-├── quick-app-maker/     ← 核心工具链与 Skill 知识库
+Agent 工作根目录（WORKSPACE_ROOT，例如 Project/）
+├── git/                 ← MinGit 绿色免安装版（与仓库同级，零 UAC 提权）
+├── dotnet/              ← .NET 10 SDK 绿色免安装版（与仓库同级，零写C盘）
+├── quick-app-maker/     ← 核心工具链与 Skill 知识库（同级）
 ├── <app-slug>/          ← 每个 App 的项目目录（与仓库同级！）
 ├── 其他 app/
 └── 临时测试、下载、脚本等   ← 也放这里
@@ -109,7 +112,7 @@ docs/windows-smoke-test.md
 - 命令参数、退出码、日志位置和实测坑点读取 `commands.md`。
 - 标记为“待实测”的命令先在当前 Windows 环境运行，以真实输出为准。
 - 实测发现新的稳定规律时，补充命令、环境、错误原文和解决步骤。
-- **每轮开始前先 `git pull --ff-only`** 获取最新 skill 知识；若 `commands.md` 有新内容，以仓库为准。
+- **每轮开始前先用同级免安装版 MinGit 执行 `.\git\cmd\git.exe -C quick-app-maker pull --ff-only origin main`** 获取最新 skill 知识；若 `commands.md` 有新内容，以仓库为准。
 
 ## 3. Create the project
 
@@ -155,8 +158,9 @@ Set-Location APP_NAME
 3. **【铁律 3】计划通知的标准调度范式（防 CS0117 与空消息异常）**：
    - `ScheduledToastNotification` 没有 `Recurrence` 属性（写了必报 CS0117）；每年重复提醒通过 `for` 循环为未来几年分别构造单次通知调度；
    - 使用 `Windows.UI.Notifications.ToastNotificationManager.CreateToastNotifier().AddToSchedule(...)`；XML 特殊字符（`&`, `<`, `>`, `"`）必须转义；catch 时必须打印 `ex.HResult`（提权环境 0x803E0120 时 Message 为空）。
-4. **【铁律 4】严禁操作 `HKLM:` 注册表与 `Cert:\LocalMachine\` 证书（杜绝 UAC 权限弹窗）**：
-   - 证书导入一律限定在当前用户上下文（`Cert:\CurrentUser\TrustedPeople`），严禁执行任何针对 `HKLM:` 或 `Cert:\LocalMachine\` 的写操作，绝不触发管理员提权确认框打扰用户。
+4. **【铁律 4】全生命周期零 UAC 提权 & 零 C 盘系统目录写入（免安装 MinGit + 免安装 .NET SDK + CurrentUser 证书 + 严禁写 HKLM）**：
+   - **底层机制（坑 62）**：AI Runner 执行线程位于私有桌面 `WinSta0\exebox-*`，而用户在 `WinSta0\Default`，UAC 在 `WinSta0\Winlogon`。跨 Desktop 直接调用 `runas` 会被底层直接报 `0x80070032 (ERROR_NOT_SUPPORTED)` 拦截；
+   - **工程铁律**：Git 与 .NET 10 SDK 全程使用工作区根目录下同级的 `git\` 与 `dotnet\` 绿色免安装版，绝不运行任何 EXE 安装器；证书只导入 `Cert:\CurrentUser\TrustedPeople`，严禁写入 `HKLM:` 或 `Cert:\LocalMachine\`，全生命周期在 Medium Integrity 下顺畅运行，杜绝触发提权。若极特殊场景确需提权，严禁关闭系统安全，必须使用 `lpDesktop="WinSta0\Default"` 桥接启动。
 5. **【铁律 5】国内 NuGet 还原镜像源（防 restore 超时卡死）**：
    - 还原依赖必须指定国内源：`dotnet restore --source https://nuget.azure.cn/v3/index.json`，严禁直连境外 `api.nuget.org`。
 

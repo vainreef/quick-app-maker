@@ -5,8 +5,8 @@
 ## 一键脚本做什么
 
 ```text
-检查 Git
-→ 缺少 Git 时从 npmmirror 下载并静默安装
+检查工作区 MinGit 或全局 Git
+→ 缺少时从 npmmirror 下载 MinGit 绿色免安装包并解压 (零 UAC 提权)
 → 立即 clone Gitee 仓库
 → 调用仓库内 bootstrap/install.ps1
 → 检查 .NET SDK、WinAppCLI、WinUI 模板
@@ -19,10 +19,10 @@
 
 `bootstrap/entry.ps1` 负责：
 
-1. 查找已安装的 Git。
-2. Git 缺失时下载固定版本 `2.47.1.windows.1`。
-3. 静默安装 Git 并读取真实安装器退出码。
-4. 安装完成后重新发现 `git.exe` 的实际位置，并用这个绝对路径 clone。
+1. 查找工作区根目录 `git\cmd\git.exe`（与 `quick-app-maker` 同级）或已安装的 Git。
+2. Git 缺失时从 npmmirror 下载固定版本绿色免安装包 `MinGit-2.47.1-64-bit.zip`。
+3. 静默解压到工作区根目录 `git\`，无需管理员提权，彻底杜绝 UAC 弹窗。
+4. 使用解压后的免安装版绝对路径进行 clone。
 5. clone 的标准输出和错误输出分别写入日志，`Cloning into ...` 只作为进度信息。
 6. 已有仓库时执行 `pull --ff-only`。
 7. clone 完成后调用仓库里的工具链安装器。
@@ -32,7 +32,7 @@
 `bootstrap/install.ps1` 会先检测：
 
 ```text
-.NET SDK 10.0.400
+.NET SDK 10.0.400 (工作区 dotnet\ 或全局)
 WinAppCLI 0.6.1
 Microsoft.WindowsAppSDK.WinUI.CSharp.Templates 0.0.6-alpha
 ```
@@ -41,11 +41,11 @@ Microsoft.WindowsAppSDK.WinUI.CSharp.Templates 0.0.6-alpha
 
 ```text
 WinAppCLI：直接安装仓库内 toolchain/winapp-cli/0.6.1/winappcli_x64.msix
-.NET SDK：从 Microsoft CDN 下载
+.NET SDK：从官方构建 CDN 下载 zip 绿色压缩包并解压至工作区 dotnet\ (零 UAC, 零写C盘)
 WinUI 模板：从 NuGet 下载固定 nupkg
 ```
 
-.NET SDK 和 WinUI 模板下载并行启动；仓库内 WinAppCLI 同时安装。.NET SDK 下载结束后立即启动安装；.NET 就绪后立即安装 WinUI 模板。
+.NET SDK 和 WinUI 模板下载并行启动；仓库内 WinAppCLI 同时安装。.NET SDK 下载结束后立即启动解压；.NET 就绪后立即安装 WinUI 模板。
 
 Bootstrap 的版本、文件名和下载地址统一读取 `bootstrap/toolchain.json`。这里是安装阶段唯一的版本来源，仓库不再维护重复的 `version-lock.md`。
 
@@ -53,9 +53,9 @@ Bootstrap 的版本、文件名和下载地址统一读取 `bootstrap/toolchain.
 
 | 组件 | 固定版本 | 来源 |
 | --- | --- | --- |
-| Git for Windows | `2.47.1.windows.1` | `registry.npmmirror.com` |
-| .NET SDK x64 | `10.0.400` | `download.microsoft.com` |
-| WinUI C# templates | `0.0.6-alpha` | `api.nuget.org` |
+| MinGit (免安装) | `2.47.1.windows.1` | `registry.npmmirror.com` |
+| .NET SDK x64 (免安装) | `10.0.400` | `builds.dotnet.microsoft.com` |
+| WinUI C# templates | `0.0.6-alpha` | `nuget.azure.cn` |
 | WinAppCLI x64 | `0.6.1` | Gitee 仓库固定副本 |
 
 初始化过程只使用：
@@ -63,8 +63,8 @@ Bootstrap 的版本、文件名和下载地址统一读取 `bootstrap/toolchain.
 ```text
 Gitee
 npmmirror
-Microsoft CDN
-NuGet
+Microsoft 官方构建 CDN
+Azure China CDN (nuget.azure.cn)
 ```
 
 WinAppCLI 没有外部下载任务，也不经过其他代码托管站点或 winget。
@@ -113,25 +113,21 @@ bootstrap/
 - `/raw/master/...` 返回 404 时直接改用 `main`。
 
 ### Git 和 PATH
-
-- Git 安装后，不依赖新终端刷新 PATH。
-- 已有 Git 时先从 PATH 和常见安装位置发现真实路径。
-- 缺少 Git 时运行 Git for Windows 安装器；安装目录由该安装器选择，常见结果是 `C:\Program Files\Git`，当前用户安装也可能位于 `%LOCALAPPDATA%\Programs\Git`。
-- 安装后脚本重新发现并输出 `Git executable: ...`。
-- 这个绝对路径会传给 `bootstrap/install.ps1`，后续流程继续使用同一个 Git。
+- 优先查找当前工作区根目录 `git\cmd\git.exe`（与 `quick-app-maker` 同级）绿色免安装版。
+- 缺少时直接下载 `MinGit-2.47.1-64-bit.zip` 并解压到工作区根目录 `git\`，不依赖全局 PATH，不触发 UAC 提权弹窗。
+- 安装/解压后输出 `Git executable: ...` 并传给后续流程。
+- 全程所有 git 命令统一使用同级 `.\git\cmd\git.exe` 免安装版本。
 
 ### clone 日志
 
 - Git 会把 `Cloning into ...` 写入 stderr，这属于正常进度。
 - clone 是否成功只看 Git 退出码和目标目录中的 `.git`。
 
-### .NET 安装
-
-- 使用 `Start-Process -PassThru -Wait` 获取真实安装器退出码。
-- 安装器进程结束后再执行 `dotnet --list-sdks`。
+### .NET 免安装解压与挂载
+- 下载官方 Binaries 绿色包 `dotnet-sdk-10.0.400-win-x64.zip`。
+- 直接解压至工作区根目录 `dotnet\`（`Project\dotnet`），通过 `$env:DOTNET_ROOT` 挂载使用，绝不运行任何 EXE 安装包，不写 `C:\Program Files`，零 UAC 提权。
+- 解压后执行 `$dotnetExe --list-sdks` 验证版本。
 - 发现 `10.0.400` 后才进入 WinUI 模板安装。
-- 安装过程中不重复启动第二个 .NET 安装器。
-- 电脑已有 .NET 6/8/9 时，先判断目标 SDK 是否为 `10.0.400`；目标版本就绪前跳过 `dotnet new list winui` 检查，避免旧 SDK 把 `list` 当作无效参数。
 
 ### WinAppCLI 安装
 

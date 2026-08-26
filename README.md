@@ -13,7 +13,7 @@
 graph TD
     subgraph Layer0 ["0. 一键入场层 (Bootstrap Entry)"]
         E1["用户输入 gitee.com/freevian/quick-app-maker"] --> E2["entry.ps1 自动执行"]
-        E2 --> E3["全自动配齐: Git + .NET 10 + WinAppCLI + WinUI 模板"]
+        E2 --> E3["全自动配齐: MinGit(免安装) + .NET 10(免安装) + WinAppCLI + WinUI 模板 (零UAC/零写C盘)"]
         E3 --> E4["输出 BOOTSTRAP_READY 并移交 Skill 执行"]
     end
 
@@ -60,19 +60,25 @@ Invoke-WebRequest -UseBasicParsing -Uri 'https://gitee.com/freevian/quick-app-ma
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 ```
 
+> **MinGit 绿色免安装铁律**：`entry.ps1` 会自动从国内镜像下载绿色免安装包 `MinGit-2.47.1-64-bit.zip` 并解压到工作区根目录下的 `git\`（与 `quick-app-maker` 同级），**全程使用该绿色免安装版 Git（`.\git\cmd\git.exe`），绝不运行任何安装程序，彻底消除 UAC 管理员提权确认框打扰！**
+
 ### 第二步：识别就绪输出与工作目录
 一键脚本执行完毕后输出：
 ```text
 BOOTSTRAP_READY
+GIT_PATH: <WORKSPACE_ROOT>\git\cmd\git.exe
+DOTNET_ROOT: <WORKSPACE_ROOT>\dotnet
 WORKSPACE_ROOT: <当前工作目录/仓库的父目录>
 NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery
 ```
 
-* **工作目录铁律（绝对红线）**：严禁往任何系统目录、用户全局目录或系统临时目录（如 `$env:TEMP`、`%LOCALAPPDATA%`、`C:\Users\...`、`C:\temp`）写入或读取任何文件！所有新项目目录 `<app-slug>/`、`README.md`、临时测试、工具缓存（`.cache/`）、安装包必须全部放在当前工作目录（`WORKSPACE_ROOT`）内。
+* **工作目录铁律（绝对红线）**：严禁往任何系统目录、用户全局目录或系统临时目录（如 `$env:TEMP`、`%LOCALAPPDATA%`、`C:\Users\...`、`C:\temp`、`C:\Program Files`）写入或读取任何文件！所有新项目目录 `<app-slug>/`、`git/`、`dotnet/`、`README.md`、临时测试、工具缓存（`.cache/`）、安装包必须全部放在当前工作目录（`WORKSPACE_ROOT`）内。
 
 ### 第三步：开工前更新知识库并进入需求访谈
+使用工作区绿色免安装版 MinGit 执行更新（**所有 git 命令统一使用同级免安装版**）：
 ```powershell
-git -C quick-app-maker pull --ff-only origin main
+# 统一使用同级绿色免安装版 MinGit（零提权、零UAC弹窗）
+.\git\cmd\git.exe -C quick-app-maker pull --ff-only origin main
 ```
 随后立即读取 [`skills/vainreef-fast-publish/SKILL.md`](skills/vainreef-fast-publish/SKILL.md) 与 [`references/discovery-interview.md`](skills/vainreef-fast-publish/references/discovery-interview.md)，向用户发起白话开场问询：
 ```text
@@ -84,50 +90,49 @@ git -C quick-app-maker pull --ff-only origin main
 ## 全景文件拓扑与职责矩阵
 
 ```text
-quick-app-maker/
-├── README.md                                # 🏛️ 全系统总览与上帝视角架构蓝图 (本文件)
-├── bootstrap/                               # 🚀 零依赖一键初始化模块
-│   ├── entry.ps1                            # 公开入口：安装 Git (缺时)、clone 仓库、启动安装器
-│   ├── install.ps1                          # 智能安装器：并行检测并补齐 .NET 10 / CLI / 模板
-│   ├── toolchain.json                       # 唯一权威版本锁清单
-│   └── workers/                             # 下载与安装子工作脚本
-├── skills/vainreef-fast-publish/            # 🧠 核心业务大脑与执行规范
-│   ├── SKILL.md                             # 12 大生命周期标准流程、5 大黄金铁律、双窗口规范
-│   └── references/                          # 核心业务子模块与权威知识库
-│       ├── discovery-interview.md           # 8 层渐进式需求访谈框架与双窗口启动通知
-│       ├── test-assets.md                   # 中国大陆 100% 畅通素材库 (音频/图标/图片/字体)
-│       ├── partner-center-guide.md          # 微软 Partner Center 注册、名称验重与 6 大表单全指南
-│       ├── delivery-considerations.md       # 交付边界、权限、离线与性能考量
-│       ├── official-sources.md              # 微软官方文档与 API 规范入口
-│       ├── edge-store-automation.md         # 声明式状态收敛与 Store 0~7 自动化标准
-│       └── toolchain/v1/commands.md         # 53 个实机验证避坑指南、命令硬规则、UI 自动化生命周期
-├── toolchain/edge-store-cli/                # 🚀 .NET 10 (C#) 声明式状态收敛驱动 (V2)
-│   ├── Invoke-EdgeStore.ps1                 # 超薄启动器 (PowerShell Launcher)
-│   ├── EdgeStore.Cli.csproj                 # C# .NET 10 控制台项目
-│   ├── Program.cs                           # 命令行入口与参数解析
-│   ├── Orchestration/                       # Store 0 ~ Store 7 全流程编排器
-│   ├── Cdp/                                 # CdpClient, shallow DomDriver/requestNode, PageInspector, Waiter
-│   ├── ComponentAdapters/                   # LitElement / Angular (HeSelect, HeCheckbox) 专属适配器
-│   ├── PartnerCenter/                       # 6 大提审表单业务适配器 (Observe/Diff/Apply/ReloadVerify)
-│   ├── Models/                              # 强类型 DesiredState / 字段级 ObservedState / ReconcilePlan / PageState
-│   ├── Validate-EdgeStoreCli.ps1             # 工程与配置预检
-│   ├── README.md                            # V2 架构文档、Store 0~7 流水线与退出码约定
-│   └── examples/store-automation.json       # 纯声明式 Desired State 配置文件样例
-├── docs/                                    # 📚 归档与实战证据库
-│   ├── windows-smoke-test.md                # 1~9 轮真实 Windows 机器全流程实测战绩记录
-│   └── partner-center/                      # 8 个 Partner Center 真实页面 DOM 快照与实测记录
-│       ├── 微软PartnerCenter个人账户注册记录.md
-│       ├── 页面快照-应用和游戏概述.html
-│       ├── 页面快照-应用程序概述.html
-│       ├── 页面快照-定价和可用性.html
-│       ├── 页面快照-属性.html
-│       ├── 页面快照-年龄分级.html
-│       ├── 页面快照-程序包.html
-│       ├── 页面快照-Store一览-管理语言.html
-│       ├── 页面快照-提交选项.html
-│       ├── Agent-运行契约.md                  # Agent 每次执行必须遵守的发布运行规则
-│       └── Edge-Store-可靠性重构.md            # 40 类问题的根因与证据链设计
-└── apps/                                    # 💻 用户本地作品工作区 (已加入 .gitignore，绝不上传)
+Project/ (WORKSPACE_ROOT, 用户工作区根目录)
+├── git/                                     # 📦 MinGit 绿色免安装版 (与 quick-app-maker 同级，零 UAC 提权)
+│   ├── cmd/
+│   │   └── git.exe                          # 全程使用的 Git 绝对/相对调用入口
+│   └── ...
+├── dotnet/                                  # 📦 .NET 10 SDK 绿色免安装版 (解压即用，零 UAC 提权，零写C盘)
+│   ├── dotnet.exe                           # 全程使用的 .NET CLI 入口 (DOTNET_ROOT)
+│   └── ...
+├── quick-app-maker/                         # 🏛️ 核心工具链与知识库仓库
+│   ├── README.md                            # 🏛️ 全系统总览与上帝视角架构蓝图 (本文件)
+│   ├── bootstrap/                           # 🚀 零依赖一键初始化模块
+│   │   ├── entry.ps1                        # 公开入口：下载解压 MinGit 至 ../git (零UAC)、clone 仓库、启动安装器
+│   │   ├── install.ps1                      # 智能安装器：并行检测并解压免安装 .NET 10 / CLI / 模板
+│   │   ├── toolchain.json                   # 唯一权威版本锁清单
+│   │   └── workers/                         # 下载与解压子工作脚本
+│   ├── skills/vainreef-fast-publish/        # 🧠 核心业务大脑与执行规范
+│   │   ├── SKILL.md                         # 12 大生命周期标准流程、5 大黄金铁律、双窗口规范
+│   │   └── references/                      # 核心业务子模块与权威知识库
+│   │       ├── discovery-interview.md       # 8 层渐进式需求访谈框架与双窗口启动通知
+│   │       ├── test-assets.md               # 中国大陆 100% 畅通素材库 (音频/图标/图片/字体)
+│   │       ├── partner-center-guide.md      # 微软 Partner Center 注册、名称验重与 6 大表单全指南
+│   │       ├── delivery-considerations.md   # 交付边界、权限、离线与性能考量
+│   │       ├── official-sources.md          # 微软官方文档与 API 规范入口
+│   │       ├── edge-store-automation.md     # 声明式状态收敛与 Store 0~7 自动化标准
+│   │       └── toolchain/v1/commands.md     # 53 个实机验证避坑指南、命令硬规则、UI 自动化生命周期
+│   ├── toolchain/edge-store-cli/            # 🚀 .NET 10 (C#) 声明式状态收敛驱动 (V2)
+│   │   ├── Invoke-EdgeStore.ps1             # 超薄启动器 (PowerShell Launcher)
+│   │   ├── EdgeStore.Cli.csproj             # C# .NET 10 控制台项目
+│   │   ├── Program.cs                       # 命令行入口与参数解析
+│   │   ├── Orchestration/                   # Store 0 ~ Store 7 全流程编排器
+│   │   ├── Cdp/                             # CdpClient, shallow DomDriver/requestNode, PageInspector, Waiter
+│   │   ├── ComponentAdapters/               # LitElement / Angular (HeSelect, HeCheckbox) 专属适配器
+│   │   ├── PartnerCenter/                   # 6 大提审表单业务适配器 (Observe/Diff/Apply/ReloadVerify)
+│   │   ├── Models/                          # 强类型 DesiredState / 字段级 ObservedState / ReconcilePlan / PageState
+│   │   ├── Validate-EdgeStoreCli.ps1         # 工程与配置预检
+│   │   ├── README.md                        # V2 架构文档、Store 0~7 流水线与退出码约定
+│   │   └── examples/store-automation.json   # 纯声明式 Desired State 配置文件样例
+│   ├── docs/                                # 📚 归档与实战证据库
+│   │   ├── windows-smoke-test.md            # 1~9 轮真实 Windows 机器全流程实测战绩记录
+│   │   └── partner-center/                  # 8 个 Partner Center 真实页面 DOM 快照与实测记录
+│   └── apps/                                # 💻 历史测试沙箱 (已加入 .gitignore，绝不上传)
+├── <app-slug>/                              # 💻 用户具体的 WinUI 3 应用项目 (与 quick-app-maker 同级)
+└── .cache/                                  # 🛠️ 本地工具与下载缓存 (只读写当前工作区)
 ```
 
 ---
@@ -136,6 +141,9 @@ quick-app-maker/
 
 ### 1. 【网络与素材支柱】中国大陆 100% 畅通红线
 * **绝对红线**：开发环境 100% 位于中国境内，**严禁一切下载海外资源的尝试**（直连 GitHub releases、raw.githubusercontent、海外未镜像 API 必被墙卡死）。
+* **全工具链绿色免安装**：
+  * Git 统一采用 npmmirror 国内镜像源的 MinGit 绿色包，解压至工作区根目录 `git\`（与 `quick-app-maker` 同级）；
+  * .NET 10 SDK 统一采用官方 Binaries 绿色压缩包（`dotnet-sdk-10.0.400-win-x64.zip`），解压至工作区根目录 `dotnet\`（通过 `$env:DOTNET_ROOT` 挂载使用，绝不运行任何 EXE 安装器，绝不写 `C:\Program Files`）。
 * **素材黄金准则**：
   * 音效优先复制系统自带 `C:\Windows\Media\*.wav`（零网络、零下载）；
   * 图标优先使用 XAML 内置 `Segoe Fluent Icons` 字体字形与 `PersonPicture` 控件；
@@ -146,7 +154,9 @@ quick-app-maker/
 * **【铁律 1】DataTemplate 必须显式声明 `x:DataType`**：凡使用 `{x:Bind}`，根节点必须声明 `x:DataType="models:Class"`。看到 `WMC9999 ErrorMessages.resources` 假死错误 100% 是漏写了 x:DataType，严禁改依赖换包！
 * **【铁律 2】ContentDialog 必须设置 `XamlRoot`**：打开弹窗前必须赋予 `XamlRoot = this.Content.XamlRoot`，否则底层必抛 `0xc000027b` 原生闪退！
 * **【铁律 3】计划通知标准范式**：CsWinRT 投影无 `Recurrence` 属性，每年提醒采用循环单次调度，catch 时打印 `HResult`（`0x803E0120` 为管理员会话系统限制，视为正常）。
-* **【铁律 4】严禁操作 `HKLM:` 注册表与 `Cert:\LocalMachine\`**：证书只导入 `CurrentUser\TrustedPeople`，彻底杜绝 UAC 管理员提权弹窗打扰用户。
+* **【铁律 4】全生命周期零 UAC 提权 & 零 C 盘系统目录写入（免安装 MinGit + 免安装 .NET SDK + CurrentUser 证书 + 严禁写 HKLM）**：
+  - **底层根因（坑 62）**：AI Runner 执行线程运行在私有桌面 `WinSta0\exebox-*`，跨 Desktop 发起 `runas` 会被底层报 `0x80070032` 拦截；
+  - **工程实践**：Git 和 .NET 10 SDK 全程使用工作区根目录 `git\` 与 `dotnet\` 下的绿色免安装版；证书只导入 `CurrentUser\TrustedPeople`，严禁操作 `HKLM:` 注册表与 `Cert:\LocalMachine\`，全生命周期在 Medium Integrity 下顺畅运行，彻底杜绝任何 UAC 管理员提权确认框打扰用户。若极特殊场景确需提权，严禁关闭系统安全，必须使用 `lpDesktop="WinSta0\Default"` 桥接启动。
 * **【铁律 5】国内 NuGet 还原极速源**：依赖还原强制指定国内 Azure CDN 源 `https://nuget.azure.cn/v3/index.json`。
 
 ### 3. 【体验与协同支柱】双轨并行与自动化建项验重

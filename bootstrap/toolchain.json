@@ -2,17 +2,22 @@
   "release": "v1",
   "dotnet": {
     "version": "10.0.400",
-    "file": "dotnet-sdk-10.0.400-win-x64.exe",
-    "url": "https://download.microsoft.com/download/0130d68c-c9c7-4114-a96c-ccdd476c6493/bd77bbcc-651a-4809-bd90-ca757cf4d5e8/dotnet-sdk-10.0.400-win-x64.exe"
+    "file": "dotnet-sdk-10.0.400-win-x64.zip",
+    "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.400/dotnet-sdk-10.0.400-win-x64.zip"
   },
   "winui_template": {
     "version": "0.0.6-alpha",
     "file": "microsoft.windowsappsdk.winui.csharp.templates.0.0.6-alpha.nupkg",
-    "url": "https://api.nuget.org/v3-flatcontainer/microsoft.windowsappsdk.winui.csharp.templates/0.0.6-alpha/microsoft.windowsappsdk.winui.csharp.templates.0.0.6-alpha.nupkg"
+    "url": "https://nuget.azure.cn/v3-flatcontainer/microsoft.windowsappsdk.winui.csharp.templates/0.0.6-alpha/microsoft.windowsappsdk.winui.csharp.templates.0.0.6-alpha.nupkg"
   },
   "winappcli": {
     "version": "0.6.1",
     "package_version": "0.6.1.0",
     "repository_path": "toolchain/winapp-cli/0.6.1/winappcli_x64.msix"
+  },
+  "git": {
+    "version": "2.47.1.windows.1",
+    "file": "MinGit-2.47.1-64-bit.zip",
+    "url": "https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/MinGit-2.47.1-64-bit.zip"
   }
 }

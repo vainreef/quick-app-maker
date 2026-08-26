@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Vainreef Edge Store CLI - Ultra-thin Direct PowerShell Launcher for .NET 10 Driver
 #>
@@ -35,9 +35,31 @@ if (-not (Test-Path -LiteralPath $projectPath)) {
     exit 2
 }
 
-$dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+$dotnet = $null
+# 1. 优先自动探测工作区同级免安装版 .NET SDK (Project\dotnet\dotnet.exe)
+$repoRoot = Split-Path -Parent (Split-Path -Parent $toolRoot)
+$workspaceRoot = if (Test-Path -LiteralPath (Join-Path $repoRoot '.git')) { Split-Path -Parent $repoRoot } else { $repoRoot }
+$workspaceDotNet = Join-Path $workspaceRoot 'dotnet\dotnet.exe'
+if (Test-Path -LiteralPath $workspaceDotNet) {
+    $env:DOTNET_ROOT = Split-Path -Parent $workspaceDotNet
+    $env:DOTNET_MULTILEVEL_LOOKUP = '0'
+    if ($env:PATH -notlike "*$($env:DOTNET_ROOT)*") {
+        $env:PATH = "$($env:DOTNET_ROOT);$env:PATH"
+    }
+    $dotnet = [PSCustomObject]@{ Source = (Resolve-Path -LiteralPath $workspaceDotNet).Path }
+}
+
+if (-not $dotnet) {
+    $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+}
 if (-not $dotnet) {
     $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+}
+if (-not $dotnet) {
+    $systemDefault = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
+    if (Test-Path -LiteralPath $systemDefault) {
+        $dotnet = [PSCustomObject]@{ Source = (Resolve-Path -LiteralPath $systemDefault).Path }
+    }
 }
 if (-not $dotnet) {
     Write-Error ".NET 10 SDK (dotnet) is required to run Edge Store CLI. Please run bootstrap/install.ps1."

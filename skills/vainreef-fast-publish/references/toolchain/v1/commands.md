@@ -244,6 +244,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 - Root cause: CLI 依据本地 JSON 与页面比对，未修改 JSON 时差异为 0
 - Fix: 用户提出新需求时，必须首先修改本地 `edge-store.json` 文件再运行收敛
 
+#### 62. AI 执行器私有 Win32 Desktop (`WinSta0\exebox-*`) 隔离导致直接 UAC 提权失败 (`ERROR_NOT_SUPPORTED 0x80070032`)
+- Environment: AI Agent 运行环境 / Windows 10/11 Win32 USER32 Desktop 对象模型
+- 现象: Agent 在终端执行 `Start-Process -Verb RunAs` 请求管理员提权时，立即抛出异常 `0x80070032 (ERROR_NOT_SUPPORTED)` 或无任何反应，无法唤起 UAC 确认框。
+- Root cause:
+  1. AI Runner 与用户的 Explorer 处于同一个物理登录会话（`Session 1`）和同一个交互式窗口站（`WinSta0`），但 AI 执行线程被放进了独立的私有 Win32 Desktop 对象（`WinSta0\exebox-XXXX`），而用户操作的桌面是 `WinSta0\Default`，UAC 安全桌面是 `WinSta0\Winlogon`。
+  2. Windows USER32 安全机制规定不同 Desktop 间 GUI 与 Shell 上下文严格隔离。从非活动私有 Desktop 直接发起 `ShellExecuteEx("runas")` 时，Windows Shell / AppInfo 服务会出于防欺骗安全机制直接拒绝并返回 `ERROR_NOT_SUPPORTED`。
+  3. 普通文件读写、编译、网络、管道等因为完全共享内核/Token，100% 正常；仅跨 Desktop 的交互式提权路径受阻。
+- Fix（遇到此问题怎么办）:
+  1. **首选方案（治本 - 零提权免安装架构）**：
+     - Git 和 .NET 10 SDK 全程采用绿色免安装版，解压至工作区根目录（`Project\git\` 与 `Project\dotnet\`）；
+     - 证书只导入 `Cert:\CurrentUser\TrustedPeople`，包管理使用用户级 `Add-AppxPackage`，全流程 100% 在 Medium Integrity 下运行，根本不需要提权。
+  2. **兜底方案（若必须提权 - 跨 Desktop 桥接）**：
+     - **严禁要求用户关闭 UAC、关闭 Defender 或修改 `EnableLUA=0`！**
+     - 使用底层 Win32 API `CreateProcess` 显式指定 `STARTUPINFO.lpDesktop = @"WinSta0\Default"` 启动非提权中间进程至用户桌面，再由该进程调用 `ShellExecuteEx("runas")`，系统即可正常切入 `WinSta0\Winlogon` 安全桌面弹出原生 UAC 确认框。
+
 ---
 
 ## 适用范围（对"大多数 Win11 电脑"的成立性）
@@ -270,3 +285,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 | 59 冲突包清理与冷刷新激活 | 是 | Partner Center 上传提审规则 |
 | 60 显式导航替代 F5 冷加载 | 是 | SPA 路由生命周期规则 |
 | 61 变更配置前置更新 JSON | 是 | 声明式状态收敛铁律 |
+| 62 Win32 Desktop 隔离与提权桥接 | 是 | Windows USER32 桌面安全模型 |

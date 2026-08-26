@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$RepoRoot = '',
     [string]$GitPath = ''
@@ -33,6 +33,8 @@ New-Item -ItemType Directory -Force -Path $cacheRoot, $logsRoot | Out-Null
 $dotnetVersion = $toolchain.dotnet.version
 $dotnetUrl = $toolchain.dotnet.url
 $dotnetInstaller = Join-Path $cacheRoot $toolchain.dotnet.file
+$dotnetRoot = Join-Path $workspaceRoot 'dotnet'
+$dotnetExe = Join-Path $dotnetRoot 'dotnet.exe'
 
 $templateVersion = $toolchain.winui_template.version
 $templateUrl = $toolchain.winui_template.url
@@ -41,7 +43,6 @@ $templatePackage = Join-Path $cacheRoot $toolchain.winui_template.file
 $winAppVersion = $toolchain.winappcli.version
 $winAppPackageVersion = $toolchain.winappcli.package_version
 $winAppPackage = Join-Path $RepoRoot ($toolchain.winappcli.repository_path -replace '/', '\')
-$dotnetExe = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
 
 function Write-Step {
     param([string]$Message)
@@ -54,6 +55,9 @@ function Resolve-GitPath {
     if ($PreferredPath -and (Test-Path -LiteralPath $PreferredPath)) {
         return (Resolve-Path -LiteralPath $PreferredPath).Path
     }
+
+    $workspaceMinGit = Join-Path $workspaceRoot 'git\cmd\git.exe'
+    if (Test-Path -LiteralPath $workspaceMinGit) { return (Resolve-Path -LiteralPath $workspaceMinGit).Path }
 
     $command = Get-Command git.exe -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
@@ -69,12 +73,48 @@ function Resolve-GitPath {
 }
 
 function Test-DotNetSdk {
-    if (-not (Test-Path -LiteralPath $dotnetExe)) { return $false }
-    $previousErrorPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    $sdks = (& $dotnetExe --list-sdks 2>$null | Out-String)
-    $ErrorActionPreference = $previousErrorPreference
-    return $sdks -match "(?m)^$([regex]::Escape($dotnetVersion))"
+    # 优先使用工作区免安装版 .NET SDK
+    if (Test-Path -LiteralPath $dotnetExe) {
+        $env:DOTNET_ROOT = $dotnetRoot
+        $env:DOTNET_MULTILEVEL_LOOKUP = '0'
+        if ($env:PATH -notlike "*$dotnetRoot*") {
+            $env:PATH = "$dotnetRoot;$env:PATH"
+        }
+        $previousErrorPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $sdks = (& $dotnetExe --list-sdks 2>$null | Out-String)
+        $ErrorActionPreference = $previousErrorPreference
+        if ($sdks -match "(?m)^$([regex]::Escape($dotnetVersion))") {
+            return $true
+        }
+    }
+
+    # 回退检查系统全局 .NET
+    $systemDotNet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+    if ($systemDotNet) {
+        $previousErrorPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $sdks = (& $systemDotNet.Source --list-sdks 2>$null | Out-String)
+        $ErrorActionPreference = $previousErrorPreference
+        if ($sdks -match "(?m)^$([regex]::Escape($dotnetVersion))") {
+            $script:dotnetExe = $systemDotNet.Source
+            return $true
+        }
+    }
+
+    $systemDefault = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
+    if (Test-Path -LiteralPath $systemDefault) {
+        $previousErrorPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $sdks = (& $systemDefault --list-sdks 2>$null | Out-String)
+        $ErrorActionPreference = $previousErrorPreference
+        if ($sdks -match "(?m)^$([regex]::Escape($dotnetVersion))") {
+            $script:dotnetExe = $systemDefault
+            return $true
+        }
+    }
+
+    return $false
 }
 
 function Test-WinAppCli {
@@ -201,9 +241,9 @@ if (-not $dotnetReady) {
     if ($dotnetDownloadProcess) {
         Wait-ProcessWithFeedback -Process $dotnetDownloadProcess -Name '.NET SDK download' -PartialPath "$dotnetInstaller.part"
     }
-    Write-Step 'Starting .NET SDK install'
+    Write-Step 'Extracting .NET SDK (portable, zero-UAC) to workspace/dotnet'
     $script = Join-Path $workersRoot 'install-dotnet.ps1'
-    $arguments = "-InstallerPath `"$dotnetInstaller`" -LogPath `"$(Join-Path $logsRoot 'dotnet-install.log')`""
+    $arguments = "-ZipPath `"$dotnetInstaller`" -DestinationPath `"$dotnetRoot`" -LogPath `"$(Join-Path $logsRoot 'dotnet-extract.log')`""
     $dotnetInstallProcess = Start-ScriptProcess -ScriptPath $script -Arguments $arguments
 }
 
@@ -213,21 +253,28 @@ if ($templateDownloadProcess) {
 
 if ($dotnetInstallProcess) {
     try {
-        Wait-ProcessWithFeedback -Process $dotnetInstallProcess -Name '.NET SDK install'
+        Wait-ProcessWithFeedback -Process $dotnetInstallProcess -Name '.NET SDK extract'
     }
     catch {
-        Write-ArtifactFailureDiagnostic -Path $dotnetInstaller -Name '.NET SDK install'
+        Write-ArtifactFailureDiagnostic -Path $dotnetInstaller -Name '.NET SDK extract'
         Remove-Item -LiteralPath $dotnetInstaller -Force -ErrorAction SilentlyContinue
-        Write-Step '.NET SDK install failed; refreshing the cached installer and retrying once'
+        Write-Step '.NET SDK extract failed; refreshing the cached archive and retrying once'
         $retryDownload = Start-DownloadProcess -Id 'dotnet-sdk-retry' -Url $dotnetUrl -OutputPath $dotnetInstaller -LogName 'dotnet-download-retry.log'
         Wait-ProcessWithFeedback -Process $retryDownload -Name '.NET SDK retry download' -PartialPath "$dotnetInstaller.part"
         $retryScript = Join-Path $workersRoot 'install-dotnet.ps1'
-        $retryArguments = "-InstallerPath `"$dotnetInstaller`" -LogPath `"$(Join-Path $logsRoot 'dotnet-install-retry.log')`""
+        $retryArguments = "-ZipPath `"$dotnetInstaller`" -DestinationPath `"$dotnetRoot`" -LogPath `"$(Join-Path $logsRoot 'dotnet-extract-retry.log')`""
         $retryInstall = Start-ScriptProcess -ScriptPath $retryScript -Arguments $retryArguments
-        Wait-ProcessWithFeedback -Process $retryInstall -Name '.NET SDK retry install'
+        Wait-ProcessWithFeedback -Process $retryInstall -Name '.NET SDK retry extract'
     }
+
+    $env:DOTNET_ROOT = $dotnetRoot
+    $env:DOTNET_MULTILEVEL_LOOKUP = '0'
+    if ($env:PATH -notlike "*$dotnetRoot*") {
+        $env:PATH = "$dotnetRoot;$env:PATH"
+    }
+
     if (-not (Test-DotNetSdk)) {
-        throw ".NET SDK $dotnetVersion was not found after installation"
+        throw ".NET SDK $dotnetVersion was not found after extraction"
     }
     $dotnetReady = $true
 }
@@ -276,10 +323,11 @@ if (-not ($dotnetReady -and $winAppReady -and $templateReady)) {
 
 Write-Host ''
 Write-Host 'BOOTSTRAP_READY'
-Write-Host "Git: $(& $gitPath --version)"
+Write-Host "GIT_PATH: $gitPath"
+Write-Host "DOTNET_ROOT: $dotnetRoot"
 Write-Host ".NET SDK: $dotnetVersion"
 Write-Host "WinAppCLI: $winAppVersion"
 Write-Host "WinUI template: $templateVersion"
 Write-Host "WORKSPACE_ROOT: $workspaceRoot"
-Write-Host "NOTE: 所有 App 项目、.cache/ 工具缓存与临时文件均放置于当前工作目录，严禁写入系统临时目录。"
+Write-Host "NOTE: 所有 App 项目、git/、dotnet/、.cache/ 工具缓存与临时文件均放置于当前工作目录，严禁写入系统临时目录与C盘系统区。"
 Write-Host 'NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery'

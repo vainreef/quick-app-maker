@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$Destination = '',
     [string]$Branch = 'main'
@@ -6,11 +6,16 @@ param(
 
 $repoUrl = 'https://gitee.com/freevian/quick-app-maker.git'
 $gitVersion = '2.47.1.windows.1'
-$gitUrl = 'https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/Git-2.47.1-64-bit.exe'
+$gitUrl = 'https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/MinGit-2.47.1-64-bit.zip'
 
 $current = (Get-Location).Path
-$bootstrapCache = Join-Path $current '.cache\bootstrap'
-$gitInstaller = Join-Path $bootstrapCache 'Git-2.47.1-64-bit.exe'
+$workspaceRoot = if (Test-Path -LiteralPath (Join-Path $current '.git')) { Split-Path -Parent $current } else { $current }
+if (-not $workspaceRoot) { $workspaceRoot = $current }
+
+$minGitDir = Join-Path $workspaceRoot 'git'
+$minGitExe = Join-Path $minGitDir 'cmd\git.exe'
+$bootstrapCache = Join-Path $workspaceRoot '.cache\bootstrap'
+$gitArchive = Join-Path $bootstrapCache 'MinGit-2.47.1-64-bit.zip'
 $gitLog = Join-Path $bootstrapCache 'git-clone.log'
 
 New-Item -ItemType Directory -Force -Path $bootstrapCache | Out-Null
@@ -21,6 +26,8 @@ function Write-Step {
 }
 
 function Find-Git {
+    if (Test-Path -LiteralPath $minGitExe) { return $minGitExe }
+
     $command = Get-Command git.exe -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
 
@@ -35,48 +42,42 @@ function Find-Git {
 }
 
 if ([string]::IsNullOrWhiteSpace($Destination)) {
-    $current = (Get-Location).Path
     if (Test-Path -LiteralPath (Join-Path $current '.git')) {
         $Destination = $current
     }
     else {
-        $Destination = Join-Path $current 'quick-app-maker'
+        $Destination = Join-Path $workspaceRoot 'quick-app-maker'
     }
 }
 
 $git = Find-Git
 if (-not $git) {
-    Write-Step "Git $gitVersion missing; downloading from npmmirror"
-    if (-not (Test-Path -LiteralPath $gitInstaller)) {
+    Write-Step "MinGit $gitVersion (portable) missing; downloading from npmmirror"
+    if (-not (Test-Path -LiteralPath $gitArchive)) {
         $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
         if ($curl) {
             $previousErrorPreference = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
-            & $curl.Source --silent --show-error -L --fail --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 1800 -o $gitInstaller $gitUrl
+            & $curl.Source --silent --show-error -L --fail --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 1800 -o $gitArchive $gitUrl
             $curlExitCode = $LASTEXITCODE
             $ErrorActionPreference = $previousErrorPreference
-            if ($curlExitCode -ne 0) { throw "Git download failed with exit code $curlExitCode" }
+            if ($curlExitCode -ne 0) { throw "MinGit download failed with exit code $curlExitCode" }
         }
         else {
-            Invoke-WebRequest -UseBasicParsing -Uri $gitUrl -OutFile $gitInstaller
+            Invoke-WebRequest -UseBasicParsing -Uri $gitUrl -OutFile $gitArchive
         }
     }
 
-    Write-Step 'Installing Git'
-    $installer = Start-Process -FilePath $gitInstaller `
-        -ArgumentList '/VERYSILENT', '/NORESTART', '/NOCANCEL', '/SP-' `
-        -PassThru -Wait
-    if ($installer.ExitCode -ne 0) {
-        Remove-Item -LiteralPath $gitInstaller -Force -ErrorAction SilentlyContinue
-        throw "Git installer exit code $($installer.ExitCode)"
-    }
-    $git = Find-Git
+    Write-Step "Extracting MinGit (portable, zero-UAC) to $minGitDir"
+    New-Item -ItemType Directory -Force -Path $minGitDir | Out-Null
+    Expand-Archive -LiteralPath $gitArchive -DestinationPath $minGitDir -Force
+    $git = $minGitExe
 }
 else {
-    Write-Step "Git already installed: $(& $git --version)"
+    Write-Step "Git ready: $(& $git --version)"
 }
 
-if (-not $git) { throw 'Git executable was not found after installation' }
+if (-not $git -or -not (Test-Path -LiteralPath $git)) { throw 'Git executable was not found after bootstrap' }
 
 if (Test-Path -LiteralPath (Join-Path $Destination '.git')) {
     Write-Step "Repository already exists: $Destination"
