@@ -1,48 +1,11 @@
-URL: https://partner.microsoft.com/zh-cn/dashboard/products/9NCDR7XD30XJ/overview
-TITLE: 应用程序概述 | 牵挂EXXE | 合作伙伴中心
+URL: chrome-error://chromewebdata/
+TITLE: partner.microsoft.com
 
 === FULL BODY TEXT ===
-Skip to main content
-牵挂EXXE
-应用程序概述
-加载项
-产品页面试验试验详细信息
-产品管理产品标识管理应用名称管理程序包WNS/MPNS
-服务Xbox 服务Xbox 预览体验计划地图产品收集和购买管理员同意
-补充信息其他测试信息
-牵挂EXXE
+This partner.microsoft.com page can’t be found
 
-MSIX 或 PWA 应用
+No webpage was found for the web address: https://partner.microsoft.com/zh-cn/dashboard/product/NotFound?locationHref=https%3A%2F%2Fpartner.microsoft.com%2Fzh-cn%2Fdashboard%2Fbundles%2Fnew
 
-处于草稿状态
-是否需要帮助?
-联系客户支持
-产品版本
-
-使用此部分提交产品。
-
-产品提交: 正在草拟(Submission 1: 上次修改时间 2026/08/26)
-请按照以下步骤将产品提交到 Microsoft Store。请参阅提交所需的文档。
-删除提交
-提交进行认证
-定价和可用性
-属性
-完成
-年龄分级
-包
-Vainreef.EXXE_1.0.3.0_x64.msix
-Validated
-完成
-Store 一览
-添加/删除语言 导出列表 导入列表
-软件包中支持的语言
-完成
-提交选项
-完成
-常规
-查看产品标识
-你可以共享 Microsoft Store 深层链接，以帮助客户在 Microsoft Store 中查找你的产品。
-应用和游戏
-收益
-见解
-帮助 + 支持
+HTTP ERROR 404
+Refresh
+Microsoft Edge

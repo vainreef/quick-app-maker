@@ -20,52 +20,61 @@ public class ProductManager
 
     public async Task<ProductIdentityResult> CreateAndReserveProductAsync(string baseUrl, string appName)
     {
-        string appsUrl = Regex.Replace(baseUrl.TrimEnd('/'), @"/products$", "") + "/apps-and-games/overview";
-        Console.WriteLine($"[INFO] Navigating to Partner Center Apps & Games dashboard: {appsUrl}");
+        string appsUrl = "https://partner.microsoft.com/zh-cn/dashboard/apps-and-games/overview";
+        Console.WriteLine($"[INFO] Navigating to Partner Center Apps & Games overview: {appsUrl}");
         await _waiter.NavigateAsync(appsUrl, "Apps and Games Overview", allowOverviewRedirect: true);
+        await Task.Delay(3000);
 
-        // Click '+ 新产品' -> 'MSIX 或 PWA 应用'
-        Console.WriteLine("[INFO] Locating '+ 新产品' (Create New Application) menu...");
-        bool clickedNew = false;
-        var clickDeadline = DateTime.UtcNow.AddSeconds(30);
-        while (!clickedNew && DateTime.UtcNow < clickDeadline)
+        // Check if we are already on the product name input page
+        bool onNameInputPage = await _client.EvaluateAsync<bool>("""
+        (() => {
+            const inp = document.querySelector('input[name="productName"], input#product-name, input[uitestid="productNameInput"], input[type="text"]');
+            return inp !== null && inp.getBoundingClientRect().width > 0;
+        })()
+        """);
+
+        if (!onNameInputPage)
         {
-            clickedNew = await _client.EvaluateAsync<bool>("""
-            (() => {
-                const allRoots=[document];
-                for(let i=0;i<allRoots.length;i++){
-                  try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){}
-                }
-                const deepAll = (selector) => {
-                  const out=[], seen=new Set();
-                  for(const root of allRoots){
-                    try { for(const e of root.querySelectorAll(selector)) if(!seen.has(e)){ seen.add(e); out.push(e); } } catch(_){}
-                  }
-                  return out;
-                };
-                const visible = e => { const r=e.getBoundingClientRect(), s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden'; };
-                const btn = deepAll('[data-automation-id="create-new-Application"],[data-automation-id="create-new-application"],[uitestid="createNewApplicationButton"]')
-                        .concat(deepAll('button,he-button,a,[role="button"]'))
-                        .find(e => {
-                          if (!visible(e)) return false;
-                          const t = (((e.innerText||'') + ' ' + (e.getAttribute('aria-label')||'') + ' ' + (e.getAttribute('title')||''))).trim();
-                          return /新建产品|新产品/.test(t) && t.length < 25;
-                        });
-                if (btn) { btn.scrollIntoView({ block: 'center', inline: 'center' }); btn.click(); return true; }
-                return false;
-            })()
-            """);
-            if (!clickedNew) await Task.Delay(700);
-        }
+            Console.WriteLine("[INFO] Locating '+ 新产品' (Create New Application) menu...");
+            bool clickedNew = false;
+            var clickDeadline = DateTime.UtcNow.AddSeconds(30);
+            while (!clickedNew && DateTime.UtcNow < clickDeadline)
+            {
+                clickedNew = await _client.EvaluateAsync<bool>("""
+                (() => {
+                    const allRoots=[document];
+                    for(let i=0;i<allRoots.length;i++){
+                      try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){}
+                    }
+                    const deepAll = (selector) => {
+                      const out=[], seen=new Set();
+                      for(const root of allRoots){
+                        try { for(const e of root.querySelectorAll(selector)) if(!seen.has(e)){ seen.add(e); out.push(e); } } catch(_){}
+                      }
+                      return out;
+                    };
+                    const visible = e => { const r=e.getBoundingClientRect(), s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden'; };
+                    const btn = deepAll('[data-automation-id="create-new-Application"],[data-automation-id="create-new-application"],[uitestid="createNewApplicationButton"]')
+                            .concat(deepAll('button,he-button,a,[role="button"]'))
+                            .find(e => {
+                              if (!visible(e)) return false;
+                              const t = (((e.innerText||'') + ' ' + (e.getAttribute('aria-label')||'') + ' ' + (e.getAttribute('title')||''))).trim();
+                              return /新建产品|新产品/.test(t) && t.length < 25;
+                            });
+                    if (btn) { btn.scrollIntoView({ block: 'center', inline: 'center' }); btn.click(); return true; }
+                    return false;
+                })()
+                """);
+                if (!clickedNew) await Task.Delay(700);
+            }
 
-        if (!clickedNew)
-        {
-            throw new InvalidOperationException("Could not locate and click the '+ 新产品' (Create New Application) button on the Apps & Games overview page.");
+            if (clickedNew)
+            {
+                Console.WriteLine("[INFO] Selecting 'MSIX 或 PWA 应用' product type...");
+                await _native.ClickOptionByDeepTextAsync(["MSIX 或 PWA 应用"], "MSIX 或 PWA 应用");
+                await Task.Delay(1500);
+            }
         }
-
-        // Choose 'MSIX 或 PWA 应用' from the type dropdown that opened
-        Console.WriteLine("[INFO] Selecting 'MSIX 或 PWA 应用' product type...");
-        await _native.ClickOptionByDeepTextAsync(["MSIX 或 PWA 应用"], "MSIX 或 PWA 应用");
 
         // Wait for product name text field
         Console.WriteLine($"[INFO] Entering product name [{appName}]...");

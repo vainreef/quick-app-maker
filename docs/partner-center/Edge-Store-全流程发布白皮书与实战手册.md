@@ -55,6 +55,7 @@ Edge Store 自动化工具链（`toolchain/edge-store-cli/`）采用**纯轻量�
 
 | 阶段代号 | 阶段名称 | 核心动作 | CLI 命令 |
 | :--- | :--- | :--- | :--- |
+| **Stage -1** | 自动建项与身份回填 | 访问 `apps-and-games/overview`，预留名称并抓取 3 大核心包身份回填 Manifest | `-Action reserve -AppName "..."` |
 | **Stage 0** | 静态离线预检 | 质检描述字数(300+)、5大特性、7关键词、MSIX架构与Assets资源完整度 | `-Action preflight` |
 | **Stage 1** | 常驻浏览器启动 | 在 `WinSta0\Default` 桌面拉起独立 Edge 会话并确权登录态 | `-Action launch -KeepOpen` |
 | **Stage 2** | 动态 Submission 探测 | 访问产品主页，动态解析当前活跃 `SubmissionId` 与 6 大表单直达 URL | `-Action discover` |
@@ -70,6 +71,15 @@ Edge Store 自动化工具链（`toolchain/edge-store-cli/`）采用**纯轻量�
 ---
 
 ## 3. 核心表单攻坚与避坑铁律
+
+### 3.0 自动建项与官方工作区路由铁律（Stage -1）
+- **核心踩坑**：
+  Partner Center 是 SPA 架构，不存在独立的 `/products/create` 物理路由或公开直达端点，直接跳转会遭遇 404 及 Akamai CDN 的 `Access Denied`（坑 76）。此外，`+ 新产品` 按钮需等待异步权限加载后才挂载到 Shadow DOM（坑 77）。
+- **铁律**：
+  1. 必须导航至官方总览工作区 `https://partner.microsoft.com/zh-cn/dashboard/apps-and-games/overview`；
+  2. 使用带 30 秒弹性等待的 Shadow DOM 深度扫描器探测 `+ 新产品` 并点击；
+  3. 选择 `MSIX 或 PWA 应用` 后填入应用名称并点击「检查可用性」与「保留产品名称」；
+  4. 自动跳转到 `/identity` 抓取真实 Package Identity 并反向回填到项目 `Package.appxmanifest` 与清单文件中。
 
 ### 3.1 程序包上传与概览页唯一真值确权（Stage 6）
 - **核心踩坑**：页面表格显示 `Validated` 绝不等于该模块已保存完成！如果页面存在历史重复行或未点「保存」，草稿依然为 `Incomplete`。
