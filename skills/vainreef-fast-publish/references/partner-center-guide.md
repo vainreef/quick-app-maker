@@ -191,4 +191,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
    - 在弹出的下拉菜单中，点击 **「删除产品」**（对应 DOM 中的 `<span class="delete-draft">删除产品</span>`）。
 5. **在确认弹窗中二次确认**：
    - 阅读微软官方删除提示，确认无误后点击确定，即可将该产品及其预留名称从开发者中心彻底删除。
+6. **刷新页面验证（⚠️ 关键注意点）**：
+   - Partner Center 为单页 SPA 架构，删除完成后控制台列表可能存在前端缓存残留，**必须手动按 F5 刷新（或冷刷新）浏览器页面**，才能在「应用和游戏」产品列表中看到该产品已被彻底移除。
+
 

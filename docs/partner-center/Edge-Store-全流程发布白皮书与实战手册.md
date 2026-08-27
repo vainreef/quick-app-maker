@@ -166,4 +166,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
    - 在弹出的下拉浮层中，点击 **「删除产品」**（DOM 结构：`<span class="delete-draft">删除产品</span>`）。
 5. **二次弹窗确认**：
    - 在系统确认对话框中点击确定，即可彻底从 Partner Center 中删除该产品。
+6. **刷新页面验证（⚠️ 关键注意点）**：
+   - Partner Center 属于单页应用（SPA），删除操作提交后前端可能存在局部视图缓存，**必须手动按 F5 刷新（或强制刷新）页面**，产品列表中才会同步更新并消失。
+
 
