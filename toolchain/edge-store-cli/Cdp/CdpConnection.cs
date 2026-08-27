@@ -140,7 +140,7 @@ public class CdpConnection
             try
             {
                 int savedPort = int.Parse(File.ReadAllText(portFile).Trim());
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
                 var versionResp = await http.GetStringAsync($"http://127.0.0.1:{savedPort}/json/version");
                 if (!string.IsNullOrEmpty(versionResp))
                 {

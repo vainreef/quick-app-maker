@@ -23,7 +23,7 @@ public static class FillListingCommand
         string baseUrl = desired.Site.BaseUrl.TrimEnd('/');
         string submissionId = desired.SubmissionId;
 
-        // 1. Resolve submissionId if empty
+        // 1. Resolve submissionId
         if (string.IsNullOrWhiteSpace(submissionId))
         {
             string cpPath = Path.Combine(stateRoot, "checkpoint.json");
@@ -51,12 +51,37 @@ public static class FillListingCommand
             throw new InvalidOperationException("Could not resolve active Submission ID for Store Listing.");
         }
 
-        // 2. Discover exact listing URL for Chinese or target language
-        string targetLanguageCode = !string.IsNullOrWhiteSpace(desired.Site.LanguageCode) ? desired.Site.LanguageCode : "zh-cn";
-        string listingUrl = $"{baseUrl}/{desired.ProductId}/submissions/{submissionId}/listings?languageid={desired.Site.LanguageId}&languagecode={targetLanguageCode}";
+        // 2. Commit any pending deletions on managelanguages if we are currently there
+        string currentUrl = await client.EvaluateAsync<string>("location.href") ?? "";
+        if (currentUrl.Contains("managelanguages", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("[INFO] Committing language grid changes (clicking Save on managelanguages)...");
+            await client.EvaluateAsync<bool>("""
+            (() => {
+              const saveBtn = Array.from(document.querySelectorAll('he-button, button, input[type="button"], input[type="submit"]')).find(e => {
+                const t = (e.innerText || e.value || e.getAttribute('aria-label') || '').trim();
+                const r = e.getBoundingClientRect();
+                return /^(保存|Save|保存并继续)$/i.test(t) && r.width > 0 && r.height > 0 && !e.disabled;
+              });
+              if (saveBtn) {
+                if (saveBtn.shadowRoot) {
+                  const inner = saveBtn.shadowRoot.querySelector('button');
+                  if (inner) inner.click();
+                }
+                saveBtn.click();
+                saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+                return true;
+              }
+              return false;
+            })()
+            """);
+            await Task.Delay(3500);
+        }
 
-        Console.WriteLine($"[NAV] Navigating directly to Store Listing form: {listingUrl}");
-        await waiter.NavigateAsync(listingUrl, "Store Listing Form");
+        // 3. Navigate directly to the Chinese listing form
+        string chineseListingUrl = $"{baseUrl}/{desired.ProductId}/submissions/{submissionId}/listings?languageid=5&languagecode=zh-cn";
+        Console.WriteLine($"[NAV] Navigating directly to Chinese Store Listing form: {chineseListingUrl}");
+        await waiter.NavigateAsync(chineseListingUrl, "Chinese Store Listing Form");
         await Task.Delay(3000);
 
         var adapter = new ListingAdapter(client, dom, waiter, native, input);
@@ -75,11 +100,11 @@ public static class FillListingCommand
 
         await Task.Delay(4000);
 
-        // 3. Navigate strictly back to Overview
+        // 4. Navigate strictly back to Overview and verify
         string overviewUrl = $"{baseUrl}/{desired.ProductId}/overview";
         Console.WriteLine($"[INFO] Navigating strictly to Product Overview: {overviewUrl}");
         await waiter.NavigateAsync(overviewUrl, "Product Overview after listing save");
-        await Task.Delay(2000);
+        await Task.Delay(2500);
 
         var inspector = new PageInspector(client);
         var snapshot = await inspector.CaptureAsync();

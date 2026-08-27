@@ -175,6 +175,12 @@ public class Program
                 case "cleanlanguages":
                     return await LanguageGridCleanerCommand.ExecuteAsync(desired, stateRoot);
 
+                case "fulldom":
+                    return await FullDomDumpCommand.ExecuteAsync(stateRoot, baseDir);
+
+                case "diagnoselisting":
+                    return await DiagnoseListingCommand.ExecuteAsync(desired, stateRoot);
+
                 case "filllisting":
                     return await FillListingCommand.ExecuteAsync(desired, stateRoot);
 

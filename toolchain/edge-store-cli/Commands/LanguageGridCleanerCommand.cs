@@ -17,9 +17,24 @@ public static class LanguageGridCleanerCommand
         var waiter = new Waiter(client);
         var input = new InputDriver(client, new AxLocator(client, new DomDriver(client)));
 
-        string currentUrl = await client.EvaluateAsync<string>("location.href") ?? "";
         string baseUrl = desired.Site.BaseUrl.TrimEnd('/');
-        string targetGridUrl = $"{baseUrl}/{desired.ProductId}/submissions/{desired.SubmissionId}/managelanguages?producttype=app";
+        string submissionId = desired.SubmissionId;
+        if (string.IsNullOrWhiteSpace(submissionId))
+        {
+            string cpPath = Path.Combine(stateRoot, "checkpoint.json");
+            if (File.Exists(cpPath))
+            {
+                try
+                {
+                    var cp = JsonSerializer.Deserialize<StoreCheckpoint>(File.ReadAllText(cpPath));
+                    if (!string.IsNullOrWhiteSpace(cp?.SubmissionId)) submissionId = cp.SubmissionId;
+                }
+                catch { }
+            }
+        }
+
+        string targetGridUrl = $"{baseUrl}/{desired.ProductId}/submissions/{submissionId}/managelanguages?producttype=app";
+        string currentUrl = await client.EvaluateAsync<string>("location.href") ?? "";
 
         if (!currentUrl.Contains("managelanguages", StringComparison.OrdinalIgnoreCase))
         {
@@ -28,39 +43,51 @@ public static class LanguageGridCleanerCommand
             await Task.Delay(2000);
         }
 
-        Console.WriteLine("[INFO] Deleting non-target languages from language grid...");
+        Console.WriteLine("[INFO] Iteratively deleting all non-Chinese languages from language grid...");
 
-        int deletedCount = await client.EvaluateAsync<int>("""
-        (() => {
-          let count = 0;
-          const links = Array.from(document.querySelectorAll('a[href*="languagecode="]'));
-          for (const a of links) {
-            const text = (a.innerText || '').trim();
-            if (text.includes('中文') || text.includes('Chinese') || (a.href || '').includes('zh-cn')) {
-              continue;
-            }
-            let container = a.parentElement;
-            for (let i = 0; i < 5 && container; i++) {
-              const delBtn = Array.from(container.querySelectorAll('he-button, button')).find(b => (b.innerText || '').trim() === '删除');
-              if (delBtn) {
-                delBtn.click();
-                if (delBtn.shadowRoot) {
-                  const inner = delBtn.shadowRoot.querySelector('button');
-                  if (inner) inner.click();
-                }
-                delBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                count++;
-                break;
+        int deletedTotal = await client.EvaluateAsync<int>("""
+        (async () => {
+          let deletedCount = 0;
+          for (let pass = 0; pass < 150; pass++) {
+            const links = Array.from(document.querySelectorAll('a[href*="languagecode="], a[href*="listings"]'));
+            let targetBtn = null;
+            let targetName = '';
+
+            for (const a of links) {
+              const text = (a.innerText || '').trim();
+              if (text === '中文(中国)' || (a.href || '').includes('languageid=5') || (a.href || '').includes('languagecode=zh-cn')) {
+                continue; // Keep Chinese (China)
               }
-              container = container.parentElement;
+              let container = a.parentElement;
+              for (let i = 0; i < 5 && container; i++) {
+                const btn = Array.from(container.querySelectorAll('he-button, button')).find(b => (b.innerText || '').trim() === '删除');
+                if (btn) {
+                  targetBtn = btn;
+                  targetName = text;
+                  break;
+                }
+                container = container.parentElement;
+              }
+              if (targetBtn) break;
             }
+
+            if (!targetBtn) break;
+
+            if (targetBtn.shadowRoot) {
+              const inner = targetBtn.shadowRoot.querySelector('button');
+              if (inner) inner.click();
+            }
+            targetBtn.click();
+            targetBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+            deletedCount++;
+            await new Promise(r => setTimeout(r, 80));
           }
-          return count;
+          return deletedCount;
         })()
         """);
 
-        Console.WriteLine($"[INFO] Triggered delete on {deletedCount} non-target languages.");
-        await Task.Delay(2500);
+        Console.WriteLine($"[PASS] Deleted {deletedTotal} non-Chinese languages.");
+        await Task.Delay(2000);
 
         // Click Save on the language grid page
         Console.WriteLine("[INFO] Clicking Save on manage languages page...");
@@ -72,12 +99,12 @@ public static class LanguageGridCleanerCommand
             return /^(保存|Save|保存并继续)$/i.test(t) && r.width > 0 && r.height > 0 && !e.disabled;
           });
           if (saveBtn) {
-            saveBtn.click();
             if (saveBtn.shadowRoot) {
               const inner = saveBtn.shadowRoot.querySelector('button');
               if (inner) inner.click();
             }
-            saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            saveBtn.click();
+            saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
             return true;
           }
           return false;

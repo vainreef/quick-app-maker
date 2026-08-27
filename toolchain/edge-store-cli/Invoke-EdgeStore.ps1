@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('preflight', 'launch', 'step', 'discover', 'inspect', 'dumpdom', 'probelanguages', 'cleanpackages', 'cleanlanguages', 'filllisting', 'reserve', 'identity', 'run', 'status', 'verify', 'stop')]
+    [ValidateSet('preflight', 'launch', 'step', 'discover', 'inspect', 'dumpdom', 'fulldom', 'probelanguages', 'cleanpackages', 'cleanlanguages', 'diagnoselisting', 'filllisting', 'reserve', 'identity', 'run', 'status', 'verify', 'stop')]
     [string]$Action = 'run',
     [ValidateSet('all', 'availability', 'properties', 'ageRatings', 'packages', 'listing', 'options')]
     [string]$Phase = 'all',
