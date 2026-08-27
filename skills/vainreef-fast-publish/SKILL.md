@@ -276,7 +276,7 @@ Agent 根据当前 App 增加针对性测试。
 
 本模块为 Agent 向用户提供微软开发者中心（Partner Center）全流程协助的标准规范。支持**独立咨询会话（窗口 2）**与**发布时刻智能断点续接**：
 
-- **详细权威操作手册**：严格查阅 [partner-center-guide.md](references/partner-center-guide.md) 及 `docs/partner-center/` 内的真实表单 DOM 快照。
+- **详细权威操作手册与架构白皮书**：严格查阅 [Edge-Store-全流程发布白皮书与实战手册](../../docs/partner-center/Edge-Store-全流程发布白皮书与实战手册.md)、[partner-center-guide.md](references/partner-center-guide.md) 及 `docs/partner-center/` 内的真实表单 DOM 快照。
 - **声明式 Edge 自动化入口 (V2)**：先读取 [Agent 运行契约](../../docs/partner-center/Agent-运行契约.md) 和 [可靠性重构](../../docs/partner-center/Edge-Store-可靠性重构.md)，再使用唯一正式入口 `toolchain/edge-store-cli/Invoke-EdgeStore.ps1`。`apps/Project/edge-store-cli-fast` 只是一轮旧诊断副本，不执行其中的 DLL。大 SPA 禁止 `DOM.getDocument(depth:-1,pierce:true)`；采用浅根、局部 `DOM.requestNode`、组件 Shadow Root 与 Accessibility Tree 语义化定位，严禁硬编码绝对坐标。
 - **独立咨询会话与自动化建项规范**：
   1. 当用户新开窗口提问“如何创建 Partner 账号 / 如何起名验重”时，Agent 专注提供咨询服务；
