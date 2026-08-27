@@ -56,17 +56,23 @@ public class ProductManager
         if (!onNameInputPage)
         {
             Console.WriteLine("[INFO] Step 1: Locating and physical clicking '+ 新产品'...");
-            bool clickedNew = await PhysicalClickElementAsync("""
-            () => {
-                return deepAll('[data-automation-id="create-new-Application"],[data-automation-id="create-new-application"],[uitestid="createNewApplicationButton"]')
-                    .concat(deepAll('button,he-button,a,[role="button"],span'))
-                    .find(e => {
-                      if (!visible(e)) return false;
-                      const t = (((e.innerText||'') + ' ' + (e.getAttribute('aria-label')||'') + ' ' + (e.getAttribute('title')||''))).trim();
-                      return /新建产品|新产品/.test(t) && t.length < 25;
-                    });
+            bool clickedNew = false;
+            for (int attempt = 0; attempt < 6; attempt++)
+            {
+                clickedNew = await PhysicalClickElementAsync("""
+                () => {
+                    return deepAll('button[data-automation-id="create-new-button"], [data-automation-id="create-new-Application"], [data-automation-id="create-new-application"], [uitestid="createNewApplicationButton"]')
+                        .concat(deepAll('button,he-button,a,[role="button"],span'))
+                        .find(e => {
+                          if (!visible(e)) return false;
+                          const t = (((e.innerText||'') + ' ' + (e.getAttribute('aria-label')||'') + ' ' + (e.getAttribute('title')||''))).trim();
+                          return /新建产品|新产品/.test(t) && t.length < 25;
+                        });
+                }
+                """, "新产品 按钮");
+                if (clickedNew) break;
+                await Task.Delay(800);
             }
-            """, "新产品 按钮");
 
             if (!clickedNew)
             {
@@ -76,21 +82,18 @@ public class ProductManager
             await Task.Delay(1200);
 
             Console.WriteLine("[INFO] Step 2: Physical clicking 'MSIX 或 PWA 应用'...");
-            bool clickedMsix = await PhysicalClickElementAsync("""
-            () => {
-                return deepAll('button,he-button,a,[role="button"],li,div[role="option"],div[role="menuitem"],he-menu-item,span')
-                    .find(e => visible(e) && (e.innerText || '').includes('MSIX 或 PWA'));
-            }
-            """, "MSIX 或 PWA 应用 菜单项");
-
-            if (!clickedMsix)
+            bool clickedMsix = false;
+            for (int attempt = 0; attempt < 6; attempt++)
             {
-                // Fallback to broader search
                 clickedMsix = await PhysicalClickElementAsync("""
                 () => {
-                    return deepAll('*').find(e => visible(e) && (e.innerText || '').trim() === 'MSIX 或 PWA 应用');
+                    return deepAll('button[value="MSIX_PWA_App"], [data-automation-id="create-new-Application"] button, button[value*="MSIX"]')
+                        .concat(deepAll('button[role="menuitem"], li[role="none"] > button'))
+                        .find(e => visible(e) && (e.innerText || '').includes('MSIX 或 PWA'));
                 }
-                """, "MSIX 或 PWA 应用 文本");
+                """, "MSIX 或 PWA 应用 菜单项 (button[value='MSIX_PWA_App'])");
+                if (clickedMsix) break;
+                await Task.Delay(800);
             }
 
             if (!clickedMsix)
@@ -124,8 +127,9 @@ public class ProductManager
             await _native.ClickOptionByDeepTextAsync(["检查可用性", "检查名称可用性"], "检查可用性");
         }
 
-        Console.WriteLine("[INFO] Step 5: Waiting for name availability verification...");
-        var checkDeadline = DateTime.UtcNow.AddSeconds(25);
+        Console.WriteLine("[INFO] Step 5: Waiting for name availability verification (strict 10s limit)...");
+        await Task.Delay(1200); // Allow async POST request to start
+        var checkDeadline = DateTime.UtcNow.AddSeconds(10);
         AvailabilityCheckResult? checkResult = null;
         while (DateTime.UtcNow < checkDeadline)
         {
@@ -142,29 +146,33 @@ public class ProductManager
                   }
                   return out;
                 };
-                const visible = e => { const r=e.getBoundingClientRect(), s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden'; };
+                const visible = e => {
+                  const r=e.getBoundingClientRect(), s=getComputedStyle(e);
+                  return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && !e.classList.contains('hidden');
+                };
 
-                // 1. 优先检测失败报警 (名称不可用 / 已被保留 / alert-danger / AlreadyReserved)
+                // 1. 严格优先检测失败报警 (名称不可用 / 已被保留 / alert-danger / AlreadyReserved)
                 const errorEls = deepAll('.alert-error, .alert-danger, [role="alert"], [data-l10n-key*="AlreadyReserved"], [data-l10n-key*="NotAvailable"], .has-error')
                     .filter(visible);
                 for (const el of errorEls) {
                     const txt = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-                    if (txt.includes('名称不可用') || txt.includes('已被保留') || txt.includes('Already reserved') || txt.includes('Not available') || txt.includes('已被使用') || txt.includes('不可用')) {
+                    if (txt.includes('不可用') || txt.includes('已被保留') || txt.includes('已被使用') || txt.includes('Already reserved') || txt.includes('Not available')) {
                         return { checked: true, available: false, errorMessage: txt };
                     }
                 }
 
-                // 2. 检测成功信号 (保留产品名称 按钮已解除禁用 或 绿勾出现)
-                const btn = deepAll('button,he-button,a,[role="button"]').find(e => visible(e) && (/保留产品名称|保留名称|Reserve product name/.test(e.innerText || '')));
-                if (btn) {
-                    const isDisabled = btn.disabled || btn.getAttribute('disabled') !== null || btn.getAttribute('aria-disabled') === 'true' || btn.classList.contains('disabled');
-                    if (!isDisabled) {
-                        return { checked: true, available: true, errorMessage: '' };
-                    }
+                // 2. 检测整页是否有不可用提示
+                const modal = document.querySelector('name-input, .modal-dialog, [role="dialog"]') || document.body;
+                const modalText = (modal.innerText || '').replace(/\s+/g, ' ');
+                if (modalText.includes('名称不可用') || modalText.includes('已被保留') || modalText.includes('不使用此名称')) {
+                    return { checked: true, available: false, errorMessage: '名称不可用。如果已保留此名称用于其他产品，请将其更新为不使用此名称。' };
                 }
 
-                const checkMark = deepAll('.win-icon-CheckMark, .win-color-fg-green, [data-l10n-key*="Available"]').find(visible);
-                if (checkMark) {
+                // 3. 严格检测成功信号 (只有在没有任何错误的情况下，检测绿色对勾或明确的"此名称可用")
+                const checkMark = deepAll('.win-icon-CheckMark, .win-color-fg-green').find(visible);
+                const hasSuccessText = modalText.includes('此名称可用') || (modalText.includes('名称可用') && !modalText.includes('不可用'));
+                
+                if (checkMark || hasSuccessText) {
                     return { checked: true, available: true, errorMessage: '' };
                 }
 
@@ -176,42 +184,61 @@ public class ProductManager
             {
                 break;
             }
-            await Task.Delay(400);
+            await Task.Delay(300);
         }
 
-        if (checkResult == null || !checkResult.Checked)
+        if (checkResult == null || !checkResult.Checked || !checkResult.Available)
         {
-            throw new InvalidOperationException("Name availability verification timed out after 25s.");
-        }
+            string domSummary = await _client.EvaluateAsync<string>("""
+            (() => {
+                const el = document.querySelector('name-input, .modal-dialog, [role="dialog"]') || document.body;
+                return (el.innerText || '').slice(0, 300).replace(/\s+/g, ' ');
+            })()
+            """) ?? "";
 
-        if (!checkResult.Available)
-        {
-            Console.WriteLine($"\n[NAME-UNAVAILABLE] ❌ 微软商店产品名称 [{appName}] 不可用！");
-            Console.WriteLine($"[NAME-UNAVAILABLE] 微软后台提示: {checkResult.ErrorMessage}");
-            throw new ProductNameUnavailableException(appName, checkResult.ErrorMessage);
+            string err = checkResult?.ErrorMessage ?? "10秒验重超时，未检测到成功绿标";
+            Console.WriteLine($"\n[NAME-UNAVAILABLE] ❌ 微软商店产品名称 [{appName}] 验重未通过！");
+            Console.WriteLine($"[NAME-UNAVAILABLE] 微软后台状态: {err}");
+            Console.WriteLine($"[NAME-UNAVAILABLE] 现场 DOM 摘要: {domSummary}\n");
+            throw new ProductNameUnavailableException(appName, $"{err} | DOM: {domSummary}");
         }
 
         Console.WriteLine("[PASS] Name is available! Proceeding to reserve...");
-        await Task.Delay(600);
+        await Task.Delay(500);
 
         Console.WriteLine("[INFO] Step 6: Clicking '保留产品名称' (Reserve product name)...");
-        bool clickedReserve = await PhysicalClickElementAsync("""
+        await _client.EvaluateAsync<bool>("""
+        (() => {
+            const allRoots=[document];
+            for(let i=0;i<allRoots.length;i++){
+              try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){}
+            }
+            for(const root of allRoots){
+              for(const b of root.querySelectorAll('button,he-button,a,[role="button"]')){
+                if((b.innerText||'').includes('保留产品名称') || (b.innerText||'').includes('保留名称')){
+                  b.click();
+                  b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+                  return true;
+                }
+              }
+            }
+            return false;
+        })()
+        """);
+
+        await PhysicalClickElementAsync("""
         () => {
             return deepAll('button,he-button,a,[role="button"]')
                 .find(e => visible(e) && (/保留产品名称|保留名称|Reserve product name/.test(e.innerText || '')));
         }
         """, "保留产品名称 按钮");
-        if (!clickedReserve)
-        {
-            await _native.ClickOptionByDeepTextAsync(["保留产品名称", "保留名称", "Reserve product name"], "保留产品名称");
-        }
 
         Console.WriteLine("[INFO] Step 7: Waiting for product reservation to complete and overview page to load...");
         await _waiter.RequireAsync(async () =>
         {
             string url = await _client.EvaluateAsync<string>("location.href") ?? "";
-            return (url.Contains("/products/") || url.Contains("/apps/")) && !url.Contains("/create");
-        }, TimeSpan.FromSeconds(45), "Wait for Product Overview URL after reservation");
+            return (url.Contains("/products/") || url.Contains("/apps/")) && !url.Contains("/create") && !url.Contains("/overview");
+        }, TimeSpan.FromSeconds(25), "Wait for Product Overview URL after reservation");
 
         string? currentUrl = await _client.EvaluateAsync<string>("location.href");
         var match = Regex.Match(currentUrl ?? "", @"/products/([^/?#]+)");
