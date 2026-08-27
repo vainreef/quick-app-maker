@@ -23,7 +23,10 @@ public static class DesiredStateValidator
         RequiredFile(desired.Assets.Msix, "assets.msix");
 
         if (string.Equals(desired.Properties.Privacy, "Yes", StringComparison.OrdinalIgnoreCase))
-            Required(desired.Properties.PrivacyPolicyUrl, "properties.privacyPolicyUrl");
+        {
+            if (string.IsNullOrWhiteSpace(desired.Properties.PrivacyPolicyUrl) && string.IsNullOrWhiteSpace(desired.Properties.PrivacyPolicyText))
+                errors.Add("When properties.privacy is 'Yes', either properties.privacyPolicyUrl or properties.privacyPolicyText must be provided.");
+        }
 
         if (DeclaresRunFullTrust(desired.Assets.Msix))
             Required(desired.SubmissionOptions.RunFullTrustReason, "submissionOptions.runFullTrustReason");

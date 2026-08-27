@@ -169,7 +169,7 @@ Project/ (WORKSPACE_ROOT, 用户工作区根目录)
   * **场景 A：全新应用上架**：
     1. 启动会话：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -KeepOpen`（用户完成首次登录）。
     2. 自动建项验重：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName "应用名称" -Manifest build/edge-store.json`（自动建项、预留、提取 Identity 并回填清单）。
-    3. 重新打包：`winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix`
+    3. 重新打包：`winapp package ./publish --executable <AppName>.exe --publisher "<Publisher>" --generate-cert --output ./store-package/<Identity>_<Version>_x64.msix`
     4. 离线质检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest build/edge-store.json`
     5. 全自动收敛：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest build/edge-store.json -Apply -KeepOpen`
     6. 显式提交：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest build/edge-store.json -Apply -Submit -ConfirmSubmit`

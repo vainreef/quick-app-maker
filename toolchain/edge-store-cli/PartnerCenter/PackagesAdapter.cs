@@ -22,9 +22,16 @@ public sealed class PackagesAdapter
         await _waiter.RequireAsync(async () =>
         {
             string url = await _client.EvaluateAsync<string>("location.href") ?? "";
-            int len = await _client.EvaluateAsync<int>("document.body?.innerText.length || 0");
-            return url.Contains("/packages", StringComparison.OrdinalIgnoreCase) && len > 100;
+            bool ready = await _client.EvaluateAsync<bool>("""
+            (() => {
+                const text = (document.body ? document.body.innerText : '') || '';
+                return text.includes('Drag your packages here') || text.includes('拖放') || text.includes('.msix') || text.includes('Device family availability');
+            })()
+            """);
+            return url.Contains("/packages", StringComparison.OrdinalIgnoreCase) && ready;
         }, TimeSpan.FromSeconds(90), "Wait for packages page state");
+
+        await Task.Delay(1500);
 
         var entries = await ObserveEntriesOnlyAsync();
         return new ObservedPackages
@@ -111,8 +118,15 @@ public sealed class PackagesAdapter
         await _checkbox.SetCheckedAsync("future device families", true, "future device families");
 
         await _native.ClickStrictAsync([
-            "button[name=\"save_button\"]", "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
-            "button[uitestid=\"saveButtonPackages\"]", "input#saveButtonPackages", "button#saveButtonPackages"
+            "input[type=\"button\"][value=\"Save\"]",
+            "input[type=\"button\"][value=\"保存\"]",
+            "input.btn-primary[value=\"Save\"]",
+            "input.btn-primary[value=\"保存\"]",
+            "button[name=\"save_button\"]",
+            "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
+            "button[uitestid=\"saveButtonPackages\"]",
+            "input#saveButtonPackages",
+            "button#saveButtonPackages"
         ], "Save packages");
         await _native.AssertNoVisibleErrorsAsync();
     }
@@ -130,24 +144,39 @@ public sealed class PackagesAdapter
     {
         return await _client.EvaluateAsync<List<PackageEntry>>("""
         (() => {
-          const roots=[document], rows=[], seen=new Set();
-          while(roots.length){
-            const root=roots.shift();
-            for(const e of root.querySelectorAll('*')) if(e.shadowRoot) roots.push(e.shadowRoot);
-            for(const e of root.querySelectorAll('tr,[role="row"],.package-row,[class*="package-item"]')){
-              const text=(e.innerText||'').trim();
-              if(/\.(msix|msixbundle|appx|appxbundle)\b/i.test(text) && !seen.has(text)){seen.add(text);rows.push(text);}
+          const allRoots = [document];
+          for (let i = 0; i < allRoots.length; i++) {
+            try { for (const e of allRoots[i].querySelectorAll('*')) if (e.shadowRoot) allRoots.push(e.shadowRoot); } catch (_) {}
+          }
+
+          const entries = [];
+          const seen = new Set();
+          for (const root of allRoots) {
+            const rows = Array.from(root.querySelectorAll('.packages-table tr, .package-table tr, table.packages-table tr, .table-device-matrix tr, tr.version-row, tr'));
+            for (const r of rows) {
+              const text = (r.innerText || '').trim();
+              const m = text.match(/[^\\/:*?"<>|\r\n]+\.(?:msixbundle|appxbundle|msix|appx)\b/i);
+              if (m) {
+                const fileName = m[0].trim();
+                if (/^(msix|appx|msixbundle|appxbundle|xap)$/i.test(fileName)) continue;
+                if (seen.has(fileName)) continue;
+                seen.add(fileName);
+
+                const rowText = (document.body ? document.body.innerText : text).toLowerCase();
+                let status = 'Unknown';
+                if (/\b(package verification error|failed to validate)\b|上传失败/.test(rowText)) {
+                  status = 'Error';
+                } else if (/uploading|processing|analyzing|正在分析|正在处理|正在上传|验证中/.test(rowText)) {
+                  status = 'Processing';
+                } else if (rowText.includes('show details') || rowText.includes('remove') || rowText.includes('删除') || rowText.includes('version') || rowText.includes('architecture') || rowText.includes('desktop') || rowText.includes('mb') || rowText.includes('validated') || rowText.includes('已验证')) {
+                  status = 'Validated';
+                }
+
+                entries.push({ fileName, status });
+              }
             }
           }
-          if(!rows.length){
-            const text=document.body?.innerText||'';
-            for(const line of text.split(/\n+/)) if(/\.(msix|msixbundle|appx|appxbundle)\b/i.test(line)) rows.push(line.trim());
-          }
-          return rows.map(text => {
-            const m=text.match(/[^\\/:*?"<>|\r\n]+\.(?:msixbundle|appxbundle|msix|appx)\b/i);
-            const status=/validated|已验证/i.test(text)?'Validated':/error|错误|失败/i.test(text)?'Error':/upload|processing|验证中|正在/i.test(text)?'Processing':'Unknown';
-            return {fileName:m?m[0].trim():'',status};
-          }).filter(x=>x.fileName);
+          return entries;
         })()
         """) ?? [];
     }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Vainreef.EdgeStore.Cdp;
 using Vainreef.EdgeStore.ComponentAdapters;
 using Vainreef.EdgeStore.State;
@@ -27,6 +28,8 @@ public class PropertiesAdapter
             return hasCat;
         }, TimeSpan.FromSeconds(60), "Wait for properties CategorySelect");
 
+        await Task.Delay(1500);
+
         var obs = new ObservedProperties();
 
         obs.Category = await _client.EvaluateAsync<string>("""
@@ -38,27 +41,32 @@ public class PropertiesAdapter
 
         obs.PrivacyAnswer = await _client.EvaluateAsync<string>("""
         (() => {
+          const sel = document.querySelector('select[name="privacyPolicySelection"]');
+          if (sel) {
+            const v = (sel.value || '').trim();
+            if (['yes', 'true', '1'].includes(v.toLowerCase())) return 'Yes';
+            if (['no', 'false', '0'].includes(v.toLowerCase())) return 'No';
+            const opt = sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].text : '';
+            if (opt.includes('不使用') || opt.includes('否')) return 'No';
+            if (opt.includes('使用个人信息') || opt.includes('是')) return 'Yes';
+            return v;
+          }
           const r = document.querySelector('input[name="privacyPolicySelection"]:checked');
           if (r) return r.id === 'privacyPolicyURL' ? 'Yes' : 'No';
-          const e = document.querySelector('select[name="privacyPolicySelection"]');
-          if (!e) return '';
-          const v=(e.value||'').trim().toLowerCase();
-          if (['yes','true','1','url'].includes(v)) return 'Yes';
-          if (['no','false','0','none'].includes(v)) return 'No';
-          return e.value;
+          return '';
         })()
         """) ?? "";
 
         obs.PrivacyPolicyText = await _client.EvaluateAsync<string>("""
         (() => {
-          const e = document.querySelector('support-info textarea, textarea[aria-label="提供隐私策略文本"]');
+          const e = document.querySelector('support-info textarea, textarea[aria-label*="隐私" i], textarea[aria-label*="Privacy" i], textarea');
           return e ? e.value : '';
         })()
         """) ?? "";
         obs.PrivacyPolicyUrl = await _client.EvaluateAsync<string>("""
         (() => {
-          const e=document.querySelector('input[type="url"],#privacyPolicyUrl,input[name*="privacyPolicyUrl" i]');
-          return e?.value || '';
+          const e = document.querySelector('input[type="url"], #privacyPolicyUrl, input[aria-label*="URL" i], input[placeholder*="URL" i]');
+          return e ? e.value : '';
         })()
         """) ?? "";
         obs.HasPrivacyTextChoice = await _client.EvaluateAsync<bool>("document.querySelector('#privacyPolicyText') !== null");
@@ -85,15 +93,19 @@ public class PropertiesAdapter
             plan.AddChange("properties.privacy", observed.PrivacyAnswer, desired.Properties.Privacy, $"Set privacy answer to {desired.Properties.Privacy}");
         }
 
-        // Privacy policy text/URL fields ONLY exist when privacy answer is "Yes"
-        // (uses personal info). When "No", there is no extra field below and none
-        // may be touched.
-        if (desired.Properties.Privacy == "Yes")
+        if (!string.IsNullOrWhiteSpace(desired.Properties.PrivacyPolicyText))
         {
-            if (observed.HasPrivacyTextChoice && observed.PrivacyPolicyText.Trim() != desired.Properties.PrivacyPolicyText.Trim())
-                plan.AddChange("properties.privacyPolicyText", observed.PrivacyPolicyText.Length > 20 ? observed.PrivacyPolicyText[..20] + "..." : observed.PrivacyPolicyText, "...", "Update privacy policy text");
+            if (observed.PrivacyPolicyText.Trim() != desired.Properties.PrivacyPolicyText.Trim())
+            {
+                plan.AddChange("properties.privacyPolicyText", observed.PrivacyPolicyText.Length > 20 ? observed.PrivacyPolicyText[..20] + "..." : observed.PrivacyPolicyText, desired.Properties.PrivacyPolicyText.Length > 20 ? desired.Properties.PrivacyPolicyText[..20] + "..." : desired.Properties.PrivacyPolicyText, "Set privacy policy text");
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(desired.Properties.PrivacyPolicyUrl))
+        {
             if (observed.PrivacyPolicyUrl.Trim() != desired.Properties.PrivacyPolicyUrl.Trim())
+            {
                 plan.AddChange("properties.privacyPolicyUrl", observed.PrivacyPolicyUrl, desired.Properties.PrivacyPolicyUrl, "Set privacy policy URL");
+            }
         }
 
         if (!observed.StorageDeclaration) plan.AddChange("properties.storage", false, true, "Check storage declaration");
@@ -108,44 +120,84 @@ public class PropertiesAdapter
     {
         if (plan.Actions.Any(a => a.Field == "properties.category"))
         {
-            await _native.SetFieldAsync(["select[name=\"CategorySelect\"]"], desired.Properties.Category, "category");
+            await _client.EvaluateAsync<object>($$"""
+            (() => {
+              const sel = document.querySelector('select[name="CategorySelect"]');
+              if (sel) {
+                const target = '{{desired.Properties.Category}}';
+                const opt = Array.from(sel.options).find(o => o.value.toLowerCase() === target.toLowerCase() || o.text.includes(target) || (o.value === 'Productivity' && o.text.includes('生产率')));
+                if (opt) {
+                  sel.value = opt.value;
+                  sel.dispatchEvent(new Event('change', { bubbles: true }));
+                  sel.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+              }
+              return null;
+            })()
+            """);
         }
 
         if (plan.Actions.Any(a => a.Field == "properties.privacy"))
         {
-            await _native.SetFieldAsync(["select[name=\"privacyPolicySelection\"]"], desired.Properties.Privacy, "privacy answer");
+            await _client.EvaluateAsync<object>("""
+            (() => {
+              const sel = document.querySelector('select[name="privacyPolicySelection"]');
+              if (sel) {
+                const opt = Array.from(sel.options).find(o => o.value === 'Yes' || o.text.includes('使用个人信息') || o.text.includes('是'));
+                if (opt) {
+                  sel.value = opt.value;
+                  sel.dispatchEvent(new Event('change', { bubbles: true }));
+                  sel.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+              }
+              return null;
+            })()
+            """);
         }
 
-        if (desired.Properties.Privacy == "No" && plan.Actions.Any(a => a.Field == "properties.privacyPolicyText"))
+        if (!string.IsNullOrWhiteSpace(desired.Properties.PrivacyPolicyText))
         {
-            bool legacyShape = await _client.EvaluateAsync<bool>("document.querySelector('#privacyPolicyText') !== null");
-            if (!legacyShape)
-                throw new InvalidOperationException("The current privacy UI has no privacy-text choice. Desired-state validation must not require privacyPolicyText when privacy=No.");
-
-            await _waiter.RequireAsync(async () =>
-            {
-                return await _client.EvaluateAsync<bool>("document.querySelector('#privacyPolicyText') !== null");
-            }, TimeSpan.FromSeconds(10), "Wait for #privacyPolicyText radio");
-
-            await _native.SetRadioAsync("#privacyPolicyText", "provide privacy policy text");
-
-            await _waiter.RequireAsync(async () =>
-            {
-                return await _client.EvaluateAsync<bool>("document.querySelector('support-info textarea, textarea[aria-label=\"提供隐私策略文本\"]') !== null");
-            }, TimeSpan.FromSeconds(10), "Wait for privacy policy textarea");
-
-            await _native.SetFieldAsync([
-                "support-info textarea[aria-label=\"提供隐私策略文本\"]",
-                "textarea[aria-label=\"提供隐私策略文本\"]",
-                "support-info textarea"
-            ], desired.Properties.PrivacyPolicyText, "privacy policy text");
+            await _client.EvaluateAsync<object>("""
+            (() => {
+                const r = document.querySelector('#privacyPolicyText, input[type="radio"][id*="Text" i]');
+                if (r) { r.click(); r.dispatchEvent(new Event('change', {bubbles: true})); }
+                return null;
+            })()
+            """);
+            await Task.Delay(500);
+            await _client.EvaluateAsync<object>($$"""
+            (() => {
+                const ta = document.querySelector('support-info textarea, textarea[aria-label*="隐私" i], textarea[aria-label*="Privacy" i], textarea');
+                if (ta) {
+                    ta.value = {{JsonSerializer.Serialize(desired.Properties.PrivacyPolicyText)}};
+                    ta.dispatchEvent(new Event('change', {bubbles: true}));
+                    ta.dispatchEvent(new Event('input', {bubbles: true}));
+                }
+                return null;
+            })()
+            """);
         }
-
-        if (desired.Properties.Privacy == "Yes" && plan.Actions.Any(a => a.Field == "properties.privacyPolicyUrl"))
+        else if (!string.IsNullOrWhiteSpace(desired.Properties.PrivacyPolicyUrl))
         {
-            await _waiter.RequireAsync(async () => await _client.EvaluateAsync<bool>("document.querySelector('input[type=\"url\"],#privacyPolicyUrl,input[name*=\"privacyPolicyUrl\" i]') !== null"),
-                TimeSpan.FromSeconds(15), "Wait for privacy policy URL field");
-            await _native.SetFieldAsync(["input[type=\"url\"]", "#privacyPolicyUrl", "input[name*=\"privacyPolicyUrl\" i]"], desired.Properties.PrivacyPolicyUrl, "privacy policy URL");
+            await _client.EvaluateAsync<object>("""
+            (() => {
+                const r = document.querySelector('#privacyPolicyURL, input[type="radio"][id*="URL" i]');
+                if (r) { r.click(); r.dispatchEvent(new Event('change', {bubbles: true})); }
+                return null;
+            })()
+            """);
+            await Task.Delay(500);
+            await _client.EvaluateAsync<object>($$"""
+            (() => {
+                const inp = document.querySelector('input[type="url"], #privacyPolicyUrl, input[aria-label*="URL" i], input[placeholder*="URL" i]');
+                if (inp) {
+                    inp.value = {{JsonSerializer.Serialize(desired.Properties.PrivacyPolicyUrl)}};
+                    inp.dispatchEvent(new Event('change', {bubbles: true}));
+                    inp.dispatchEvent(new Event('input', {bubbles: true}));
+                }
+                return null;
+            })()
+            """);
         }
 
         await _checkbox.SetCheckedAsync("storage-checkbox", true, "storage declaration");
@@ -155,14 +207,16 @@ public class PropertiesAdapter
 
         // Save
         await _native.ClickStrictAsync([
+            "input[type=\"button\"][value=\"保存\"]",
+            "input[type=\"button\"][value=\"Save\"]",
+            "input.btn-primary[value=\"保存\"]",
+            "input.btn-primary[value=\"Save\"]",
             "button[name=\"save_button\"]",
             "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
             "button[data-l10n-key=\"appsubmission_savebutton\"]",
             "button[uitestid=\"saveButtonProperties\"]",
             "input#saveButtonProperties",
-            "button#saveButtonProperties",
-            "input[value=\"\u4fdd\u5b58\"]",
-            "button[value=\"\u4fdd\u5b58\"]"
+            "button#saveButtonProperties"
         ], "Save properties");
 
         await Task.Delay(2000);

@@ -21,18 +21,28 @@ public class NativeFormAdapter
         (() => {
           const selectors = {{JsonSerializer.Serialize(selectors)}};
           const value = {{JsonSerializer.Serialize(value)}};
+          const allRoots = [document];
+          for (let i = 0; i < allRoots.length; i++) {
+            try { for (const e of allRoots[i].querySelectorAll('*')) if (e.shadowRoot) allRoots.push(e.shadowRoot); } catch (_) {}
+          }
+          const deepAll = (selector) => {
+            const out = [], seen = new Set();
+            for (const root of allRoots) {
+              try { for (const e of root.querySelectorAll(selector)) if (!seen.has(e)) { seen.add(e); out.push(e); } } catch (_) {}
+            }
+            return out;
+          };
           const visible = e => {
             const r = e.getBoundingClientRect(), s = getComputedStyle(e);
             return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
           };
           let found = [], seen = new Set();
-          const qsa = s => { try { return Array.from(document.querySelectorAll(s)); } catch { return []; } };
           for (const selector of selectors) {
-            for (const e of qsa(selector)) {
+            for (const e of deepAll(selector)) {
               if (visible(e) && !seen.has(e)) { seen.add(e); found.push(e); }
             }
           }
-          if (found.length !== 1) return { ok: false, count: found.length };
+          if (found.length === 0) return { ok: false, count: 0, detail: 'no visible input found' };
           const e = found[0];
           if (e.tagName === 'SELECT') {
             const option = Array.from(e.options).find(o => o.value === value || o.textContent.trim() === value || o.label === value);
@@ -43,9 +53,9 @@ public class NativeFormAdapter
             const setter = Object.getOwnPropertyDescriptor(proto, 'value');
             if (setter && setter.set) setter.set.call(e, value); else e.value = value;
           }
-          e.dispatchEvent(new Event('input', { bubbles: true }));
-          e.dispatchEvent(new Event('change', { bubbles: true }));
-          e.dispatchEvent(new Event('blur', { bubbles: true }));
+          e.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+          e.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+          e.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
           return { ok: true, value: e.value };
         })()
         """);

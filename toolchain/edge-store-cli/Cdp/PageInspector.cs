@@ -42,8 +42,8 @@ public sealed class PageInspector
             ageQuestionnaire: hasAny('input[name="inputMode"],[name="question#1109"]'),
             ageSummary: /\/ageratings\/summary/i.test(url) || /分级\s*ID|当前分级|rating\s*id/i.test(text),
             packages: /\/packages(?:[/?#]|$)/i.test(url) && (hasAny('input[type="file"]') || /Validated|验证|程序包/i.test(text)),
-            listingGrid: hasAny('submission-listing-summary,a[href*="listings?languageid="],he-data-grid'),
-            listingForm: hasAny('#description-required,textarea[name="description"],button[name="save_button"]') && /\/listings/i.test(url),
+            listingGrid: /\/managelanguages/i.test(url) || (hasAny('submission-listing-summary,he-data-grid') && !/[?&]languageid=/i.test(url)),
+            listingForm: (/[?&]languageid=/i.test(url) || hasAny('#description-required,#shortDescription,textarea[name="description"]')) && !/\/managelanguages/i.test(url),
             options: /\/options(?:[/?#]|$)/i.test(url) && hasAny('input#radioReleaseDate_manual,input#radioReleaseDate_asap,textarea'),
             modal: has('[role="dialog"],[aria-modal="true"]'),
             certification: /正在认证|in certification|certification in progress/i.test(text),
@@ -59,7 +59,7 @@ public sealed class PageInspector
           else if (signals.ageSummary) kind='AgeRatingsSummary';
           else if (signals.ageQuestionnaire) kind='AgeRatingsQuestionnaire';
           else if (signals.listingForm) kind='ListingForm';
-          else if (signals.listingGrid && /\/listings|\/managelanguages/i.test(url)) kind='ListingLanguageGrid';
+          else if (signals.listingGrid) kind='ListingLanguageGrid';
           else if (signals.availability) kind='AvailabilityForm';
           else if (signals.properties) kind='PropertiesForm';
           else if (signals.packages) kind='PackagesForm';

@@ -44,15 +44,15 @@ public sealed class OverviewAdapter
             'properties': ['/properties', '属性'],
             'ageRatings': ['/ageratings', '年龄分级'],
             'packages': ['/packages', '程序包', '包'],
-            'listing': ['/listings', '/managelanguages', 'store 一览', 'store listing'],
+            'listing': ['/managelanguages', '/listings', 'store 一览', 'store listing'],
             'options': ['/options', 'submissionoptions', '提交选项']
           };
 
           const result = {};
-          const fullText = (document.body ? document.body.innerText : '').toLowerCase();
+          const allLinks = Array.from(document.querySelectorAll('a, button, he-button, [role="link"]'));
 
           for (const [phase, matchers] of Object.entries(phaseMap)) {
-            const link = Array.from(document.querySelectorAll('a, button, he-button, [role="link"], div')).find(a => {
+            const link = allLinks.find(a => {
               const href = (a.href || a.getAttribute('href') || '').toLowerCase();
               const name = (a.getAttribute('name') || '').toLowerCase();
               const text = (a.innerText || '').trim().toLowerCase();
@@ -60,22 +60,13 @@ public sealed class OverviewAdapter
             });
 
             if (!link) {
-              if (matchers.some(m => fullText.includes(m))) {
-                result[phase] = 'Complete';
-              } else {
-                result[phase] = 'Unknown';
-              }
+              result[phase] = 'Unknown';
               continue;
             }
 
-            let container = link;
-            for (let i = 0; i < 5 && container.parentElement; i++) {
-              if (container.parentElement.tagName === 'BODY') break;
-              container = container.parentElement;
-            }
-
-            const text = (container.innerText || '').trim();
-            const html = (container.innerHTML || '').slice(0, 8000);
+            let container = link.closest('li, tr, .micro-row, .app-module-row, .list-group-item') || link.parentElement;
+            const text = (container ? container.innerText : link.innerText || '').trim();
+            const html = (container ? container.innerHTML : '').slice(0, 4000);
             const evidence = (text + ' ' + html).toLowerCase();
 
             let status = 'Complete';

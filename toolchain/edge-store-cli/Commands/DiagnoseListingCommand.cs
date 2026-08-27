@@ -34,82 +34,69 @@ public static class DiagnoseListingCommand
             }
         }
 
-        // 1. Check managelanguages rows
-        string managelangsUrl = $"{baseUrl}/{desired.ProductId}/submissions/{submissionId}/managelanguages?producttype=app";
-        Console.WriteLine($"[NAV] Navigating to: {managelangsUrl}");
-        await waiter.NavigateAsync(managelangsUrl, "Manage Store Languages");
+        string zhUrl = $"{baseUrl}/{desired.ProductId}/submissions/{submissionId}/listings?languageid=5&languagecode=zh-cn";
+        Console.WriteLine($"[NAV] Navigating directly to Chinese Listing form: {zhUrl}");
+        await waiter.NavigateAsync(zhUrl, "Chinese Listing Form");
+        await waiter.RequireAsync(async () =>
+        {
+            return await client.EvaluateAsync<bool>("document.querySelector('#description-required, #shortDescription') !== null");
+        }, TimeSpan.FromSeconds(30), "Wait for listing form elements");
         await Task.Delay(2000);
 
-        var languagesInfo = await client.EvaluateAsync<Dictionary<string, object>>("""
+        var report = await client.EvaluateAsync<Dictionary<string, object>>("""
         (() => {
-          const links = Array.from(document.querySelectorAll('a[href*="listings"]')).map(a => {
-            let row = a.parentElement;
-            let rowText = '';
-            for (let i = 0; i < 6 && row; i++) {
-              const t = (row.innerText || '').trim();
-              if (t.length > 2 && t.length < 150) {
-                rowText = t.replace(/\s+/g, ' ');
-                break;
-              }
-              row = row.parentElement;
-            }
-            return {
-              text: (a.innerText || '').trim(),
-              href: a.href,
-              rowSummary: rowText
-            };
-          });
+          const descEl = document.querySelector('#description-required');
+          const shortDescEl = document.querySelector('#shortDescription');
+          const features = Array.from(document.querySelectorAll('input[id^="feature-"]')).map(x => x.value.trim()).filter(Boolean);
+          const keywords = Array.from(document.querySelectorAll('#search-terms he-option, he-select[multiple] he-option'))
+            .filter(e => (e.getAttribute('slot') || '').startsWith('selected-') || e.getAttribute('role') === 'listitem')
+            .map(e => (e.innerText || e.getAttribute('value') || '').trim())
+            .filter(Boolean);
+
+          const allInputs = Array.from(document.querySelectorAll('input, textarea')).map(e => ({
+            id: e.id || '',
+            name: e.name || '',
+            type: e.type || '',
+            value: (e.value || '').trim()
+          })).filter(x => x.id || x.name);
+
+          const images = Array.from(document.querySelectorAll('img')).map(img => ({
+            src: img.src ? (img.src.startsWith('data:') ? 'data:image...' : img.src) : '',
+            alt: img.alt || '',
+            width: img.naturalWidth || img.width,
+            height: img.naturalHeight || img.height,
+            visible: img.getBoundingClientRect().width > 0
+          }));
+
+          const alerts = Array.from(document.querySelectorAll('.alert-error, .alert-danger, [role="alert"], .validation-error, .field-validation-error'))
+            .map(e => (e.innerText || '').trim())
+            .filter(Boolean);
+
+          const text = (document.body.innerText || '');
+          const screenshotCountMatch = text.match(/桌面\s*\((\d+)\)/);
+          const screenshotCount = screenshotCountMatch ? parseInt(screenshotCountMatch[1], 10) : 0;
+
           return {
-            languagesCount: links.length,
-            languages: links
+            url: location.href,
+            description: descEl ? descEl.value : null,
+            descriptionLength: descEl ? descEl.value.length : 0,
+            shortDescription: shortDescEl ? shortDescEl.value : null,
+            featuresCount: features.length,
+            features: features,
+            keywordsCount: keywords.length,
+            keywords: keywords,
+            screenshotCount: screenshotCount,
+            totalImagesOnPage: images.length,
+            alerts: alerts,
+            inputs: allInputs
           };
         })()
         """);
 
-        Console.WriteLine("[INFO] Languages in grid:");
-        Console.WriteLine(JsonSerializer.Serialize(languagesInfo, Program.JsonIndented));
-
-        // 2. Check the Chinese listing form directly
-        string? zhHref = await client.EvaluateAsync<string?>("""
-        (() => {
-          const links = Array.from(document.querySelectorAll('a[href*="listings"]'));
-          const zh = links.find(a => (a.innerText || '').includes('中文') || (a.href || '').includes('zh-cn') || (a.href || '').includes('languageid=7') || (a.href || '').includes('languageid=5'));
-          return zh ? zh.href : null;
-        })()
-        """);
-
-        if (!string.IsNullOrWhiteSpace(zhHref))
-        {
-            Console.WriteLine($"[NAV] Navigating to Chinese form: {zhHref}");
-            await waiter.NavigateAsync(zhHref, "Chinese Listing Form");
-            await Task.Delay(3000);
-
-            var formValidation = await client.EvaluateAsync<Dictionary<string, object>>("""
-            (() => {
-              const alerts = Array.from(document.querySelectorAll('.alert-error, .alert-danger, [role="alert"], .has-error, .field-validation-error, [class*="error"]'))
-                .map(e => (e.innerText || '').trim())
-                .filter(t => t && t.length > 2);
-
-              const missingAssets = Array.from(document.querySelectorAll('.img-uploader, [class*="upload"]'))
-                .map(e => ({ text: (e.innerText || '').replace(/\s+/g, ' ').slice(0, 100) }))
-                .slice(0, 10);
-
-              const emptyRequired = Array.from(document.querySelectorAll('input[required], textarea[required], select[required]'))
-                .filter(e => !e.value)
-                .map(e => e.id || e.name || e.getAttribute('aria-label') || '');
-
-              return {
-                url: location.href,
-                alerts: alerts,
-                emptyRequired: emptyRequired,
-                uploadBoxes: missingAssets
-              };
-            })()
-            """);
-
-            Console.WriteLine("[INFO] Chinese Form Validation / Error Status:");
-            Console.WriteLine(JsonSerializer.Serialize(formValidation, Program.JsonIndented));
-        }
+        Console.WriteLine("\n=======================================================");
+        Console.WriteLine("[INFO] Store 一览【中文(中国)】DOM 现场检测报告：");
+        Console.WriteLine(JsonSerializer.Serialize(report, Program.JsonIndented));
+        Console.WriteLine("=======================================================\n");
 
         return 0;
     }

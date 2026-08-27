@@ -77,9 +77,9 @@ Get-ChildItem ./publish -Recurse |
 
 ```powershell
 # 首次打包：生成开发证书并安装到本机
-winapp package ./publish --generate-cert --install-cert --publisher "CN=AppPublisher" --output ./store-package/App_1.0.0.0_x64.msix
+winapp package ./publish --executable <AppName>.exe --generate-cert --install-cert --publisher "CN=AppPublisher" --output ./store-package/App_1.0.0.0_x64.msix
 # 后续重打包：复用同一个 pfx（推荐，避免每次换证书导致信任失效）
-winapp package ./publish --cert .\<Identity>_cert.pfx --cert-password password --output ./store-package/App_1.0.0.0_x64.msix
+winapp package ./publish --executable <AppName>.exe --cert .\<Identity>_cert.pfx --cert-password password --output ./store-package/App_1.0.0.0_x64.msix
 ```
 
 要点：

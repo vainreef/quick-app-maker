@@ -39,14 +39,14 @@ public class OptionsAdapter
 
         obs.HasFullTrustBox = await _client.EvaluateAsync<bool>("""
         (() => {
-          return Array.from(document.querySelectorAll('textarea')).some(e => (e.parentElement?.parentElement?.innerText || '').includes('\u4e3a\u4f55\u9700\u8981\u4f7f\u7528'));
+          return !!document.querySelector('textarea.text-area-width, section textarea, h2[data-l10n-key="resCapSectionHeader"]');
         })()
         """);
 
         obs.FullTrustReasonText = await _client.EvaluateAsync<string>("""
         (() => {
-          const els = Array.from(document.querySelectorAll('textarea')).filter(e => (e.parentElement?.parentElement?.innerText || '').includes('\u4e3a\u4f55\u9700\u8981\u4f7f\u7528'));
-          return els.length === 1 ? els[0].value : '';
+          const el = document.querySelector('textarea.text-area-width, section textarea');
+          return el ? el.value : '';
         })()
         """) ?? "";
 
@@ -83,7 +83,7 @@ public class OptionsAdapter
 
         bool hasFullTrust = await _client.EvaluateAsync<bool>("""
         (() => {
-          return Array.from(document.querySelectorAll('textarea')).some(e => (e.parentElement?.parentElement?.innerText || '').includes('\u4e3a\u4f55\u9700\u8981\u4f7f\u7528'));
+          return !!document.querySelector('textarea.text-area-width, section textarea, h2[data-l10n-key="resCapSectionHeader"]');
         })()
         """);
 
@@ -91,14 +91,13 @@ public class OptionsAdapter
         {
             await _client.EvaluateAsync<bool>($$"""
             (() => {
-              const needle = '\u4e3a\u4f55\u9700\u8981\u4f7f\u7528';
-              const els = Array.from(document.querySelectorAll('textarea')).filter(e => (e.parentElement?.parentElement?.innerText || '').includes(needle));
-              if (els.length !== 1) return false;
-              const e = els[0];
+              const el = document.querySelector('textarea.text-area-width, section textarea');
+              if (!el) return false;
               const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
-              if (setter && setter.set) setter.set.call(e, {{System.Text.Json.JsonSerializer.Serialize(desired.SubmissionOptions.RunFullTrustReason)}});
-              e.dispatchEvent(new Event('input', { bubbles: true }));
-              e.dispatchEvent(new Event('change', { bubbles: true }));
+              if (setter && setter.set) setter.set.call(el, {{System.Text.Json.JsonSerializer.Serialize(desired.SubmissionOptions.RunFullTrustReason)}});
+              else el.value = {{System.Text.Json.JsonSerializer.Serialize(desired.SubmissionOptions.RunFullTrustReason)}};
+              el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
               return true;
             })()
             """);

@@ -5,13 +5,14 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('preflight', 'launch', 'step', 'discover', 'inspect', 'dumpdom', 'fulldom', 'probelanguages', 'cleanpackages', 'cleanlanguages', 'diagnoselisting', 'filllisting', 'reserve', 'identity', 'run', 'status', 'verify', 'stop')]
+    [ValidateSet('preflight', 'launch', 'step', 'discover', 'inspect', 'dumpdom', 'fulldom', 'probelanguages', 'cleanpackages', 'cleanlanguages', 'diagnoselisting', 'filllisting', 'inspectoptions', 'filloptions', 'reserve', 'identity', 'run', 'status', 'verify', 'stop')]
     [string]$Action = 'run',
     [ValidateSet('all', 'availability', 'properties', 'ageRatings', 'packages', 'listing', 'options')]
     [string]$Phase = 'all',
     [string]$Manifest = '',
     [string]$ProductId = '',
     [string]$AppName = '',
+    [string]$Url = '',
     [string]$StateDir = '',
     [switch]$Apply,
     [switch]$Submit,
@@ -111,6 +112,11 @@ if (-not [string]::IsNullOrWhiteSpace($ProductId)) {
 if (-not [string]::IsNullOrWhiteSpace($AppName)) {
     $forwardArgs.Add("--app-name")
     $forwardArgs.Add($AppName)
+}
+
+if (-not [string]::IsNullOrWhiteSpace($Url)) {
+    $forwardArgs.Add("--url")
+    $forwardArgs.Add($Url)
 }
 
 $effectiveStateDir = if (-not [string]::IsNullOrWhiteSpace($StateDir)) { [System.IO.Path]::GetFullPath($StateDir) } else { Join-Path $toolRoot 'state' }

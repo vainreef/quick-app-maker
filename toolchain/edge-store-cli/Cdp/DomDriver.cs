@@ -132,6 +132,22 @@ public class DomDriver
             objectId,
             files = files.Select(Path.GetFullPath).ToArray()
         });
+
+        try
+        {
+            await _client.SendAsync("Runtime.callFunctionOn", new
+            {
+                objectId,
+                functionDeclaration = """
+                function() {
+                    this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                    this.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                }
+                """,
+                awaitPromise = true
+            });
+        }
+        catch { }
     }
 }
 

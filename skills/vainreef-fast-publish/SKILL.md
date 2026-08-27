@@ -1,4 +1,4 @@
----
+﻿---
 name: vainreef-fast-publish
 description: "Turn a natural-language Windows app idea into a working WinUI project, then build, run, package, and prepare it for Microsoft Store submission. Use the repository bootstrap for the Windows toolchain, use the versioned command notes for known Windows behavior, let the agent design and write each app from its requirements, and feed newly observed build problems back into the command notes."
 ---
@@ -312,11 +312,11 @@ Agent 根据当前 App 增加针对性测试。
    ```
 2. **构建商店发布包（含 Assets 图标资源质检）**：
    ```powershell
-   dotnet publish -c Release -r win-x64 -o ./publish
+   dotnet publish -c Release -r win-x64 --self-contained true -o ./publish
    # 确保 Assets 图标完整拷贝，杜绝 Partner Center 接受验证时报图像缺失错误
    if (Test-Path ./Assets) { Copy-Item -Recurse -Force ./Assets ./publish/ }
    New-Item -ItemType Directory -Force ./store-package | Out-Null
-   winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
+   winapp package ./publish --executable <AppName>.exe --publisher "<Publisher>" --generate-cert --output ./store-package/<Identity>_<Version>_x64.msix
    ```
 3. **清理权限声明与多设备依赖**：
    - 移除 manifest 中模板自带的未用特权（如 `systemAIModels`）；
@@ -369,6 +369,7 @@ Agent 根据当前 App 增加针对性测试。
 
 - [discovery-interview.md](references/discovery-interview.md)：渐进式需求访谈建议。
 - [partner-center-guide.md](references/partner-center-guide.md)：微软开发者中心（Partner Center）注册、包身份获取与商店提审全流程指引。
+- [troubleshooting-and-anti-patterns.md](references/troubleshooting-and-anti-patterns.md)：微软商店自动化异常诊断、避坑指南与自愈手册。
 - [toolchain/README.md](references/toolchain/README.md)：工具版本与命令资料的职责。
 - [toolchain/v1/commands.md](references/toolchain/v1/commands.md)：当前 Windows 命令和实测记录。
 - [capabilities/registry.md](capabilities/registry.md)：可选能力建议与历史经验。
@@ -376,3 +377,4 @@ Agent 根据当前 App 增加针对性测试。
 - [test-assets.md](references/test-assets.md)：测试素材来源清单（图标/图片/音频/字体/数据，含许可红线）。
 - [official-sources.md](references/official-sources.md)：官方文档入口。
 - [project-readme-template.md](assets/project-readme-template.md)：每个 App 的 living README 起点。
+

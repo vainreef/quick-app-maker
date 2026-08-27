@@ -1,69 +1,88 @@
-# Agent 运行契约（Edge Store）
+﻿# Microsoft Partner Center 商店发布 Agent 运行契约 (V2 标准版)
 
-这是执行规则，不是过程日志。Agent 每次接手发布任务都以本文件和
-`docs/partner-center/Edge-Store-可靠性重构.md` 为准，不从旧 `process.md` 的历史命令推导当前实现。
+本文档是 Agent 执行 Windows 应用发布提审的**唯一最高行为准则与操作手册**。
+任何 Agent 接手发布任务时，必须以本契约和 quick-app-maker/skills/vainreef-fast-publish/SKILL.md 为准，严禁单脚本盲目一冲到底，严禁盲目猜想。
 
-## 唯一正式入口
+---
 
-只使用：
+## 一、 唯一官方工具链入口
 
-```text
-toolchain/edge-store-cli/Invoke-EdgeStore.ps1
-toolchain/edge-store-cli/EdgeStore.Cli.csproj
-```
+执行所有发布、排障、诊断命令，一律且仅使用：
+`powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action <action> [参数...]
+`
+- **源码工程**：quick-app-maker/toolchain/edge-store-cli/EdgeStore.Cli.csproj（基于 .NET 10 SDK 绿色版免安装编译）。
+- **绝对禁止**：严禁执行任何 pps/Project/edge-store-cli-fast/ 废弃旧目录下的 DLL 或临时脚本。
 
-`apps/Project/edge-store-cli-fast/` 是上一轮诊断副本和生成物，不是正式运行时。里面的 DLL、`_tmp-diag` 脚本和旧 README 都不参与发布流程。不要从 process.md 复制 `edge-store-cli-fast/bin/.../EdgeStore.Cli.dll` 命令。
+---
 
-## 核心发布铁律：严禁一个脚本一冲到底
+## 二、 商店发布标准 10 步流水线（严禁跳步与一冲到底）
 
-发布提审必须严格拆解为 **独立离散阶段（Store 0 ~ Store 8）** 执行。**每步执行完毕后，必须自动或手动调用阶段专属 DOM 探针进行深度自检，断言确认完好后再进入下一步。**
+发布流程严格解耦为 **10 个离散阶段**。每个阶段执行后，必须通过 DOM 结构化证据确权成功后，方可进入下一阶段：
 
-```text
-阶段 0: 静态离线预检              (-Action preflight)
-阶段 1: 独立常驻浏览器拉起与登录态确权 (-Action launch / -Action inspect)
-阶段 2: 概览页动态 Submission 探测    (-Action discover)
-阶段 3: 定价与可用性离散步进与自检      (-Action step -Phase availability)
-阶段 4: 应用属性离散步进与自检          (-Action step -Phase properties)
-阶段 5: 年龄分级离散步进与自检          (-Action step -Phase ageRatings)
-阶段 6: 程序包上传与状态自检          (-Action step -Phase packages)
-阶段 7: 应用商店一览离散步进与自检      (-Action step -Phase listing)
-阶段 8: 提审选项离散步进与自检          (-Action step -Phase options)
-阶段 9: 概览页 6 大模块冷加载总检      (-Action verify)
-阶段 10: 显式双确认提交审核          (-Action submit -ConfirmSubmit)
-```
+| 阶段 | 阶段标识 | 执行命令 | 核心任务与自检断言 |
+| :---: | :--- | :--- | :--- |
+| **STORE -1** | **名称预留与建项** | -Action reserve -AppName <名称> -Manifest .\<app>\build\edge-store.json | 自动在微软后台建项、验重、预留名称，并自动回填 3 大 Identity |
+| **STORE 0** | **离线静态预检** | -Action preflight -Manifest .\<app>\build\edge-store.json | 校验描述字数 (300~500字)、特性列表 ($\ge 3$)、关键词 ($\le 7$)、MSIX 及资产文件存在性 |
+| **STORE 1** | **浏览器拉起确权** | -Action launch -KeepOpen | 拉起独立常驻 Edge (9222 调试端口)，确权已处于微软开发者后台登录态 |
+| **STORE 2** | **提审探测与基线** | -Action discover -Manifest .\<app>\build\edge-store.json | 提取当前草稿 SubmissionId，生成 6 大表单直达 URL 并写入 checkpoint |
+| **STORE 3** | **定价与可用性** | -Action step -Phase availability -Manifest .\<app>\build\edge-store.json -Apply | 设定免费 (Tier 0)、全市场分发，保存并断言概览页显示「完成」 |
+| **STORE 4** | **应用属性 (含隐私)** | -Action step -Phase properties -Manifest .\<app>\build\edge-store.json -Apply | 分类设为工具，**强制声明包含隐私政策并填入离线文本**，保存并断言「完成」 |
+| **STORE 5** | **年龄分级** | -Action step -Phase ageRatings -Manifest .\<app>\build\edge-store.json -Apply | 获取/关联 IARC 年龄分级问卷，保存并断言「完成」 |
+| **STORE 6** | **程序包上传** | -Action step -Phase packages -Manifest .\<app>\build\edge-store.json -Apply | 上传 MSIX，自动清理异常包，等待后台唯一 Validated 验证通过并保存 |
+| **STORE 7** | **Store 一览 (Listing)** | **分步执行**：<br>1. -Action cleanlanguages -Manifest ...<br>2. -Action filllisting -Manifest ... | **阶段1**：严格正则 languageid=5 清理 85 门外语并保存网格；<br>**阶段2**：自动展开折叠面板，自愈关键词至 $\le 7$ 个，CDP派发上传事件上传截图/图标并保存 |
+| **STORE 8** | **提交选项 (Options)** | **分步执行**：<br>1. -Action inspectoptions -Manifest ...<br>2. 经用户批准后执行 -Action filloptions -Manifest ... | **阶段1**：等待受限功能 API 返回，提取 DOM 向用户汇报；<br>**阶段2**：选择发布模式 (Manual)，填报 unFullTrust 桌面进程理由并保存 |
+| **STORE 9** | **概览页全绿校验** | -Action verify -Manifest .\<app>\build\edge-store.json | 冷加载 Overview 页面，断言 6 大模块 100% 全部处于「完成」状态 |
+| **STORE 10** | **最终提交认证** | -Action submit -ConfirmSubmit -Manifest .\<app>\build\edge-store.json | 向用户展示全绿总览，经用户明确同意后触发最终提审 |
 
-## 每次执行前的顺序与步进规范
+---
 
-1. 先读 manifest 和 Listing Markdown；确认 `values.description`、`shortDescription`、`features`、`keywords` 都已导入。
-2. 执行 `-Action preflight` 进行静态质检。
-3. 执行 `-Action launch` 启动独立常驻 Edge，并在 `WinSta0\Default` 桌面确权。
-4. 执行 `-Action discover` 动态探测 `submissionId` 和 6 大表单链接并建立 DOM 基线。
-5. 针对 6 大表单依次执行单步步进 `-Action step -Phase <phase>`，每一阶段执行后必须检查输出的 `[DOM-PROBE]` 结构化证据。
-6. 全阶段步进完成后，执行 `-Action verify` 确认概览页全绿勾且无「未启动」模块。
-7. 经用户确认后，方可执行最终提审 `-Action submit -ConfirmSubmit`。
+## 三、 七大核心防坑铁律与异常自愈规范
 
-## 收敛与 DOM 自检规则
+### 1. 隐私政策强制铁律 (Global Privacy Policy Invariant)
+- quick-app-maker 生态下**所有 App 必须选择「是，包含隐私策略」(Privacy Policy: Yes)**；
+- 隐私策略文本栏统一填入标准离线声明：
+  本应用为本地运行工具，不收集、不存储、不上传任何用户个人隐私数据或使用习惯。
+- 严禁在 manifest 中将隐私政策设为 No。
 
-- `0 form differences` 不代表产品完成。
-- **配置变更前置铁律**：当用户要求修改线上表单字段（如“把隐私政策改成否”）时，Agent **必须首先修改本地 Desired State JSON 文件**，再调用 CLI 执行收敛。严禁直接执行 CLI 导致 0 差异空转退出。
-- `AppliedUnverified` 不代表保存成功。
-- **强制阶段后 DOM 探针（DOM Self-Inspection）**：每个 Phase 保存后，必须由探针在 DOM 中提取真实渲染的文本、复选框态、下拉框值和图片数量进行双向断言，断言不符直接中断报错。
-- **概览模块状态真值标准**：`<app-module-status>` 容器内无 badge 文本即判定为 `Complete`；包含 `<he-badge class="text-non-started">未启动</he-badge>` 为 `Incomplete`。严禁因缺失“完成”文本而 fallback 到 Unknown。
-- 最终必须读取概览模块状态；`Unknown`、`Incomplete`、`Processing`、`Error` 都不通过。
-- 只有概览证据与 DOM 探针快照写入 checkpoint 后才是 `PRODUCT_VERIFIED`。
-- 未加 `-Apply` 发现差异时退出码为 4，禁止写入完成状态。
+### 2. 语言网格清理严格正则定界 (Strict Regex Language ID Invariant)
+- 进入 managelanguages 页面清理外语时，**必须使用严格正则定界符**：
+  /(?:[?&])languageid=5(?:&|$)/ 或 /(?:[?&])languagecode=zh-cn(?:&|$)/i
+- 绝对禁止使用子串 includes('languageid=5') 或 includes('5')，避免将 151、52、115、45、159 等外语错误保留导致残留 80+ 门语言。
 
-## 页面/控件与排障规则
+### 3. 视觉资产上传必须派发 DOM 事件 (File Upload Event Dispatch Invariant)
+- CDP 命令 DOM.setFileInputFiles 仅在 <input type=file> 节点上挂载文件列表，**不会触发 Angular 上传监听器**；
+- 驱动必须在设置文件后立即执行：
+  `javascript
+  input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  `
+- **保存前硬核断言**：在点击保存前，必须校验页面上 桌面 (1) 或缩略图已成功生成。未生成截图绝对禁止点击保存！
 
-- 先识别页面类型，再等待页面控件；SPA 空壳只算 LoadingShell。
-- 每次 Lit/Angular 动作后重新查询节点；不缓存节点、文件 input 索引或坐标。
-- 每个 toggle 只发一次物理 click；不混合 mousedown、mouseup、click 和 `.click()`。
-- 文件上传使用 `DOM.describeNode` + `DOM.setFileInputFiles` 穿透 Shadow DOM，且 MSIX 必须包含完整 Assets。
-- 文件名出现只代表文件名出现；包必须达到唯一 `Validated` 且退回概览页确权显示完成。
-- **模块化架构与指令集**：CLI 入口 `Program.cs` 保持在 300 行以内，各阶段独立封装于 `Commands/`（`preflight`, `launch`, `step`, `discover`, `inspect`, `dumpdom`, `cleanpackages`, `cleanlanguages`, `filllisting`, `verify`, `stop`）。
-- **语言列表管理铁律**：进入 Store 一览若遇多语言网格（Manage Languages），必须通过组件级批量删除非目标语言并在 `managelanguages` 底部点击「保存」，严禁单项慢速轮询导致超时。
-- **导航安全铁律**：严禁通过模糊锚点 `a[href*="/overview"]` 导航回概览页（防止误跳外部 Learn 文档），必须使用绝对构造的 `${baseUrl}/${productId}/overview` 控制台 URL 强制跳转。
+### 4. 关键词（Tag）容量自愈与折叠面板展开 (Keyword Accordion & Limit Invariant)
+- 微软商店硬性限制：**关键词最多 7 个**；
+- #search-terms 处于 其他信息 折叠区域内，执行前必须先点击展开按钮；
+- 必须先读取现场已存 Chip，定位非目标或超出配额的旧标签并点击关闭图标移除，最后仅追加缺失词汇，确保页面标签总数 $\le 7$ 个。
 
-## 退出和报告
+### 5. 提交选项受限功能异步等待 (Restricted Capabilities Async Invariant)
+- MSIX 声明了 unFullTrust 时，页面中的 <section>受限的功能</section> 是由 Angular 异步拉取后台接口后动态渲染的；
+- 必须使用 Waiter.RequireAsync 显式等待 	extarea.text-area-width 渲染出现后再取值/填报；
+- 填入理由必须通过属性描述符 Setter 写入并触发 input/change。
 
-Agent 报告必须包含：命令、phase、PageKind、URL、PLAN、动作结果、冷加载 PLAN、概览模块状态、checkpoint 状态和退出码。只写“按钮点到了”“EXIT=0”“CONVERGED”而没有这些证据，视为报告不完整。
+### 6. 安全导航与绝对 URL 定位 (Absolute URL Navigation Invariant)
+- 严禁通过页面上的模糊相对链接（如 [href*=/overview]）返回概览页（防止误跳微软外部 Learn 文档）；
+- 必须使用由 ${baseUrl}//overview 显式构造的绝对控制台 URL 导航。
+
+### 7. 干净编译与 DLL 锁处理 (Clean Build & Compilation Invariant)
+- 每次修改 C# 驱动代码后，建议使用 -p:UseSharedCompilation=false 进行编译；
+- 若遇文件时间戳或增量编译未命中，先清理 in/ 与 obj/ 目录再执行构建。
+
+---
+
+## 四、 退出状态与结构化证据输出
+
+每次执行完毕，Agent 必须向用户输出包含以下字段的清晰结构化状态表：
+1. 当前阶段与执行命令；
+2. 页面 URL 与 DOM 探针状态；
+3. 6 大模块现场真实完成情况；
+4. 退出码（0 = 成功，非 0 = 异常并附带报错根因）。

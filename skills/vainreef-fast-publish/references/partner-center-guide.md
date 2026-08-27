@@ -118,11 +118,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 - **Agent 推荐填报标准**：
   1. **构建商店包与资源质检**：Agent 执行本地打包，必须确保 `Assets/*.png`（StoreLogo、Square150x150 等）完整拷贝入发布目录：
      ```powershell
-     dotnet publish -c Release -r win-x64 -o ./publish
+     dotnet publish -c Release -r win-x64 --self-contained true -o ./publish
      # 确保 Assets 完整打包，避免 Partner Center 报图像缺失
      if (Test-Path ./Assets) { Copy-Item -Recurse -Force ./Assets ./publish/ }
      New-Item -ItemType Directory -Force ./store-package | Out-Null
-     winapp package ./publish --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
+     winapp package ./publish --executable <AppName>.exe --publisher "<Publisher>" --generate-cert --output ./store-package/<Identity>_<Version>_x64.msix
      ```
   2. **上传程序包**：驱动通过 Shadow DOM 穿透自动绑定 `.msix` 文件；
   3. **排障与保存铁律**：页面上**只能保留唯一一行状态为 `Validated` 的有效包**；若有历史残留的 `Analyzing` 或 `Error` 行，必须先点击 Delete / Cancel 清理干净；刷新页面（冷加载）确认 Save 按钮高亮后点击保存。
@@ -136,32 +136,61 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 
 ---
 
-### 表单 5：Store 一览 (Store Listing & 语言物料)
-- **页面 URL**：`.../submissions/<submission-id>/listings`
+### 表单 2：属性 (App Properties)
+- **页面 URL**：`.../submissions/<submission-id>/properties`
 - **Agent 推荐填报标准**：
-  1. **语言管理**：进入中文（中国）`zh-cn` 页面填报，其他语言直接忽略；
-  2. **文案物料（Agent 提前为用户拟定并润色）**：
-     - **应用标题**：与预留名称一致；
-     - **简短摘要 (Short Description)**：100 字以内，点明核心用途；
-     - **完整描述 (Description)**：排版工整，涵盖“产品亮点”、“使用场景”、“设计理念”与“离线安全保证”；
-     - **产品功能 (App Features)**：3~5 条精炼卖点；
-     - **搜索关键字 (Search Terms)**：最多 7 个高频中文词汇（每个 $\le 40$ 字符）；
-  3. **视觉物料（Agent 提前在本地生成合格尺寸）**：
-     - **应用截图 (Screenshots)**：上传 1~5 张 1920×1080 真实无拉伸桌面运行截图（必填）；
-     - **应用图标 (App Logo)**：上传 1:1 专属高分辨率 Logo（300×300 / 150×150 PNG）；
+  1. **类别**：一级分类通常选择 **「工具和生产力」(Developer / Utilities / Productivity)**；
+  2. **隐私策略（⚠️ 全局强制铁律）**：
+     - `quick-app-maker` 生态下**所有 App 必须选择「是，包含隐私策略」(Privacy Policy: Yes)**；
+     - 隐私策略文本栏中填入本地离线声明标准文本：
+       `本应用为本地运行工具，不收集、不存储、不上传任何用户个人隐私数据或使用习惯。`
+  3. **网站与支持联系信息**：按需选填；
   4. **保存**：点击底部的 **「保存」** 按钮。
+
+---
+
+### 表单 5：Store 一览 (Store Listing & 语言物料)
+- **页面 URL**：`.../submissions/<submission-id>/managelanguages?producttype=app` 与 `.../listings?languageid=5&languagecode=zh-cn`
+- **分步闭环工作流标准**：
+  1. **阶段 1：语言网格检测与多余外语清理**：
+     - 进入 `managelanguages` 页面，提取当前所有语言列表；
+     - **严格正则匹配**：语言 ID 识别必须使用严格正则 `/(?:[?&])languageid=5(?:&|$)/`，绝对禁止使用模糊的 `includes('languageid=5')`，避免将 `151`、`52`、`115`、`45` 等外语错误保留；
+     - 逐行点击非中文外语的【删除】按钮；
+     - 点击页面底部的【保存】按钮提交语言网格变更（页面会自动重定向回概述页）。
+  2. **阶段 2：进入中文（中国）详情表单**：
+     - 导航进入 `.../listings?languageid=5&languagecode=zh-cn`；
+     - 等待 `#description-required` 与 `#shortDescription` 渲染就绪；
+  3. **文案物料填报**：
+     - **完整描述 (Description)**：排版工整（300~500字），涵盖产品亮点、使用场景、设计理念与本地安全说明；
+     - **简短摘要 (Short Description)**：一句话点明核心用途（<= 270 字符）；
+     - **产品功能 (Product Features)**：3~5 条精炼卖点；
+  4. **关键词（Tag）7个上限与残留清理自愈算法**：
+     - 必须先自动展开「其他信息」折叠面板；
+     - 读取当前页面已存在的关键词 Chip 数量与内容；
+     - 若已有历史残留或默认标签超出 7 个，必须先定位每个非目标 Chip 上的删除按钮并点击移除；
+     - 仅向 `#search-terms` 中追加缺失的目标词，**严格确保页面总关键词数量 $\le 7$ 个**，杜绝触发表单提交报错。
+  5. **视觉资产上传与事件派发铁律**：
+     - **桌面屏幕截图（必须至少 1 张 1920x1080 PNG）**；
+     - **应用图标徽标**：1:1 酷图 (1080x1080)、300x300、150x150、71x71 PNG；
+     - **事件派发**：CDP 的 `DOM.setFileInputFiles` 仅在 DOM 节点挂载 FileList，**必须紧接着派发 `input` 与 `change` 事件**，否则 Angular 上传处理器不会向 Azure Blob 发送上传请求；
+     - **保存前硬核校验**：在点击保存前，**必须校验页面上 `桌面 (1)` 或缩略图已成功渲染**，未上传成功绝对禁止点击保存！
+  6. **保存**：点击底部的 **「保存」** 按钮。
 
 ---
 
 ### 表单 6：提交选项 (Submission Options)
 - **页面 URL**：`.../submissions/<submission-id>/options`
-- **Agent 推荐填报标准**：
-  1. **发布暂缓选项 (Publishing Mode)**：
-     - 默认选择 **「除非我选择“立即发布”，否则不发布此提交」(Manual)**，认证通过后保留人工发布控制；
-  2. **受限的功能 (Restricted capabilities) 说明**（⚠️ **必填项**）：
-     - 若包内声明了 `runFullTrust`，页面会出现用途说明文本框，填写 500 字以内说明：
+- **分阶段操作标准**：
+  1. **阶段 1：现场 DOM 诊断查看 (Inspect)**：
+     - 进入 options 页面，等待受限功能 API 后台请求返回并渲染 `<section>受限的功能</section>`；
+     - 提取发布模式单选框当前选中项与 `runFullTrust` 理由输入框状态，向用户汇报，**停下来等待确认**。
+  2. **阶段 2：填报与保存 (Fill & Save)**：
+     - **发布暂缓选项 (Publishing Mode)**：默认设为 **「除非我选择“立即发布”，否则不发布此提交」(Manual)**；
+     - **受限的功能 (Restricted capabilities) 说明**（⚠️ **必填项**）：
+       使用 `textarea.text-area-width` 或全局穿透定位器定位输入框，填入合规理由并派发 `input`/`change`：
        `这是一个 WinUI 3 桌面应用，需要以全信任桌面进程运行才能正常启动并提供本地通知、文件和系统集成功能。应用仅在用户本机运行，不访问或修改其他用户的数据。`
-  3. **保存**：点击底部的 **「保存」** 按钮。
+     - 点击底部的 **「保存」** 按钮；
+     - 导航回 Overview 页面确认状态变为「完成」。
 
 ---
 

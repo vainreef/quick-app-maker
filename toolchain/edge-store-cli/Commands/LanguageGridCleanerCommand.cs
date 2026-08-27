@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Vainreef.EdgeStore.Cdp;
 using Vainreef.EdgeStore.ComponentAdapters;
+using Vainreef.EdgeStore.PartnerCenter;
 using Vainreef.EdgeStore.State;
 
 namespace Vainreef.EdgeStore.Commands;
@@ -16,6 +17,7 @@ public static class LanguageGridCleanerCommand
 
         var waiter = new Waiter(client);
         var input = new InputDriver(client, new AxLocator(client, new DomDriver(client)));
+        var gridManager = new ListingLanguageGridManager(client, input);
 
         string baseUrl = desired.Site.BaseUrl.TrimEnd('/');
         string submissionId = desired.SubmissionId;
@@ -43,53 +45,10 @@ public static class LanguageGridCleanerCommand
             await Task.Delay(2000);
         }
 
-        Console.WriteLine("[INFO] Iteratively deleting all non-Chinese languages from language grid...");
+        Console.WriteLine("[INFO] Converging language grid to desired supported languages...");
+        int deleted = await gridManager.DeleteUnwantedLanguagesAsync(desired);
+        Console.WriteLine($"[PASS] Languages deleted: {deleted}");
 
-        int deletedTotal = await client.EvaluateAsync<int>("""
-        (async () => {
-          let deletedCount = 0;
-          for (let pass = 0; pass < 150; pass++) {
-            const links = Array.from(document.querySelectorAll('a[href*="languagecode="], a[href*="listings"]'));
-            let targetBtn = null;
-            let targetName = '';
-
-            for (const a of links) {
-              const text = (a.innerText || '').trim();
-              if (text === '中文(中国)' || (a.href || '').includes('languageid=5') || (a.href || '').includes('languagecode=zh-cn')) {
-                continue; // Keep Chinese (China)
-              }
-              let container = a.parentElement;
-              for (let i = 0; i < 5 && container; i++) {
-                const btn = Array.from(container.querySelectorAll('he-button, button')).find(b => (b.innerText || '').trim() === '删除');
-                if (btn) {
-                  targetBtn = btn;
-                  targetName = text;
-                  break;
-                }
-                container = container.parentElement;
-              }
-              if (targetBtn) break;
-            }
-
-            if (!targetBtn) break;
-
-            if (targetBtn.shadowRoot) {
-              const inner = targetBtn.shadowRoot.querySelector('button');
-              if (inner) inner.click();
-            }
-            targetBtn.click();
-            targetBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
-            deletedCount++;
-            await new Promise(r => setTimeout(r, 80));
-          }
-          return deletedCount;
-        })()
-        """);
-
-        Console.WriteLine($"[PASS] Deleted {deletedTotal} non-Chinese languages.");
-        await Task.Delay(2000);
-
-        // Click Save on the language grid page
         Console.WriteLine("[INFO] Clicking Save on manage languages page...");
         bool saveClicked = await client.EvaluateAsync<bool>("""
         (() => {
@@ -114,7 +73,7 @@ public static class LanguageGridCleanerCommand
         if (saveClicked)
         {
             Console.WriteLine("[PASS] Clicked Save on language grid.");
-            await Task.Delay(4000);
+            await Task.Delay(3000);
         }
         else
         {

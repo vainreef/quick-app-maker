@@ -18,6 +18,7 @@ public class Program
         string productId = "";
         string stateDir = "";
         string appName = "";
+        string targetUrl = "";
         bool apply = false;
         bool submit = false;
         bool confirmSubmit = false;
@@ -33,6 +34,11 @@ public class Program
                 case "-action":
                 case "-a":
                     if (i + 1 < args.Length) action = args[++i].ToLowerInvariant();
+                    break;
+                case "--url":
+                case "-url":
+                case "-u":
+                    if (i + 1 < args.Length) targetUrl = args[++i];
                     break;
                 case "--phase":
                 case "-phase":
@@ -176,13 +182,19 @@ public class Program
                     return await LanguageGridCleanerCommand.ExecuteAsync(desired, stateRoot);
 
                 case "fulldom":
-                    return await FullDomDumpCommand.ExecuteAsync(stateRoot, baseDir);
+                    return await FullDomDumpCommand.ExecuteAsync(stateRoot, baseDir, targetUrl);
 
                 case "diagnoselisting":
                     return await DiagnoseListingCommand.ExecuteAsync(desired, stateRoot);
 
                 case "filllisting":
                     return await FillListingCommand.ExecuteAsync(desired, stateRoot);
+
+                case "inspectoptions":
+                    return await InspectOptionsCommand.ExecuteAsync(desired, stateRoot);
+
+                case "filloptions":
+                    return await FillOptionsCommand.ExecuteAsync(desired, stateRoot);
 
                 case "cleanpackages":
                     return await PackageCleanerCommand.ExecuteAsync(desired, stateRoot);
