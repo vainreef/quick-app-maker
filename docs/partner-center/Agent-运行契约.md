@@ -22,7 +22,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
 
 | 阶段 | 阶段标识 | 执行命令 | 核心任务与自检断言 |
 | :---: | :--- | :--- | :--- |
-| **STORE -1** | **名称预留与建项** | -Action reserve -AppName <名称> -Manifest .\<app>\build\edge-store.json | 自动在微软后台建项、验重、预留名称，并自动回填 3 大 Identity |
+| **STORE -1** | **名称预留与建项 (用户交互模式)** | -Action reserve -Manifest .\<app>\build\edge-store.json | 自动拉起弹窗，由用户在浏览器直接输入心仪名称并点击保留，脚本自动监听进入产品页后全自动抓取 3 大 Identity 并回填本地 |
 | **STORE 0** | **离线静态预检** | -Action preflight -Manifest .\<app>\build\edge-store.json | 校验描述字数 (300~500字)、特性列表 ($\ge 3$)、关键词 ($\le 7$)、MSIX 及资产文件存在性 |
 | **STORE 1** | **浏览器拉起确权** | -Action launch -KeepOpen | 拉起独立常驻 Edge (9222 调试端口)，确权已处于微软开发者后台登录态 |
 | **STORE 2** | **提审探测与基线** | -Action discover -Manifest .\<app>\build\edge-store.json | 提取当前草稿 SubmissionId，生成 6 大表单直达 URL 并写入 checkpoint |

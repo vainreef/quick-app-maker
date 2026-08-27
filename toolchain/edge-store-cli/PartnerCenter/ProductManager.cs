@@ -18,48 +18,37 @@ public class ProductManager
         _native = native;
     }
 
-    public async Task<ProductIdentityResult> CreateAndReserveProductAsync(string baseUrl, string appName)
+    public async Task<ProductIdentityResult> UserAssistedReserveProductAsync(string baseUrl, string? suggestedAppName = null)
     {
-        string appsUrl = "https://partner.microsoft.com/zh-cn/dashboard/apps-and-games/overview";
-        Console.WriteLine($"[INFO] Navigating to Partner Center Apps & Games overview: {appsUrl}");
-        await _waiter.NavigateAsync(appsUrl, "Apps and Games Overview", allowOverviewRedirect: true);
-        await _waiter.RequireAsync(async () =>
-        {
-            return await _client.EvaluateAsync<bool>("(document.body ? document.body.innerText : '').includes('新产品') || (document.body ? document.body.innerText : '').includes('应用和游戏')");
-        }, TimeSpan.FromSeconds(30), "Wait for Apps & Games overview");
-        await Task.Delay(2000);
+        string currentUrl = await _client.EvaluateAsync<string>("location.href") ?? "";
+        var initialMatch = Regex.Match(currentUrl, @"/products/([^/?#]+)");
+        if (!initialMatch.Success) initialMatch = Regex.Match(currentUrl, @"/apps/([^/?#]+)");
 
-        async Task<bool> IsNameInputVisibleAsync()
+        if (!initialMatch.Success)
         {
-            return await _client.EvaluateAsync<bool>("""
+            if (!currentUrl.Contains("/apps-and-games/overview"))
+            {
+                string appsUrl = "https://partner.microsoft.com/zh-cn/dashboard/apps-and-games/overview";
+                Console.WriteLine($"[INFO] Navigating to Partner Center Apps & Games overview: {appsUrl}");
+                await _waiter.NavigateAsync(appsUrl, "Apps and Games Overview", allowOverviewRedirect: true);
+                await _waiter.RequireAsync(async () =>
+                {
+                    return await _client.EvaluateAsync<bool>("(document.body ? document.body.innerText : '').includes('新产品') || (document.body ? document.body.innerText : '').includes('应用和游戏')");
+                }, TimeSpan.FromSeconds(30), "Wait for Apps & Games overview");
+                await Task.Delay(1500);
+            }
+
+            // 检查弹窗是否已经打开，若未打开则帮用户点开
+            bool isModalOpen = await _client.EvaluateAsync<bool>("""
             (() => {
-                const allRoots=[document];
-                for(let i=0;i<allRoots.length;i++){
-                  try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){}
-                }
-                const deepAll = (selector) => {
-                  const out=[], seen=new Set();
-                  for(const root of allRoots){
-                    try { for(const e of root.querySelectorAll(selector)) if(!seen.has(e)){ seen.add(e); out.push(e); } } catch(_){}
-                  }
-                  return out;
-                };
-                const visible = e => { const r=e.getBoundingClientRect(), s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden'; };
-                const inps = deepAll('input[name="productName"], input#product-name, input[uitestid="productNameInput"], input[type="text"]').filter(visible);
-                return inps.length > 0;
+                return document.querySelector('name-input, .modal-dialog, [role="dialog"]') !== null;
             })()
             """);
-        }
 
-        bool onNameInputPage = await IsNameInputVisibleAsync();
-
-        if (!onNameInputPage)
-        {
-            Console.WriteLine("[INFO] Step 1: Locating and physical clicking '+ 新产品'...");
-            bool clickedNew = false;
-            for (int attempt = 0; attempt < 6; attempt++)
+            if (!isModalOpen)
             {
-                clickedNew = await PhysicalClickElementAsync("""
+                Console.WriteLine("[INFO] 正在为您点开【+ 新产品】 -> 【MSIX 或 PWA 应用】名称预留弹窗...");
+                await PhysicalClickElementAsync("""
                 () => {
                     return deepAll('button[data-automation-id="create-new-button"], [data-automation-id="create-new-Application"], [data-automation-id="create-new-application"], [uitestid="createNewApplicationButton"]')
                         .concat(deepAll('button,he-button,a,[role="button"],span'))
@@ -70,191 +59,73 @@ public class ProductManager
                         });
                 }
                 """, "新产品 按钮");
-                if (clickedNew) break;
-                await Task.Delay(800);
-            }
-
-            if (!clickedNew)
-            {
-                throw new InvalidOperationException("Failed to click '新产品' button on Apps and Games overview.");
-            }
-
-            await Task.Delay(1200);
-
-            Console.WriteLine("[INFO] Step 2: Physical clicking 'MSIX 或 PWA 应用'...");
-            bool clickedMsix = false;
-            for (int attempt = 0; attempt < 6; attempt++)
-            {
-                clickedMsix = await PhysicalClickElementAsync("""
+                await Task.Delay(1000);
+                await PhysicalClickElementAsync("""
                 () => {
                     return deepAll('button[value="MSIX_PWA_App"], [data-automation-id="create-new-Application"] button, button[value*="MSIX"]')
                         .concat(deepAll('button[role="menuitem"], li[role="none"] > button'))
                         .find(e => visible(e) && (e.innerText || '').includes('MSIX 或 PWA'));
                 }
-                """, "MSIX 或 PWA 应用 菜单项 (button[value='MSIX_PWA_App'])");
-                if (clickedMsix) break;
-                await Task.Delay(800);
+                """, "MSIX 或 PWA 应用 菜单项");
             }
 
-            if (!clickedMsix)
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("\n================================================================================");
+            Console.WriteLine("【用户操作指引：请在已打开的 Edge 浏览器中完成名称预留】");
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine("1. 浏览器中名称预留弹窗已准备就绪；");
+            Console.WriteLine("2. 请在输入框中输入您期望的应用名称（建议加副标题/定位，如：牵挂 - 桌面便签...）；");
+            Console.WriteLine("3. 点击【检查可用性】确认绿标通过；");
+            Console.WriteLine("4. 点击【保留产品名称】创建应用；");
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine(">>> 脚本正在后台自动监听，您保留成功并进入产品页面后将自动接管后续所有提审流程！");
+            Console.WriteLine("================================================================================\n");
+            Console.ResetColor();
+
+            // 监听进入产品详情页（最长等待 10 分钟）
+            await _waiter.RequireAsync(async () =>
             {
-                throw new InvalidOperationException("Failed to click 'MSIX 或 PWA 应用' menu item.");
-            }
-
-            Console.WriteLine("[PASS] Clicked 'MSIX 或 PWA 应用', waiting for Name input form to open...");
-            await _waiter.RequireAsync(IsNameInputVisibleAsync, TimeSpan.FromSeconds(20), "Wait for Product Name input field");
+                string url = await _client.EvaluateAsync<string>("location.href") ?? "";
+                return (url.Contains("/products/") || url.Contains("/apps/")) && !url.Contains("/create") && !url.Contains("/apps-and-games/overview");
+            }, TimeSpan.FromMinutes(10), "等待用户在浏览器中完成名称预留并进入产品页面");
         }
 
-        Console.WriteLine($"[INFO] Step 3: Entering product name [{appName}]...");
-        await _native.SetFieldAsync([
-            "input[name=\"productName\"]",
-            "input#product-name",
-            "input[uitestid=\"productNameInput\"]",
-            "input[type=\"text\"]"
-        ], appName, "Product Name");
-
-        await Task.Delay(800);
-
-        Console.WriteLine("[INFO] Step 4: Checking name availability...");
-        bool clickedCheck = await PhysicalClickElementAsync("""
-        () => {
-            return deepAll('button,he-button,a,[role="button"]')
-                .find(e => visible(e) && (/检查可用性|检查名称可用性/.test(e.innerText || '')));
-        }
-        """, "检查可用性 按钮");
-        if (!clickedCheck)
-        {
-            await _native.ClickOptionByDeepTextAsync(["检查可用性", "检查名称可用性"], "检查可用性");
-        }
-
-        Console.WriteLine("[INFO] Step 5: Waiting for name availability verification (strict 10s limit)...");
-        await Task.Delay(1200); // Allow async POST request to start
-        var checkDeadline = DateTime.UtcNow.AddSeconds(10);
-        AvailabilityCheckResult? checkResult = null;
-        while (DateTime.UtcNow < checkDeadline)
-        {
-            checkResult = await _client.EvaluateAsync<AvailabilityCheckResult>("""
-            (() => {
-                const allRoots=[document];
-                for(let i=0;i<allRoots.length;i++){
-                  try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){}
-                }
-                const deepAll = (selector) => {
-                  const out=[], seen=new Set();
-                  for(const root of allRoots){
-                    try { for(const e of root.querySelectorAll(selector)) if(!seen.has(e)){ seen.add(e); out.push(e); } } catch(_){}
-                  }
-                  return out;
-                };
-                const visible = e => {
-                  const r=e.getBoundingClientRect(), s=getComputedStyle(e);
-                  return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden' && !e.classList.contains('hidden');
-                };
-
-                // 1. 严格优先检测失败报警 (名称不可用 / 已被保留 / alert-danger / AlreadyReserved)
-                const errorEls = deepAll('.alert-error, .alert-danger, [role="alert"], [data-l10n-key*="AlreadyReserved"], [data-l10n-key*="NotAvailable"], .has-error')
-                    .filter(visible);
-                for (const el of errorEls) {
-                    const txt = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-                    if (txt.includes('不可用') || txt.includes('已被保留') || txt.includes('已被使用') || txt.includes('Already reserved') || txt.includes('Not available')) {
-                        return { checked: true, available: false, errorMessage: txt };
-                    }
-                }
-
-                // 2. 检测整页是否有不可用提示
-                const modal = document.querySelector('name-input, .modal-dialog, [role="dialog"]') || document.body;
-                const modalText = (modal.innerText || '').replace(/\s+/g, ' ');
-                if (modalText.includes('名称不可用') || modalText.includes('已被保留') || modalText.includes('不使用此名称')) {
-                    return { checked: true, available: false, errorMessage: '名称不可用。如果已保留此名称用于其他产品，请将其更新为不使用此名称。' };
-                }
-
-                // 3. 严格检测成功信号 (只有在没有任何错误的情况下，检测绿色对勾或明确的"此名称可用")
-                const checkMark = deepAll('.win-icon-CheckMark, .win-color-fg-green').find(visible);
-                const hasSuccessText = modalText.includes('此名称可用') || (modalText.includes('名称可用') && !modalText.includes('不可用'));
-                
-                if (checkMark || hasSuccessText) {
-                    return { checked: true, available: true, errorMessage: '' };
-                }
-
-                return { checked: false, available: false, errorMessage: '' };
-            })()
-            """);
-
-            if (checkResult != null && checkResult.Checked)
-            {
-                break;
-            }
-            await Task.Delay(300);
-        }
-
-        if (checkResult == null || !checkResult.Checked || !checkResult.Available)
-        {
-            string domSummary = await _client.EvaluateAsync<string>("""
-            (() => {
-                const el = document.querySelector('name-input, .modal-dialog, [role="dialog"]') || document.body;
-                return (el.innerText || '').slice(0, 300).replace(/\s+/g, ' ');
-            })()
-            """) ?? "";
-
-            string err = checkResult?.ErrorMessage ?? "10秒验重超时，未检测到成功绿标";
-            Console.WriteLine($"\n[NAME-UNAVAILABLE] ❌ 微软商店产品名称 [{appName}] 验重未通过！");
-            Console.WriteLine($"[NAME-UNAVAILABLE] 微软后台状态: {err}");
-            Console.WriteLine($"[NAME-UNAVAILABLE] 现场 DOM 摘要: {domSummary}\n");
-            throw new ProductNameUnavailableException(appName, $"{err} | DOM: {domSummary}");
-        }
-
-        Console.WriteLine("[PASS] Name is available! Proceeding to reserve...");
-        await Task.Delay(500);
-
-        Console.WriteLine("[INFO] Step 6: Clicking '保留产品名称' (Reserve product name)...");
-        await _client.EvaluateAsync<bool>("""
-        (() => {
-            const allRoots=[document];
-            for(let i=0;i<allRoots.length;i++){
-              try { for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); } catch(_){}
-            }
-            for(const root of allRoots){
-              for(const b of root.querySelectorAll('button,he-button,a,[role="button"]')){
-                if((b.innerText||'').includes('保留产品名称') || (b.innerText||'').includes('保留名称')){
-                  b.click();
-                  b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
-                  return true;
-                }
-              }
-            }
-            return false;
-        })()
-        """);
-
-        await PhysicalClickElementAsync("""
-        () => {
-            return deepAll('button,he-button,a,[role="button"]')
-                .find(e => visible(e) && (/保留产品名称|保留名称|Reserve product name/.test(e.innerText || '')));
-        }
-        """, "保留产品名称 按钮");
-
-        Console.WriteLine("[INFO] Step 7: Waiting for product reservation to complete and overview page to load...");
-        await _waiter.RequireAsync(async () =>
-        {
-            string url = await _client.EvaluateAsync<string>("location.href") ?? "";
-            return (url.Contains("/products/") || url.Contains("/apps/")) && !url.Contains("/create") && !url.Contains("/overview");
-        }, TimeSpan.FromSeconds(25), "Wait for Product Overview URL after reservation");
-
-        string? currentUrl = await _client.EvaluateAsync<string>("location.href");
-        var match = Regex.Match(currentUrl ?? "", @"/products/([^/?#]+)");
+        currentUrl = await _client.EvaluateAsync<string>("location.href") ?? "";
+        var match = Regex.Match(currentUrl, @"/products/([^/?#]+)");
         if (!match.Success)
         {
-            match = Regex.Match(currentUrl ?? "", @"/apps/([^/?#]+)");
+            match = Regex.Match(currentUrl, @"/apps/([^/?#]+)");
         }
         if (!match.Success)
         {
-            throw new InvalidOperationException($"Failed to extract new ProductId from URL: {currentUrl}");
+            throw new InvalidOperationException($"无法从当前 URL [{currentUrl}] 中提取 ProductId。");
         }
 
         string productId = match.Groups[1].Value;
-        Console.WriteLine($"[PASS] New product reserved successfully! ProductId: {productId}");
+        Console.WriteLine($"\n[PASS] 成功检测到新建产品！ProductId: {productId}");
 
-        return await ScrapeIdentityAsync(baseUrl, productId);
+        // 提取页面上的产品名称
+        string actualProductName = await _client.EvaluateAsync<string>("""
+        (() => {
+            const el = document.querySelector('he-page-title, h1, [slot="active-title"], .page-title');
+            return (el ? (el.innerText || el.textContent || '') : '').trim();
+        })()
+        """) ?? "";
+
+        if (string.IsNullOrWhiteSpace(actualProductName))
+        {
+            actualProductName = suggestedAppName ?? "牵挂";
+        }
+        Console.WriteLine($"[PASS] 捕获到产品名称: {actualProductName}");
+
+        Console.WriteLine($"[INFO] 正在抓取官方 Identity (Package/Identity/Name, Publisher, PublisherDisplayName)...");
+        var result = await ScrapeIdentityAsync(baseUrl, productId);
+        return result;
+    }
+
+    public async Task<ProductIdentityResult> CreateAndReserveProductAsync(string baseUrl, string appName)
+    {
+        return await UserAssistedReserveProductAsync(baseUrl, appName);
     }
 
     public async Task<ProductIdentityResult> ScrapeIdentityAsync(string baseUrl, string productId)
