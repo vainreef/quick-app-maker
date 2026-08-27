@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Vainreef.EdgeStore.Commands;
 using Vainreef.EdgeStore.Orchestration;
+using Vainreef.EdgeStore.PartnerCenter;
 using Vainreef.EdgeStore.State;
 
 namespace Vainreef.EdgeStore;

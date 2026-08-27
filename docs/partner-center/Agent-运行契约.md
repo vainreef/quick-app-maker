@@ -1,4 +1,4 @@
-﻿# Microsoft Partner Center 商店发布 Agent 运行契约 (V2 标准版)
+# Microsoft Partner Center 商店发布 Agent 运行契约 (V2 标准版)
 
 本文档是 Agent 执行 Windows 应用发布提审的**唯一最高行为准则与操作手册**。
 任何 Agent 接手发布任务时，必须以本契约和 quick-app-maker/skills/vainreef-fast-publish/SKILL.md 为准，严禁单脚本盲目一冲到底，严禁盲目猜想。
@@ -70,12 +70,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
 - 填入理由必须通过属性描述符 Setter 写入并触发 input/change。
 
 ### 6. 安全导航与绝对 URL 定位 (Absolute URL Navigation Invariant)
-- 严禁通过页面上的模糊相对链接（如 [href*=/overview]）返回概览页（防止误跳微软外部 Learn 文档）；
+- 严禁通过页面上的模糊相对链接（如  [href*=/overview]）返回概览页（防止误跳微软外部 Learn 文档）；
 - 必须使用由 ${baseUrl}//overview 显式构造的绝对控制台 URL 导航。
 
 ### 7. 干净编译与 DLL 锁处理 (Clean Build & Compilation Invariant)
 - 每次修改 C# 驱动代码后，建议使用 -p:UseSharedCompilation=false 进行编译；
-- 若遇文件时间戳或增量编译未命中，先清理 in/ 与 obj/ 目录再执行构建。
+- 若遇文件时间戳或增量编译未命中，先清理 bin/ 与 obj/ 目录再执行构建。
+
+### 8. 微软商店应用名称解耦与不可用自愈铁律 (Store Product Name Decoupling & Invariant)
+- **名称解耦原则**：
+  - 微软商店的 Product Name 具有全球唯一性，且直接决定商店搜索索引与 SEO 曝光；
+  - 本地应用的 DisplayName（如窗口标题、任务栏图标名称）与微软商店预留的 Product Name **完全解耦独立**；
+- **名称不可用即时中断**：
+  - 在 STORE -1 建项预留阶段，一旦检测到 `.alert-danger` / `[data-l10n-key*="AlreadyReserved"]` / `名称不可用`，驱动必须**立即以退出码 42 中断，绝对禁止死等超时**；
+- **Agent 交互与自愈建议规范**：
+  - Agent 必须主动向用户报告名称已被占用，并基于产品定位给出 3 个“主名称 - 副标题/说明”的候选方案（例如：`牵挂 - 桌面便签与倒数日`、`牵挂 (Qiangua) - 仪式感待办提醒`）；
+  - 经用户选定或输入新名称后，传入新名称重新执行 STORE -1。
 
 ---
 
