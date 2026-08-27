@@ -19,7 +19,8 @@ param(
     [switch]$ConfirmSubmit,
     [switch]$KeepOpen,
     [switch]$ReloadVerify,
-    [switch]$SkipReloadVerify
+    [switch]$SkipReloadVerify,
+    [switch]$Rebuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,18 +73,10 @@ if (-not (Test-Path -LiteralPath $dllPath)) {
     $dllPath = Join-Path $toolRoot 'bin\Debug\net10.0\EdgeStore.Cli.dll'
 }
 
-# 智能感知：如果 DLL 不存在，或者有任意 .cs 源码修改时间明显晚于 DLL（>2秒缓冲），则自动增量编译
-$needsBuild = -not (Test-Path -LiteralPath $dllPath)
-if (-not $needsBuild) {
-    $dllTime = (Get-Item -LiteralPath $dllPath).LastWriteTimeUtc
-    $latestSource = Get-ChildItem -Path $toolRoot -Filter "*.cs" -Recurse | Where-Object { $_.FullName -notmatch '\\obj\\' -and $_.FullName -notmatch '\\bin\\' } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-    if ($latestSource -and $latestSource.LastWriteTimeUtc -gt $dllTime.AddSeconds(2)) {
-        $needsBuild = $true
-    }
-}
-
+# 仅在 DLL 不存在或显式指定 -Rebuild 时才触发编译
+$needsBuild = (-not (Test-Path -LiteralPath $dllPath)) -or $Rebuild
 if ($needsBuild) {
-    Write-Host "[INFO] Detected source code changes. Auto-rebuilding Edge Store CLI..."
+    Write-Host "[INFO] Building Edge Store CLI..."
     & $dotnet.Source build $projectPath -c Release --nologo -v q /p:UseSharedCompilation=false
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Edge Store CLI build failed with exit code $LASTEXITCODE."
