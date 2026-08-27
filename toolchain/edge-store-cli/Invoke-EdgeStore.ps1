@@ -72,12 +72,12 @@ if (-not (Test-Path -LiteralPath $dllPath)) {
     $dllPath = Join-Path $toolRoot 'bin\Debug\net10.0\EdgeStore.Cli.dll'
 }
 
-# 智能感知：如果 DLL 不存在，或者有任意 .cs 源码修改时间晚于 DLL，则自动增量编译
+# 智能感知：如果 DLL 不存在，或者有任意 .cs 源码修改时间明显晚于 DLL（>2秒缓冲），则自动增量编译
 $needsBuild = -not (Test-Path -LiteralPath $dllPath)
 if (-not $needsBuild) {
     $dllTime = (Get-Item -LiteralPath $dllPath).LastWriteTimeUtc
     $latestSource = Get-ChildItem -Path $toolRoot -Filter "*.cs" -Recurse | Where-Object { $_.FullName -notmatch '\\obj\\' -and $_.FullName -notmatch '\\bin\\' } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-    if ($latestSource -and $latestSource.LastWriteTimeUtc -gt $dllTime) {
+    if ($latestSource -and $latestSource.LastWriteTimeUtc -gt $dllTime.AddSeconds(2)) {
         $needsBuild = $true
     }
 }
