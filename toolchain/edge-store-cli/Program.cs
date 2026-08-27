@@ -220,6 +220,24 @@ public class Program
                     return 2;
             }
         }
+        catch (ProductNameUnavailableException ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("\n================================================================================");
+            Console.WriteLine($"[NAME-UNAVAILABLE] ❌ 微软商店产品名称 [{ex.AppName}] 不可用！");
+            Console.WriteLine($"[NAME-UNAVAILABLE] 微软后台提示: {ex.Detail}");
+            Console.WriteLine("--------------------------------------------------------------------------------");
+            Console.WriteLine("【微软商店应用命名规则与排障指引】");
+            Console.WriteLine("1. 微软商店的 Product Name 具有全球唯一性，且用于商店搜索排名与 SEO。");
+            Console.WriteLine("2. 微软商店的产品名称 与 本地应用窗口显示的 DisplayName 完全解耦独立。");
+            Console.WriteLine("3. 当基础名称已被他人预留时，建议采用‘主名称 - 副标题/定位说明’的命名模式：");
+            Console.WriteLine($"   - {ex.AppName} - 桌面便签与倒数日提醒");
+            Console.WriteLine($"   - {ex.AppName} - 充满仪式感的纪念日与待办笔记本");
+            Console.WriteLine($"   - {ex.AppName} ({ex.AppName}) - 温馨桌面提醒工具");
+            Console.WriteLine("================================================================================\n");
+            Console.ResetColor();
+            return 42;
+        }
         catch (Exception ex)
         {
             Console.WriteLine($"[ERROR] Unhandled exception: {ex.Message}");
