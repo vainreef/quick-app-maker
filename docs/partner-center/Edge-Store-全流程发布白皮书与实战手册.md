@@ -148,3 +148,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
 # 8. 显式双确认提交审核
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action submit -ConfirmSubmit -Manifest .\qiangua\build\edge-store-EXXE.json -StateDir .\.cache\edge-store-state
 ```
+
+---
+
+## 6. 如何删除产品（用户手动操作指引与安全红线）
+
+> ⚠️ **安全红线**：删除产品属于高风险且不可逆动作，**绝对严禁 Agent 通过自动化脚本代为删除**。如果需要删除产品，必须指引用户在网页端自行操作。
+
+### 用户手动删除产品标准指引：
+1. **删除草稿提交（前置）**：
+   - 若当前产品存在正在草拟的提交（Draft Submission），必须先在产品页面点击 **「删除提交」** 按钮，使产品回到无草稿状态。
+2. **进入应用程序概述页面**：
+   - 访问 `https://partner.microsoft.com/zh-cn/dashboard/products/<ProductId>/overview`。
+3. **点击下拉菜单触发器**：
+   - 点击右上角或标题旁的更多操作图标按钮（DOM 结构：`<a slot="trigger" class="dropdown-toggle" id="he-dropdown-button-1"><he-icon name="more"></he-icon></a>`）。
+4. **点击「删除产品」**：
+   - 在弹出的下拉浮层中，点击 **「删除产品」**（DOM 结构：`<span class="delete-draft">删除产品</span>`）。
+5. **二次弹窗确认**：
+   - 在系统确认对话框中点击确定，即可彻底从 Partner Center 中删除该产品。
+

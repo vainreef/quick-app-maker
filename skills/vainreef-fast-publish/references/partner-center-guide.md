@@ -173,3 +173,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
    - **自动化安全扫描与预处理**：约 10~30 分钟；
    - **人工审核与合规检查**：通常 **24 ~ 72 小时**；
    - **上架成功**：审核通过后状态变为 `In the Store`，全球 Windows 用户均可在 Microsoft Store 搜索并直接下载安装！
+
+---
+
+## 阶段五：如何删除产品（用户自主操作指引）
+
+> ⚠️ **安全红线**：删除产品属于高风险且不可逆操作，**严禁 Agent 通过自动化脚本代用户执行删除**。若用户需要删除产品，Agent **必须清晰指引用户在网页端自行操作**。
+
+### 用户手动删除产品标准步骤：
+1. **前置条件（清理提交草稿）**：
+   - 若当前产品存在正在草拟的提交（Draft Submission），必须先在产品页面点击 **「删除提交」** 按钮，将提交草稿清理干净。
+2. **进入产品概述页**：
+   - 打开浏览器，访问该产品的控制台主页（例如 `https://partner.microsoft.com/zh-cn/dashboard/products/<ProductId>/overview`，即「应用程序概述」页面）。
+3. **点击更多选项按钮（`...` 触发器）**：
+   - 在产品标题右侧，找到并点击带有三个点的更多操作按钮（对应 DOM 中的 `<a slot="trigger" class="dropdown-toggle"><he-icon name="more"></he-icon></a>`）。
+4. **点击「删除产品」**：
+   - 在弹出的下拉菜单中，点击 **「删除产品」**（对应 DOM 中的 `<span class="delete-draft">删除产品</span>`）。
+5. **在确认弹窗中二次确认**：
+   - 阅读微软官方删除提示，确认无误后点击确定，即可将该产品及其预留名称从开发者中心彻底删除。
+
