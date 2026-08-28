@@ -76,16 +76,36 @@
 
 ---
 
-## 6. 产品预留名称不可用与解耦重命名规范 (Product Name Unavailable & Decoupling Guide)
+## 6. 产品预留名称交互式建项与名称占用排障 (Product Name Reservation Protocol)
 
-- **错误现象**：在预留名称阶段，页面出现红字警告：`名称不可用。如果已保留此名称用于其他产品，请将其更新为不使用此名称。`（`<span data-l10n-key="AppHub_ReserveNames_AlreadyReserved">`），保留按钮保持禁用。
+- **错误现象**：在预留名称阶段，页面出现红字警告：`名称不可用。如果已保留此名称用于其他产品，请将其更新为不使用此名称。`
 - **根本原因**：微软商店中的产品名称具有全球唯一性。常用词、单字词（如“牵挂”、“记事本”）通常已被其他开发者占用或受微软官方保留。
-- **核心认知（解耦原则）**：
-  - **微软商店应用名称（Product Name）**：用于微软商店搜索、应用商店展示页与 SEO 索引；
-  - **本地应用窗口名称（DisplayName）**：定义在 `Package.appxmanifest` 中，决定安装后桌面图标名称、窗口标题和开始菜单项。
-  - **两者完全解耦独立**，商店名称无需强行与本地窗口名保持单字一致！
-- **自愈与交互规范**：
-  1. **驱动即时中断**：检测到 `.alert-danger` / `名称不可用` 时，立即以退出码 `42` 退出，绝不盲目死等；
-  2. **Agent 提问与建议**：Agent 立即停止脚本，向用户解释名称占用，并给出符合“主名称 - 副标题/定位”的建议备选名称（例如：`牵挂 - 桌面便签与倒数日提醒`、`牵挂 (Qiangua) - 充满仪式感的纪念日笔记本`）；
-  3. **用户确认后重新预留**：经用户选定新名称后，使用 `-AppName "新名称"` 重新执行 STORE -1。
+- **重构后的标准工作流**：
+  - 由脚本为用户拉起预留弹窗，交由用户在 Edge 浏览器中直接输入心仪名称并点击保留；
+  - 脚本后台自动监听 URL 进入产品页，全自动提取 ProductId 与 3 大 Identity 并回填本地。
+
+---
+
+## 7. MSIX 清单 DisplayName 与商店预留名称不匹配拒包 (Package DisplayName Matching Invariant)
+
+- **错误现象**：在 Packages 页面上传 MSIX 程序包后，微软后台返回红色错误提示：
+  > `此软件包的清单（Package/Properties/DisplayName）使用了你未保留的显示名称: xxx`
+  > `Delete the faulty package(s) listed above before you can save your changes.`
+- **根本原因**：
+  - 微软 Partner Center 要求 MSIX 的 `Package.appxmanifest` 中的 `<Properties><DisplayName>` 和 `<Application ... uap:VisualElements DisplayName="...">`，**必须与微软后台为该产品已保留的名称列表 100% 完全一致**；
+  - 若在后台预留了 `Qiangua - 牵挂桌面记事与倒数日`，但本地打包清单中只写了 `牵挂`，微软校验器会判定该包使用了“未保留名称”而报错拒包。
+- **正确自愈与闭环规范**：
+  1. 在 STORE -1 用户预留名称成功后，脚本从页面抓取到实际预留的产品名称（`actualProductName`）；
+  2. 自动将 `actualProductName` 同步更新到 `edge-store.json` 的 `productName` 以及 `Package.appxmanifest` 中的所有 `DisplayName` 节点；
+  3. 执行 `dotnet publish` 与 `winapp package` 重新打包 MSIX。
+
+---
+
+## 8. Packages 上传验证负反馈实时拦截与异常包自愈 (Packages Realtime Error Trap & Auto-Clean)
+
+- **错误现象**：MSIX 上传出错后，页面已显示红色错误提示，但旧版脚本依然在单向轮询 `Validated` 状态直到 12 分钟超时。
+- **根本原因**：轮询循环缺乏多态负反馈拦截，且旧版文本匹配逻辑中 `rowText.includes('mb')` 或 `desktop` 误命中了错误提示行，导致死等。
+- **自愈机制**：
+  1. **实时负反馈拦截器**：每 500ms 扫描 `.alert-error`、`.alert-danger`、`.faulty-package-message`，一旦微软返回校验失败，秒级捕获具体错误并抛出异常中断；
+  2. **自动清理异常包（Auto-clean Faulty Packages）**：在重新上传前，自动扫描并点击页面上的 `a.upload-action[data-l10n-key="app_package_action_delete"]` / `Delete` 按钮，清理掉所有残留的损坏包，恢复纯净上传环境。
 

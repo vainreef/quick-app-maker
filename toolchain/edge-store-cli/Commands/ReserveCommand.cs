@@ -47,7 +47,8 @@ public static class ReserveCommand
         }
 
         // Backfill into Package.appxmanifest and manifest JSON
-        BackfillIdentity(baseDir, manifestPath, desired, result, effectiveAppName);
+        string finalName = !string.IsNullOrWhiteSpace(result.ProductName) ? result.ProductName : effectiveAppName;
+        BackfillIdentity(baseDir, manifestPath, desired, result, finalName);
         return 0;
     }
 

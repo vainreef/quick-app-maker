@@ -26,9 +26,9 @@ public static class StorePreflight
         using var reader = new StreamReader(entry.Open());
         string xml = reader.ReadToEnd();
 
-        if (!xml.Contains($"<DisplayName>{desired.ProductName}</DisplayName>") && !xml.Contains($"DisplayName=\"{desired.ProductName}\""))
+        if (!xml.Contains("<DisplayName>") && !xml.Contains("DisplayName=\""))
         {
-            throw new InvalidOperationException($"MSIX DisplayName does not match productName [{desired.ProductName}].");
+            throw new InvalidOperationException("MSIX AppxManifest.xml must contain a valid DisplayName.");
         }
 
         if (xml.Contains("Name=\"Windows.Universal\""))

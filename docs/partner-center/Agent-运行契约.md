@@ -77,15 +77,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
 - 每次修改 C# 驱动代码后，建议使用 -p:UseSharedCompilation=false 进行编译；
 - 若遇文件时间戳或增量编译未命中，先清理 bin/ 与 obj/ 目录再执行构建。
 
-### 8. 微软商店应用名称解耦与不可用自愈铁律 (Store Product Name Decoupling & Invariant)
-- **名称解耦原则**：
-  - 微软商店的 Product Name 具有全球唯一性，且直接决定商店搜索索引与 SEO 曝光；
-  - 本地应用的 DisplayName（如窗口标题、任务栏图标名称）与微软商店预留的 Product Name **完全解耦独立**；
-- **名称不可用即时中断**：
-  - 在 STORE -1 建项预留阶段，一旦检测到 `.alert-danger` / `[data-l10n-key*="AlreadyReserved"]` / `名称不可用`，驱动必须**立即以退出码 42 中断，绝对禁止死等超时**；
-- **Agent 交互与自愈建议规范**：
-  - Agent 必须主动向用户报告名称已被占用，并基于产品定位给出 3 个“主名称 - 副标题/说明”的候选方案（例如：`牵挂 - 桌面便签与倒数日`、`牵挂 (Qiangua) - 仪式感待办提醒`）；
-  - 经用户选定或输入新名称后，传入新名称重新执行 STORE -1。
+### 8. MSIX DisplayName 与商店预留名称强一致性铁律 (MSIX DisplayName Matching Invariant)
+- **微软后台强制校验**：MSIX 的 `Package.appxmanifest` 中的 `<Properties><DisplayName>` 以及 `<Application ... uap:VisualElements DisplayName="...">`，**必须与微软开发者后台该产品已预留的名称 100% 完全一致**；
+- 若预留了 `Qiangua - 牵挂桌面记事与倒数日`，本地清单绝不能只写短名称“牵挂”，否则微软后台上传时会直接报错拒包：`此软件包的清单（Package/Properties/DisplayName）使用了你未保留的显示名称`；
+- **自动化回填原则**：在 STORE -1 用户预留名称成功后，驱动必须将从后台抓取到的实际完整产品名称，自动同步回填至 `edge-store.json` 与 `Package.appxmanifest`，然后再触发 Release 编译与 MSIX 打包。
+
+### 9. 程序包上传实时负反馈与异常自动清理铁律 (Packages Realtime Error Trap & Auto-Clean Invariant)
+- **拒绝单向死等**：包上传验证轮询期间，每 500ms 必须同时监听 `.alert-error`、`.alert-danger`、`.faulty-package-message` 等负反馈报警；
+- **即时秒级中断**：一旦发现微软后台报错（如“未保留的显示名称”或“包验证错误”），必须立即提取具体错误文本，自动点击 `Delete` 清理异常包，并秒级抛出异常中断，绝不盲等 12 分钟超时；
+- **上传前环境自愈**：每次上传前，自动扫描页面是否存在残留的 Faulty Package 并自动清理。
 
 ---
 

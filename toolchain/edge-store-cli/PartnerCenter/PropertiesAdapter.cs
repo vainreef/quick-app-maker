@@ -159,19 +159,38 @@ public class PropertiesAdapter
         {
             await _client.EvaluateAsync<object>("""
             (() => {
-                const r = document.querySelector('#privacyPolicyText, input[type="radio"][id*="Text" i]');
-                if (r) { r.click(); r.dispatchEvent(new Event('change', {bubbles: true})); }
+                const r = Array.from(document.querySelectorAll('input[type="radio"], input[name*="privacy" i], label')).find(e => {
+                    return (e.innerText || e.textContent || '').includes('提供隐私策略文本') || e.id === 'privacyPolicyText' || (e.getAttribute('value')||'').toLowerCase().includes('text');
+                });
+                if (r) {
+                    if (r.tagName === 'LABEL') {
+                        const inp = r.querySelector('input') || document.getElementById(r.htmlFor);
+                        if (inp) { inp.checked = true; inp.click(); inp.dispatchEvent(new Event('change', {bubbles: true})); }
+                        else { r.click(); }
+                    } else {
+                        r.checked = true;
+                        r.click();
+                        r.dispatchEvent(new Event('change', {bubbles: true}));
+                    }
+                }
                 return null;
             })()
             """);
-            await Task.Delay(500);
+            await Task.Delay(800);
             await _client.EvaluateAsync<object>($$"""
             (() => {
-                const ta = document.querySelector('support-info textarea, textarea[aria-label*="隐私" i], textarea[aria-label*="Privacy" i], textarea');
+                const ta = document.querySelector('textarea[name*="privacy" i], textarea[id*="privacy" i], support-info textarea, textarea[aria-label*="隐私" i], textarea[aria-label*="Privacy" i], textarea');
                 if (ta) {
-                    ta.value = {{JsonSerializer.Serialize(desired.Properties.PrivacyPolicyText)}};
-                    ta.dispatchEvent(new Event('change', {bubbles: true}));
+                    ta.focus();
+                    const prop = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+                    if (prop && prop.set) {
+                        prop.set.call(ta, {{JsonSerializer.Serialize(desired.Properties.PrivacyPolicyText)}});
+                    } else {
+                        ta.value = {{JsonSerializer.Serialize(desired.Properties.PrivacyPolicyText)}};
+                    }
                     ta.dispatchEvent(new Event('input', {bubbles: true}));
+                    ta.dispatchEvent(new Event('change', {bubbles: true}));
+                    ta.blur();
                 }
                 return null;
             })()

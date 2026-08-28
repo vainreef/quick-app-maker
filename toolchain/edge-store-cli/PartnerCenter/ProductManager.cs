@@ -120,6 +120,7 @@ public class ProductManager
 
         Console.WriteLine($"[INFO] 正在抓取官方 Identity (Package/Identity/Name, Publisher, PublisherDisplayName)...");
         var result = await ScrapeIdentityAsync(baseUrl, productId);
+        result.ProductName = actualProductName;
         return result;
     }
 
@@ -225,6 +226,7 @@ public class ProductManager
 
             return {
                 productId: pid,
+                productName: '',
                 identityName: getValByLabel('Package/Identity/Name'),
                 publisher: getValByLabel('Package/Identity/Publisher'),
                 publisherDisplayName: getValByLabel('Package/Properties/PublisherDisplayName') || getValByLabel('PublisherDisplayName')
@@ -233,7 +235,7 @@ public class ProductManager
         """);
         if (result == null || string.IsNullOrWhiteSpace(result.IdentityName) || string.IsNullOrWhiteSpace(result.Publisher))
         {
-            throw new InvalidOperationException("Failed to scrape Product Identity credentials from Partner Center.");
+            throw new InvalidOperationException($"Failed to scrape identity fields for ProductId [{productId}]. Make sure Product Identity table has loaded.");
         }
 
         Console.WriteLine($"[PASS] Scraped Package Identity:");
@@ -295,6 +297,7 @@ public class ElementRect
 public class ProductIdentityResult
 {
     public string ProductId { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
     public string IdentityName { get; set; } = string.Empty;
     public string Publisher { get; set; } = string.Empty;
     public string PublisherDisplayName { get; set; } = string.Empty;

@@ -77,12 +77,11 @@ public sealed class PackagesAdapter
             throw new InvalidOperationException("Package upload blocked: the same filename already has duplicate/error rows. No new upload was attempted.");
 
         string fileName = Path.GetFileName(desired.Assets.Msix);
-        if (plan.Actions.Any(a => a.Field == "packages.msix"))
+        if (plan.Actions.Any(a => a.Field == "packages.msix") || plan.Actions.Any(a => a.Field == "packages.conflict"))
         {
-            // Query the live control at the moment of use. The upload input is a
-            // hidden native input (often inside a shadow component); resolve its
-            // objectId by shadow-piercing Runtime.evaluate and set files via
-            // objectId (DOM.requestNode can fail on these hidden/shadow inputs).
+            // 自动清理页面上现存的异常包 (Delete faulty packages)
+            await CleanFaultyPackagesAsync();
+
             string? fileInputObj = null;
             var inputDeadline = DateTime.UtcNow.AddSeconds(40);
             while (DateTime.UtcNow < inputDeadline)
@@ -99,16 +98,46 @@ public sealed class PackagesAdapter
                 await Task.Delay(1000);
             }
             if (string.IsNullOrWhiteSpace(fileInputObj)) throw new InvalidOperationException("No live package file input is present.");
+            Console.WriteLine($"[INFO] Uploading MSIX package [{desired.Assets.Msix}] via CDP file input...");
             await _dom.SetFileInputFilesByObjectIdAsync(fileInputObj, [desired.Assets.Msix]);
         }
 
-        await _waiter.RequireAsync(async () =>
+        Console.WriteLine($"[INFO] Waiting for package {fileName} to be verified by Partner Center (with realtime error trap)...");
+        var validationDeadline = DateTime.UtcNow.AddMinutes(12);
+        while (DateTime.UtcNow < validationDeadline)
         {
+            // 1. 实时负反馈检测：检查页面是否出现验证错误 (Faulty package alert)
+            string? faultyError = await _client.EvaluateAsync<string>("""
+            (() => {
+                const alerts = Array.from(document.querySelectorAll('.alert-error, .alert-danger, .faulty-package-message, [role="alert"]'));
+                for (const a of alerts) {
+                    const txt = (a.innerText || a.textContent || '').trim().replace(/\s+/g, ' ');
+                    if (txt.includes('未保留的显示名称') || txt.includes('faulty') || txt.includes('验证错误') || txt.includes('修复所有程序包验证错误')) {
+                        return txt;
+                    }
+                }
+                return null;
+            })()
+            """);
+
+            if (!string.IsNullOrWhiteSpace(faultyError))
+            {
+                Console.WriteLine($"\n[PACKAGE-ERROR] ❌ 微软后台程序包验证失败: {faultyError}\n");
+                await CleanFaultyPackagesAsync();
+                throw new InvalidOperationException($"MSIX validation rejected by Partner Center: {faultyError}");
+            }
+
+            // 2. 正向成功检测
             var current = await ObserveEntriesOnlyAsync();
             var same = current.Where(x => string.Equals(x.FileName, fileName, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (same.Any(x => x.IsError)) throw new InvalidOperationException($"Package validation returned Error for {fileName}.");
-            return same.Count == 1 && same[0].IsValidated;
-        }, TimeSpan.FromMinutes(12), $"Wait for package {fileName} to reach Validated");
+            if (same.Count == 1 && same[0].IsValidated)
+            {
+                Console.WriteLine($"[PASS] Package [{fileName}] validated successfully!");
+                break;
+            }
+
+            await Task.Delay(1000);
+        }
 
         await _checkbox.SetCheckedAsync("Windows 10/11 Desktop", true, "desktop device family");
         await _checkbox.SetCheckedAsync("Windows 10 Mobile", false, "mobile device family");
@@ -140,6 +169,22 @@ public sealed class PackagesAdapter
         await _native.AssertNoVisibleErrorsAsync();
     }
 
+    private async Task CleanFaultyPackagesAsync()
+    {
+        await _client.EvaluateAsync<bool>("""
+        (() => {
+            const btns = Array.from(document.querySelectorAll('a.upload-action, a[data-l10n-key*="delete" i], button.upload-action, a'))
+                .filter(e => /Delete|删除|Remove/.test(e.innerText || e.getAttribute('data-l10n-key') || ''));
+            for (const b of btns) {
+                b.click();
+                b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+            }
+            return btns.length > 0;
+        })()
+        """);
+        await Task.Delay(1000);
+    }
+
     private async Task<List<PackageEntry>> ObserveEntriesOnlyAsync()
     {
         return await _client.EvaluateAsync<List<PackageEntry>>("""
@@ -148,11 +193,24 @@ public sealed class PackagesAdapter
           for (let i = 0; i < allRoots.length; i++) {
             try { for (const e of allRoots[i].querySelectorAll('*')) if (e.shadowRoot) allRoots.push(e.shadowRoot); } catch (_) {}
           }
+          const deepAll = (selector) => {
+            const out=[], seen=new Set();
+            for(const root of allRoots){
+              try { for(const e of root.querySelectorAll(selector)) if(!seen.has(e)){ seen.add(e); out.push(e); } } catch(_){}
+            }
+            return out;
+          };
+          const visible = e => { const r=e.getBoundingClientRect(), s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden'; };
+
+          // 1. 检查是否存在全局或局部错误警告
+          const errorEls = deepAll('.alert-error, .alert-danger, .faulty-package-message, [role="alert"]').filter(visible);
+          const errorTexts = errorEls.map(e => (e.innerText || e.textContent || '').trim().replace(/\s+/g, ' ')).filter(t => t.length > 0);
+          const hasFaultyError = errorTexts.some(t => /未保留的显示名称|faulty|验证错误|必须修复所有程序包|Delete the faulty/i.test(t));
 
           const entries = [];
           const seen = new Set();
           for (const root of allRoots) {
-            const rows = Array.from(root.querySelectorAll('.packages-table tr, .package-table tr, table.packages-table tr, .table-device-matrix tr, tr.version-row, tr'));
+            const rows = Array.from(root.querySelectorAll('.packages-table tr, .package-table tr, table.packages-table tr, .table-device-matrix tr, tr.version-row, tr, div.spacer-xs-top'));
             for (const r of rows) {
               const text = (r.innerText || '').trim();
               const m = text.match(/[^\\/:*?"<>|\r\n]+\.(?:msixbundle|appxbundle|msix|appx)\b/i);
@@ -162,13 +220,12 @@ public sealed class PackagesAdapter
                 if (seen.has(fileName)) continue;
                 seen.add(fileName);
 
-                const rowText = (document.body ? document.body.innerText : text).toLowerCase();
                 let status = 'Unknown';
-                if (/\b(package verification error|failed to validate)\b|上传失败/.test(rowText)) {
+                if (hasFaultyError) {
                   status = 'Error';
-                } else if (/uploading|processing|analyzing|正在分析|正在处理|正在上传|验证中/.test(rowText)) {
+                } else if (text.includes('正在上传') || text.includes('正在处理') || text.includes('正在分析') || text.includes('Uploading') || text.includes('Processing')) {
                   status = 'Processing';
-                } else if (rowText.includes('show details') || rowText.includes('remove') || rowText.includes('删除') || rowText.includes('version') || rowText.includes('architecture') || rowText.includes('desktop') || rowText.includes('mb') || rowText.includes('validated') || rowText.includes('已验证')) {
+                } else if (!hasFaultyError && (text.includes('Desktop') || text.includes('已验证') || text.includes('Validated') || text.includes('Windows 10') || text.includes('x64') || text.includes('MB'))) {
                   status = 'Validated';
                 }
 
