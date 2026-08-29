@@ -106,9 +106,9 @@ Unknown 也不通过。缺少完成证据和明确失败同样会阻止 checkpoi
 | 上传幂等 | 8、9、24 | 文件名+状态模型、Validated 才完成、重复/Error 阻断、冷加载验证 |
 | 收敛语义 | 10、11、13、37、38、40 | AppliedUnverified、重新 Diff、OverviewAdapter、Unknown 不通过 |
 | 业务规则 | 14、15、16、20、21、22 | 条件校验、双语 Markdown、正向非空、supportedLanguageCodes |
-| CLI/流程 | 30、31、32、33、34、35、36、39 | inspect/status、参数兼容、单表直达、preflight 独立、一次进程、提交固定三步 |
+| CLI/流程 | 30、31、32、33、34、35、36、39 | inspect/status、参数兼容、单表直达、preflight 独立、一次进程、verify 后移交用户提交 |
 | 编码/诊断 | 28、2、27 | C#/PowerShell UTF-8、WAIT 心跳、首个谓词异常、checkpoint evidence |
-| 实战进阶 | 41、42、43、44、45 | Overview 无 badge 即完成判定、Privacy=No 免文本框联动、Shadow DOM ObjectId 文件绑定、MSIX Assets 拷贝前置质检、7 大原地急救诊断动作 (dumpdom/answerno/fixpackage/canceluploads) |
+| 实战进阶 | 41、42、43、44、45 | Overview 无 badge 即完成判定、Privacy 条件联动、Shadow DOM ObjectId 文件绑定、MSIX Assets 拷贝前置质检、公开诊断动作与 launcher 一致性 |
 
 ## 命令语义
 
@@ -117,20 +117,22 @@ Unknown 也不通过。缺少完成证据和明确失败同样会阻止 checkpoi
 - `inspect`：只读当前页面，不导航。
 - `status`：会话、checkpoint、当前页面状态。
 - `dumpdom`：清洗并导出结构化控制台 DOM 快照（`dom-dump-LIVE.html`），剥离无用标签，保留控件与状态。
-- `answerno`：原地秒选 9 道年龄分级题、勾选条款并保存（不刷新不跳转）。
-- `fixpackage` / `canceluploads`：清理死锁/冲突包并重新上传/激活保存按钮。
-- `run -Phase X`：只执行 X；有 checkpoint submissionId 时直接进入该表。
-- `run -Phase all`：明确执行六表；不再被描述成登录检查。
+- `fulldom` / `diagnoselisting`：提取完整页面或 Listing 专项证据。
+- `cleanpackages`：清理冲突包行；重新上传仍由 packages 阶段执行并验证唯一 `Validated`。
+- `probelanguages` / `cleanlanguages`：探测和清理 Listing 语言网格。
+- `step -Phase <phase>`：默认离散路径，只执行指定阶段；有 checkpoint submissionId 时直接进入该表。
+- `run -Phase <phase>`：兼容入口，只执行指定阶段。
+- `run -Phase all`：明确执行六表；不再被描述成登录检查，也不作为默认离散发布路径。
 - 不带 `-Apply` 发现差异返回 4，不写完成。
-- `-Submit -ConfirmSubmit -Apply`：概览六项全部完成后，执行提交按钮、确认按钮、认证状态三步。
+- `verify`：概览六项全部完成后输出最终证据；自动化在此结束，由用户在浏览器复核并点击提交。
 
 ## 验收门槛
 
 合并前至少执行：
 
 ```text
-dotnet build toolchain/edge-store-cli/EdgeStore.Cli.csproj -c Release
-dotnet run --project toolchain/edge-store-cli-tests/EdgeStore.Cli.Tests.csproj -c Release
+dotnet build toolchain/edge-store-cli/EdgeStore.Cli.csproj -c Release /p:UseSharedCompilation=false
+dotnet run --project toolchain/edge-store-cli-tests/EdgeStore.Cli.Tests.csproj -c Release -p:UseSharedCompilation=false
 git diff --check
 ```
 

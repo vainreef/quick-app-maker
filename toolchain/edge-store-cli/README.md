@@ -78,7 +78,7 @@ STORE 3: PLAN                    # 计算 DesiredState vs ObservedState 生成�
     ↓
 STORE 4: FORM RECONCILIATION     # 逐表执行 (HeSelect 语义点击 / 原生表单修改 / 保存)
     ↓
-STORE 5: RELOAD VERIFICATION     # 强制 F5 刷新页面二次读取，验证服务端真正持久化
+STORE 5: RELOAD VERIFICATION     # 对当前绝对 URL 冷导航二次读取，验证服务端真正持久化
     ↓
 STORE 6: SUBMISSION INTEGRITY    # 概览页确认 6 大模块均显示绿色已完成状态
     ↓
@@ -116,19 +116,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 
 `status` 同时返回 PID/Port、checkpoint 和当前结构化页面状态。不要把 `run -Phase all` 当检查命令。
 
-### 3. 单表/全表声明式收敛（含冷加载二次持久化校验）
+### 3. 离散单表收敛（默认发布路径）
 ```powershell
 # 按表逐项收敛：
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase availability -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase properties   -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase ageRatings   -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase packages     -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase listing      -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase options      -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
-
-# 或整链一键收敛：
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase availability -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase properties   -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase ageRatings   -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase packages     -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action cleanlanguages -Manifest .\<app>\build\edge-store.json
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action filllisting -Manifest .\<app>\build\edge-store.json
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action inspectoptions -Manifest .\<app>\build\edge-store.json
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action filloptions -Manifest .\<app>\build\edge-store.json
 ```
+
+`run -Phase all` 保留为显式六阶段兼容入口；它会执行写操作，发布主路径仍按上面的离散命令逐步审查。
 
 ### 4. 提审交付（由用户手动点击）
 - 概览页 6 大模块全绿总检通过后，自动化填报全部结束；
@@ -139,7 +140,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 
 ## 诊断与修复辅助动作
 
-这三个动作用来**只读抽取当前 DOM** 或在表单卡住时**针对性修复**，不纳入自动流水线，按需手工调用：
+以下动作与 `Invoke-EdgeStore.ps1` 当前 `ValidateSet` 保持一致，用于只读诊断或单点清理：
 
 ### dumpdom —— 抽取当前页面清洗后的 DOM
 ```powershell
@@ -147,19 +148,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 ```
 - 产物：`dom-dump-LIVE.html`（写在 manifest 所在目录），只保留**按钮/表单控件 + 位置(所在行文本) + 状态(checked/disabled/selected)**，剥离导航、AI 助手、隐藏弹窗与整段说明。还附带 he-select/he-checkbox 主机清单、文件输入、定价区容器、提审行原始 HTML。
 
-### answerno —— 年龄分级当前页答案快速勾选（不刷新、不跳转）
+### fulldom / diagnoselisting —— 深度页面诊断
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action answerno -Manifest .\<app>\build\edge-store.json -StateDir .\<cache>\state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action fulldom -Manifest .\<app>\build\edge-store.json -StateDir .\<cache>\state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action diagnoselisting -Manifest .\<app>\build\edge-store.json -StateDir .\<cache>\state
 ```
-- 在当前 `/ageratings/edit` 页把 9 道「是/否」题全选「否」，随后点「预览分级」；在 `/ageratings/summary` 页勾选 IARC 条款并点「保存」。幂等。
+- `fulldom` 输出完整原始页面证据；`diagnoselisting` 聚焦 Listing 的语言、折叠区、关键词和上传控件。
 
-### fixpackage —— 修复失败的程序包
+### cleanpackages —— 清理冲突程序包
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action fixpackage -Manifest .\<app>\build\edge-store.json -StateDir .\<cache>\state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action cleanpackages -Manifest .\<app>\build\edge-store.json -StateDir .\<cache>\state
 ```
-- 在 `/packages` 页点击失败包的「Delete」，随后把 `store-package\<Identity>_<Version>_x64.msix` 重新上传。
+- 清理 `Error`、重复或冲突行后，再单独执行 packages 阶段上传；清理动作本身不代表上传完成。
 
-`-StateDir` 默认落在仓库 `toolchain/edge-store-cli/state`（只读，不推荐）。请用 `-StateDir <工作区>/.cache/edge-store-state` 把会话/日志/checkpoint 放在工作区。
+每次显式传入 `-StateDir <工作区>/.cache/edge-store-state`，把会话、日志和 checkpoint 固定在工作区缓存目录。
 
 ---
 
@@ -176,7 +178,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 7. **产品声明复选框**：用 `name`（如 `'storage-checkbox'`、`'windows-checkbox'`、`'usesGenAI-checkbox'`）定位，不要用 `windows` 这类模糊文本。
 8. **年龄分级答案**：每题 2 个单选 `input[name="question#<id>"]`，答案文本在 label 里的 `<span class="response-text">是/否</span>`。选「否」时用 `.response-text` 精确匹配，且**先 `scrollIntoView` 再测坐标**（题在页下方，不滚会误判越界）。
 9. **上传文件**：上传控件的 `input[type=file]` 是隐藏/Shadow DOM 内的原生输入。用 `Runtime.evaluate` 穿透 Shadow DOM 解析其 `objectId`，再用 `DOM.setFileInputFiles(objectId, ...)`。**不要**用 `DOM.requestNode`（对隐藏/Shadow 输入会失败）。清单、列表页图片上传同样适用。
-10. **清单/Logo 资源**：`winapp package ./publish` 只打包发布目录内容；若 manifest 引用 `Assets\StoreLogo.png` 等，必须先复制 `Assets\*` 到 `publish\Assets\`，否则包内缺图 → 商店「包接受验证错误：无法找到图像 Assets\StoreLogo」。
+10. **清单/Logo 资源**：`winapp package ./publish` 只打包发布目录内容；若 manifest 引用 `Assets\StoreLogo.png` 等，先精确重建 `publish\Assets\`，避免缺图和 `Assets\Assets` 嵌套。
 11. **失败包清理**：同名包出现 Error 行会阻止再上传。先在 `/packages` 点 `Delete`（`a.upload-action`），再重传修正后的包。包校验大包（WindowsAppSDK 自包含）会「Analyzing package」较久，且 `runFullTrust` 受限能力需在「提交选项」填用途说明获批。
 12. **每步操作读日志**：所有导航/等待/点击/输入/选择/勾选都会打 `[HH:mm:ss.fff] [级别] ...` 到控制台并追加到 `<state>/logs/ops.log`，便于定位卡点。
 

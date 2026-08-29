@@ -2,8 +2,17 @@
 
 > Agent 执行发布自动化前先读取 `AGENTS.md`、`docs/partner-center/Agent-运行契约.md` 和 `docs/partner-center/Edge-Store-可靠性重构.md`。`apps/Project/edge-store-cli-fast` 不是正式源码入口。
 
-> **让自然语言想法在 Windows 上全自动蜕变为真实的 WinUI 3 现代桌面应用，并直通 Microsoft Store 微软应用商店。**  
+> **让自然语言想法在 Windows 上全自动蜕变为真实的 WinUI 3 现代桌面应用，并直通 Microsoft Store 微软应用商店。**
 > 一键自动化工具链准备 · 8层渐进式需求访谈 · 5大一次性写对黄金铁律 · 双窗口并行与名称前置验重 · 商店6大表单全套指引
+
+维护者在提交前执行：
+
+```bash
+python3 scripts/validate-skill.py
+python3 scripts/test_validate_skill.py
+```
+
+校验覆盖 Skill frontmatter、内部链接、Markdown 围栏、控制字符、WinAppCLI 版本、launcher action 与文档一致性，以及已发生过的后台编译和证书循环回归。
 
 ---
 
@@ -26,7 +35,7 @@ graph TD
 
     subgraph Layer2 ["2. 双轨并行研发层 (Dual-Window Concurrency)"]
         D4 --> P1["启动全自动构建流水线 (约 15~20 分钟)"]
-        P1 -->|窗口 1: 专注构建| W1["编码 -> 自包含 MSIX 打包 -> winapp ui 自动化黑盒测试 -> 本地安装"]
+        P1 -->|窗口 1: 专注构建| W1["编码 -> 前台构建 -> winapp run 独立启动 -> winapp ui 自动化黑盒测试"]
         P1 -->|友好非阻塞提示| W2["窗口 2: 独立咨询会话<br>用户提问: '如何创建 Partner 账号 / 如何起名？'"]
         W2 --> W3["读取本地 partner-center-guide.md<br>指引 Xbox 注册免验证码 -> 身份证上传 -> 免费个人开发者"]
         W3 --> W4["控制台前置验重: '+ 新产品' -> 'MSIX 或 PWA' -> 实时测名字并预留 -> 拿到 3 大 Package Identity"]
@@ -34,16 +43,16 @@ graph TD
 
     subgraph Layer3 ["3. 交付与共创层 (Deliver & Co-Create)"]
         W1 --> C1["首版交付话术: '已装好，请打开把玩，哪里不顺手随时告诉我，改到满意为止'"]
-        C1 --> C2["用户本地试用体验 -> 提修改意见 -> 小步迭代重装 (严禁首版主动推销上架)"]
+        C1 --> C2["用户本地试用体验 -> 提修改意见 -> 小步重新构建并更新本机注册"]
     end
 
     subgraph Layer4 ["4. 商店发布与断点续接层 (Partner Center & Store)"]
         C2 -->|用户主动提出: '我想发布到商店'| S0["Store 0: 离线静态质检 (MSIX解包/Desktop依赖/Logo/截图/<=7关键字)"]
         W4 -.回填 3 大 Package Identity.- -> S0
         S0 --> S1["Store 1~2: 启动隔离 Edge & 动态探测 live submissionId 与 6 表真实 href"]
-        S1 --> S2["Store 3~4: 声明式差异收敛 (he-select/he-checkbox 原生 CDP 物理点击)"]
-        S2 --> S3["Store 5~6: F5 刷新持久化二次验证 & 概览页 6 大模块绿勾总检"]
-        S3 --> S4["Store 7: 概览页 6 大模块绿勾总检 -> 移交用户审核并手动点击【提交进行认证】 -> 24~72h 全球上线！"]
+        S1 --> S2["Store 3~8: 每次只执行一个表单阶段并提取现场 DOM 证据"]
+        S2 --> S3["Store 9: 冷导航回读 + 概览页 6 大模块总检"]
+        S3 --> S4["Store 10: 移交用户审核并手动点击【提交进行认证】"]
     end
 ```
 
@@ -114,7 +123,7 @@ Project/ (WORKSPACE_ROOT, 用户工作区根目录)
 │   │       ├── delivery-considerations.md   # 交付边界、权限、离线与性能考量
 │   │       ├── official-sources.md          # 微软官方文档与 API 规范入口
 │   │       ├── edge-store-automation.md     # 声明式状态收敛与 Store 0~7 自动化标准
-│   │       └── toolchain/v1/commands.md     # 53 个实机验证避坑指南、命令硬规则、UI 自动化生命周期
+│   │       └── toolchain/v1/commands.md     # 构建/运行/打包唯一命令手册、硬规则与错误收敛表
 │   ├── toolchain/edge-store-cli/            # 🚀 .NET 10 (C#) 声明式状态收敛驱动 (V2)
 │   │   ├── Invoke-EdgeStore.ps1             # 超薄启动器 (PowerShell Launcher)
 │   │   ├── EdgeStore.Cli.csproj             # C# .NET 10 控制台项目
@@ -154,29 +163,30 @@ Project/ (WORKSPACE_ROOT, 用户工作区根目录)
 * **【铁律 1】DataTemplate 必须显式声明 `x:DataType`**：凡使用 `{x:Bind}`，根节点必须声明 `x:DataType="models:Class"`。看到 `WMC9999 ErrorMessages.resources` 假死错误 100% 是漏写了 x:DataType，严禁改依赖换包！
 * **【铁律 2】ContentDialog 必须设置 `XamlRoot`**：打开弹窗前必须赋予 `XamlRoot = this.Content.XamlRoot`，否则底层必抛 `0xc000027b` 原生闪退！
 * **【铁律 3】计划通知标准范式**：CsWinRT 投影无 `Recurrence` 属性，每年提醒采用循环单次调度，catch 时打印 `HResult`（`0x803E0120` 为管理员会话系统限制，视为正常）。
-* **【铁律 4】全生命周期零 UAC 提权 & 零 C 盘系统目录写入（免安装 MinGit + 免安装 .NET SDK + CurrentUser 证书 + 严禁写 HKLM）**：
+* **【铁律 4】默认开发链零提权、零本地证书循环、零 C 盘系统目录写入**：
   - **底层根因（坑 62）**：AI Runner 执行线程运行在私有桌面 `WinSta0\exebox-*`，跨 Desktop 发起 `runas` 会被底层报 `0x80070032` 拦截；
-  - **工程实践**：Git 和 .NET 10 SDK 全程使用工作区根目录 `git\` 与 `dotnet\` 下的绿色免安装版；证书只导入 `CurrentUser\TrustedPeople`，严禁操作 `HKLM:` 注册表与 `Cert:\LocalMachine\`，全生命周期在 Medium Integrity 下顺畅运行，彻底杜绝任何 UAC 管理员提权确认框打扰用户。若极特殊场景确需提权，严禁关闭系统安全，必须使用 `lpDesktop="WinSta0\Default"` 桥接启动。
+  - **工程实践**：Git 和 .NET 10 SDK 全程使用工作区根目录 `git\` 与 `dotnet\` 下的绿色免安装版；本机试用统一使用 `winapp run --detach` 开发注册，不创建 MSIX 签名证书；Store 上传包与商店外精确侧载分开处理。
 * **【铁律 5】国内 NuGet 还原极速源**：依赖还原强制指定国内 Azure CDN 源 `https://nuget.azure.cn/v3/index.json`。
 
 ### 3. 【体验与协同支柱】双轨并行与自动化建项验重
-* **构建主干**：需求确认后启动构建，专心推进代码编写、MSIX 自包含打包与 `winapp ui` 自动化黑盒测试。
+* **构建主干**：需求确认后启动构建，编译命令保持前台单实例，通过 `winapp run --detach` 启动并用 `winapp ui` 做黑盒测试；商店包在用户明确进入发布阶段后单独生成。
 * **全新产品建项与验重**：发布全新应用时，通过 `Invoke-EdgeStore.ps1 -Action reserve -AppName "应用名称" -Manifest build/edge-store.json` 自动在控制台完成 `+ 新产品 -> MSIX 或 PWA -> 检查可用性 -> 保留产品名称 -> 自动提取 3 大 Identity 并回填 Package.appxmanifest`，0 次打扰用户。
 
 ### 4. 【交付与发布支柱】声明式状态收敛 & Store 全流程自动化流水线
 * **首版交付心智**：第一版安装到电脑后，Agent 热情邀请用户试用：“已装在电脑上，随时可以打开把玩，哪里不顺手随时告诉我，我们继续修改直到你满意为止”，**严禁首版主动推销上架**。
 * **声明式状态收敛标准执行流**：
   * **场景 A：全新应用上架**：
-    1. 启动会话：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -KeepOpen`（用户完成首次登录）。
-    2. 自动建项验重：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName "应用名称" -Manifest build/edge-store.json`（自动建项、预留、提取 Identity 并回填清单）。
-    3. 重新打包：`winapp package ./publish --executable <AppName>.exe --publisher "<Publisher>" --generate-cert --output ./store-package/<Identity>_<Version>_x64.msix`
-    4. 离线质检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest build/edge-store.json`
-    5. 全自动收敛：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest build/edge-store.json -Apply -KeepOpen`
-    6. 提审交付：概览页 6 大模块全绿总检后，Agent 输出“自动填报已结束，请仔细审核后，点击 提交进行认证 按钮”，由用户在浏览器中审核后亲自点击提交。
+    1. 启动会话：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -StateDir .\.cache\edge-store-state -KeepOpen`（用户完成首次登录）。
+    2. 自动建项验重：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName "应用名称" -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state`（自动建项、预留、提取 Identity 并回填清单）。
+    3. 自包含发布：`dotnet publish <project> -c Release -r win-x64 --self-contained true -o ./publish /p:WindowsAppSDKSelfContained=true /p:UseSharedCompilation=false`
+    4. 生成 Store 上传包：`winapp package ./publish --manifest ./Package.appxmanifest --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix`
+    5. 离线质检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state`
+    6. 离散填报：逐次执行 `step`、`cleanlanguages`、`filllisting`、`inspectoptions`、`filloptions`，每步审查 DOM 证据。
+    7. 提审交付：`verify` 冷加载确认概览模块后，由用户在浏览器中审核并亲自点击提交。
   * **场景 B：已有应用更新 / 单表断点续跑**：
-    1. 快速探针：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action inspect -Manifest build/edge-store.json`
-    2. 单表执行：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase <properties/listing/packages> -Manifest build/edge-store.json -Apply -KeepOpen`
-    3. 全局核验：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action verify -Manifest build/edge-store.json`
+    1. 快速探针：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action inspect -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state`
+    2. 单表执行：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase <phase> -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state -Apply -KeepOpen`，其中 `<phase>` 取 `availability`、`properties`、`ageRatings` 或 `packages`。
+    3. 全局核验：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action verify -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state`
 
 ---
 

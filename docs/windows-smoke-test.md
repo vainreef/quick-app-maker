@@ -2,6 +2,8 @@
 
 这份手册用于真实 Windows 机器测试整条链路。每次测试都以实际输出为准；发现稳定坑点后，把结论同步到 `skills/vainreef-fast-publish/references/toolchain/v1/commands.md`。
 
+> 当前执行命令以 `commands.md` 为准。下方旧轮次保留当时事实，其中已经被新版 WinApp CLI、Windows 文档或新流程取代的命令只用于解释历史问题。
+
 ## Test record
 
 实测记录使用匿名轮次编号（轮次 1、轮次 2…）。具体 App 项目、会话日志与运行报告归档在 Agent 工作根目录（仓库父目录）下的各项目目录中，不入仓库、不 push。
@@ -106,7 +108,7 @@
   1. DataTemplate 内部漏写 `x:DataType` 会导致 XamlCompiler 抛出假死错误 `WMC9999 ErrorMessages.resources`，极具误导性（坑 37）；
   2. WinUI 3 中 ContentDialog 漏设 `XamlRoot` 会直接触发 `0xc000027b` 原生闪退崩溃（坑 38）；
   3. `ScheduledToastNotification` 投影无 `Recurrence` 属性，每年提醒需循环单次调度（坑 39）；
-  4. 证书导入严禁使用 `LocalMachine` 避免 UAC 提权弹窗，改用 `CurrentUser\TrustedPeople`（坑 40）；
+  4. 当时在单机上记录了 `CurrentUser\TrustedPeople` 结果；该结论现已退役。当前普通本机验证使用 `winapp run --detach`，精确 MSIX 侧载按机器证书信任的独立流程处理；
   5. 国内 NuGet 还原镜像使用 `https://nuget.azure.cn/v3/index.json` 防超时（坑 41）。
 - 第六轮重大教训：在 SKILL.md 注入“WinUI 3 一次性写对的 5 大黄金铁律”，彻底从源头杜绝 LLM 漏写 `x:DataType` 和 `XamlRoot` 造成的盲目试错与权限弹窗。
 - 未执行：第 8 步重复 Bootstrap；真实 toast 弹出（管理员会话系统限制，需普通会话验证）
@@ -177,17 +179,17 @@ Set-Location $appName
 ## 4. Build and run
 
 ```powershell
-dotnet build
+dotnet build -c Debug --nologo -v minimal /p:UseSharedCompilation=false
 $debugBuildExit = $LASTEXITCODE
 
-dotnet run
+winapp run . --no-build --detach --json
 $runExit = $LASTEXITCODE
 
-dotnet build -c Release
+dotnet build -c Release --nologo -v minimal /p:UseSharedCompilation=false
 $releaseBuildExit = $LASTEXITCODE
 ```
 
-注意：`dotnet run` 会阻塞当前会话直到 App 退出（winapp 集成）。人工检查时窗口关闭后命令才会返回；自动化会话不要用它做后台启动（见 commands.md「命令执行硬规则 1」——7 次卡死教训，正确姿势是 `explorer shell:AppsFolder\<PFN>!App` 或结尾杀进程）。
+记录 `winapp run` 返回的 PID/JSON。应用启动与编译命令分离，构建保持前台，应用使用 `--detach` 脱离当前命令生命周期。
 
 人工检查：
 
@@ -200,12 +202,12 @@ $releaseBuildExit = $LASTEXITCODE
 ## 5. Publish
 
 ```powershell
-dotnet publish -c Release -r win-x64 -o ./publish
+dotnet publish -c Release -r win-x64 --self-contained true -o ./publish /p:WindowsAppSDKSelfContained=true /p:UseSharedCompilation=false
 $publishExit = $LASTEXITCODE
 Get-ChildItem ./publish -Recurse | Select-Object FullName, Length
 ```
 
-记录 Publish 输出目录、文件数量、总大小、warning 和退出码。
+记录 Publish 输出目录、文件数量、总大小、warning、退出码，并确认 `.csproj` 已固定 `WindowsAppSDKSelfContained=true`。检查 `publish\Assets` 存在且没有 `Assets\Assets`。
 
 ## 6. Inspect and run the packaging command
 
@@ -215,10 +217,10 @@ Get-ChildItem ./publish -Recurse | Select-Object FullName, Length
 winapp package --help | Tee-Object -FilePath ./winapp-pack-help.txt
 ```
 
-然后试运行当前候选命令：
+生成 Microsoft Store 上传包：
 
 ```powershell
-winapp package ./publish --generate-cert --install-cert
+winapp package ./publish --manifest ./Package.appxmanifest --self-contained --executable "$appName.exe" --output "./store-package/${appName}_1.0.0.0_x64.msix"
 $packExit = $LASTEXITCODE
 ```
 
@@ -226,21 +228,22 @@ $packExit = $LASTEXITCODE
 
 - 最终采用的命令。
 - MSIX 绝对路径。
-- 证书路径。
-- 管理员确认情况。
+- MSIX 文件大小与 SHA-256。
+- 包内 manifest、语言和 Assets 结果。
 - warning / error。
 - 退出码。
 
-## 7. Install, launch, uninstall, reinstall
+Store 上传包省略开发证书和本地安装。运行 `Invoke-EdgeStore.ps1 -Action preflight` 验证包与物料。
 
-使用 `winapp package --help` 和打包输出给出的实际安装方式完成：
+## 7. Local lifecycle and optional exact-package test
 
-1. 首次安装。
-2. 从开始菜单启动。
-3. 关闭 App。
-4. 卸载。
-5. 使用同一包重新安装。
-6. 再次启动。
+默认本机生命周期验证：
+
+1. `winapp run --detach` 注册并启动；
+2. 使用 `winapp ui` 验证启动、核心流程、关闭重开和数据保持；
+3. 使用返回的 PID 关闭 App；
+4. 需要干净注册时执行 `winapp unregister --manifest ./Package.appxmanifest`；
+5. 商店外精确 MSIX 侧载作为单独测试路线，只有测试目标明确包含该项时执行。
 
 记录每一步的命令、用户界面提示和结果。
 
@@ -263,10 +266,10 @@ Run:
 Release build:
 Publish:
 Pack:
-Install:
-Launch:
-Uninstall:
-Reinstall:
+Local run PID:
+UI verification:
+Store preflight:
+Optional exact-package sideload:
 Second bootstrap:
 ```
 

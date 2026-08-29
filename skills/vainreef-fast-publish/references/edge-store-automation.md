@@ -146,7 +146,7 @@ Observe value again & Assert(observed == desired)
 
 ---
 
-## 7. 标准全自动化流水线（Store -1 ~ Store 7）
+## 7. 标准自动填报与用户提交流水线（Store -1 ~ Store 7）
 
 ```text
 STORE -1: PRODUCT & IDENTITY     # 自动建项验重并提取 3 大 Identity 回填源码 (Invoke-EdgeStore.ps1 -Action reserve)
@@ -165,17 +165,18 @@ STORE 5: RELOAD VERIFICATION     # 显式 URL 导航冷加载页面二次读取�
     ↓
 STORE 6: SUBMISSION INTEGRITY    # 概览页确认 6 大模块均达到 Complete 状态 (无未启动徽章)
     ↓
-STORE 7: EXPLICIT SUBMIT         # 必须显式传入 -Submit -ConfirmSubmit 触发终审
+STORE 7: USER SUBMIT DELIVERY    # verify 输出全绿证据后，移交用户在浏览器中复核并点击提交
 ```
 
 ---
 
 ## 8. 原地急救与排障诊断动作 (Diagnostic Actions)
 
-当特定表单因网络波动、历史冲突包或微前端偶发异常受阻时，驱动提供了 7 大原地急救指令，避免盲目重跑全流程：
+当特定表单因网络波动、历史冲突包或微前端偶发异常受阻时，使用 launcher 当前公开的诊断动作，避免盲目重跑全流程：
 
 - **`dumpdom`**：清洗并导出结构化控制台 DOM 快照（`dom-dump-LIVE.html`），快速排查控件选择器；
-- **`answerno`**：在当前年龄分级页原地选择 9 道“否”题并完成条款签署；
-- **`fixpackage` / `canceluploads`**：清理死锁的 `Analyzing` 上传行或冲突包，刷新后重新绑定文件；
-- **`fixprivacy`**：原地修复并保存属性页隐私策略；
+- **`fulldom` / `diagnoselisting`**：提取完整页面或 Listing 专项证据；
+- **`cleanpackages`**：清理冲突包行，随后由 packages 阶段重新上传并等待唯一 `Validated`；
+- **`probelanguages` / `cleanlanguages`**：探测和清理语言网格；
+- **`inspectoptions`**：只读提取提交选项现场状态；
 - **`filloptions`**：原地填写提交选项全信任说明并保存。

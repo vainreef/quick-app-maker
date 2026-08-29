@@ -4,6 +4,9 @@
 .idea/
 *.swp
 *.swo
+__pycache__/
+*.pyc
+
 
 # .NET / Windows build output
 **/bin/

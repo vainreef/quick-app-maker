@@ -1,125 +1,123 @@
-# Microsoft Partner Center 商店发布 Agent 运行契约 (V2 标准版)
+# Microsoft Partner Center 商店发布 Agent 运行契约
 
-本文档是 Agent 执行 Windows 应用发布提审的**唯一最高行为准则与操作手册**。
-任何 Agent 接手发布任务时，必须以本契约和 quick-app-maker/skills/vainreef-fast-publish/SKILL.md 为准，严禁单脚本盲目一冲到底，严禁盲目猜想。
+本文档定义 Partner Center 自动化的执行边界和完成语义。开始发布前同时读取：
 
----
+1. 本文件；
+2. `docs/partner-center/Edge-Store-可靠性重构.md`；
+3. `skills/vainreef-fast-publish/SKILL.md`。
 
-## 一、 唯一官方工具链入口
+## 唯一实现入口
 
-执行所有发布、排障、诊断命令，一律且仅使用：
-`powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action <action> [参数...]
-`
-- **源码工程**：quick-app-maker/toolchain/edge-store-cli/EdgeStore.Cli.csproj（基于 .NET 10 SDK 绿色版免安装编译）。
-- **绝对禁止**：严禁执行任何 pps/Project/edge-store-cli-fast/ 废弃旧目录下的 DLL 或临时脚本。
+所有发布、排障和诊断操作统一使用：
 
----
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 `
+  -Action <action> `
+  -Manifest .\<app>\build\edge-store.json `
+  -StateDir .\.cache\edge-store-state
+```
 
-## 二、 商店发布标准 10 步流水线（严禁跳步与一冲到底）
+- 正式源码：`toolchain/edge-store-cli/`。
+- `apps/Project/edge-store-cli-fast/`、历史 DLL、`process.md` 临时命令和 `_tmp-diag` 脚本都不属于当前实现。
+- 所有状态、日志、下载和缓存均保存在 `WORKSPACE_ROOT` 内。
 
-发布流程严格解耦为 **10 个离散阶段**。每个阶段执行后，必须通过 DOM 结构化证据确权成功后，方可进入下一阶段：
+## 标准离散流水线
 
-| 阶段 | 阶段标识 | 执行命令 | 核心任务与自检断言 |
-| :---: | :--- | :--- | :--- |
-| **STORE -1** | **名称预留与建项 (用户交互模式)** | -Action reserve -Manifest .\<app>\build\edge-store.json | 自动拉起弹窗，由用户在浏览器直接输入心仪名称并点击保留，脚本自动监听进入产品页后全自动抓取 3 大 Identity 并回填本地 |
-| **STORE 0** | **离线静态预检** | -Action preflight -Manifest .\<app>\build\edge-store.json | 校验描述字数 (300~500字)、特性列表 ($\ge 3$)、关键词 ($\le 7$)、MSIX 及资产文件存在性 |
-| **STORE 1** | **浏览器拉起确权** | -Action launch -KeepOpen | 拉起独立常驻 Edge (9222 调试端口)，确权已处于微软开发者后台登录态 |
-| **STORE 2** | **提审探测与基线** | -Action discover -Manifest .\<app>\build\edge-store.json | 提取当前草稿 SubmissionId，生成 6 大表单直达 URL 并写入 checkpoint |
-| **STORE 3** | **定价与可用性** | -Action step -Phase availability -Manifest .\<app>\build\edge-store.json -Apply | 设定免费 (Tier 0)、全市场分发，保存并断言概览页显示「完成」 |
-| **STORE 4** | **应用属性 (含隐私)** | -Action step -Phase properties -Manifest .\<app>\build\edge-store.json -Apply | 分类设为工具，**强制声明包含隐私政策并填入离线文本**，保存并断言「完成」 |
-| **STORE 5** | **年龄分级** | -Action step -Phase ageRatings -Manifest .\<app>\build\edge-store.json -Apply | 获取/关联 IARC 年龄分级问卷，保存并断言「完成」 |
-| **STORE 6** | **程序包上传** | -Action step -Phase packages -Manifest .\<app>\build\edge-store.json -Apply | 上传 MSIX，自动清理异常包，等待后台唯一 Validated 验证通过并保存 |
-| **STORE 7** | **Store 一览 (Listing)** | **分步执行**：<br>1. -Action cleanlanguages -Manifest ...<br>2. -Action filllisting -Manifest ... | **阶段1**：严格正则 languageid=5 清理 85 门外语并保存网格；<br>**阶段2**：自动展开折叠面板，自愈关键词至 $\le 7$ 个，CDP派发上传事件上传截图/图标并保存 |
-| **STORE 8** | **提交选项 (Options)** | **分步执行**：<br>1. -Action inspectoptions -Manifest ...<br>2. 经用户批准后执行 -Action filloptions -Manifest ... | **阶段1**：等待受限功能 API 返回，提取 DOM 向用户汇报；<br>**阶段2**：选择发布模式 (Manual)，填报 unFullTrust 桌面进程理由并保存 |
-| **STORE 9** | **概览页全绿校验** | -Action verify -Manifest .\<app>\build\edge-store.json | 冷加载 Overview 页面，断言 6 大模块 100% 全部处于「完成」状态 |
-| **STORE 10** | **最终提审交付 (用户手动提交)** | 自动填报收尾与证据汇报 | 向用户展示全绿总览与 6 大模块完成证据。**绝对禁止 Agent 代点提交**，由用户在浏览器仔细审核后手动点击【提交进行认证】按钮 |
+每个阶段单独执行、单独审查证据。只有当前阶段达到完成语义后才进入下一阶段。
 
----
+| 阶段 | 命令 | 结果要求 |
+| --- | --- | --- |
+| STORE -1 名称预留 | `-Action reserve -AppName "<AppName>"` | 自动检查可用性、预留名称、提取 ProductId 和三项包身份并回填本地文件 |
+| STORE 0 离线预检 | `-Action preflight` | MSIX、manifest、语言、文案和资产通过静态校验 |
+| STORE 1 会话 | `-Action launch -KeepOpen` | 独立 Edge 会话可连接，用户已完成登录 |
+| STORE 2 基线发现 | `-Action discover` | 从当前产品概览提取实时 submissionId 与表单 URL |
+| STORE 3 定价 | `-Action step -Phase availability -Apply` | 冷加载回读无差异，概览模块为 `Complete` |
+| STORE 4 属性 | `-Action step -Phase properties -Apply` | 冷加载回读无差异，概览模块为 `Complete` |
+| STORE 5 年龄分级 | `-Action step -Phase ageRatings -Apply` | 问卷与条款持久化，概览模块为 `Complete` |
+| STORE 6 程序包 | `-Action step -Phase packages -Apply` | 只有一行同名包且状态为 `Validated`，概览模块为 `Complete` |
+| STORE 7 商店一览 | `cleanlanguages` 后执行 `filllisting` | 目标语言、文案、关键词和视觉资产持久化，概览模块为 `Complete` |
+| STORE 8 提交选项 | `inspectoptions`，审查后执行 `filloptions` | 发布模式和受限功能说明持久化，概览模块为 `Complete` |
+| STORE 9 总检 | `-Action verify` | 冷导航后的概览页六大模块均为 `Complete` |
+| STORE 10 提交交付 | 用户在浏览器中复核并点击提交 | Agent 汇报证据并结束自动填报 |
 
-## 三、 七大核心防坑铁律与异常自愈规范
+`inspect` 与 `status` 是状态探针。`run -Phase all` 是明确的六阶段写操作，不作为状态查询。
 
-### 1. 隐私政策强制铁律 (Global Privacy Policy Invariant)
-- quick-app-maker 生态下**所有 App 必须选择「是，包含隐私策略」(Privacy Policy: Yes)**；
-- 隐私策略文本栏统一填入标准离线声明：
-  本应用为本地运行工具，不收集、不存储、不上传任何用户个人隐私数据或使用习惯。
-- 严禁在 manifest 中将隐私政策设为 No。
+## 完成语义
 
-### 2. 语言网格清理严格正则定界 (Strict Regex Language ID Invariant)
-- 进入 managelanguages 页面清理外语时，**必须使用严格正则定界符**：
-  /(?:[?&])languageid=5(?:&|$)/ 或 /(?:[?&])languagecode=zh-cn(?:&|$)/i
-- 绝对禁止使用子串 includes('languageid=5') 或 includes('5')，避免将 151、52、115、45、159 等外语错误保留导致残留 80+ 门语言。
+以下结果都只是中间证据：
 
-### 3. 视觉资产上传必须派发 DOM 事件 (File Upload Event Dispatch Invariant)
-- CDP 命令 DOM.setFileInputFiles 仅在 <input type=file> 节点上挂载文件列表，**不会触发 Angular 上传监听器**；
-- 驱动必须在设置文件后立即执行：
-  `javascript
-  input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-  input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-  `
-- **保存前硬核断言**：在点击保存前，必须校验页面上 桌面 (1) 或缩略图已成功生成。未生成截图绝对禁止点击保存！
+- 命令退出码为 0；
+- 点击动作成功；
+- 当前 DOM 与目标值相等；
+- 页面显示文件名；
+- 表单差异暂时为 0。
 
-### 4. 关键词（Tag）容量自愈与折叠面板展开 (Keyword Accordion & Limit Invariant)
-- 微软商店硬性限制：**关键词最多 7 个**；
-- #search-terms 处于 其他信息 折叠区域内，执行前必须先点击展开按钮；
-- 必须先读取现场已存 Chip，定位非目标或超出配额的旧标签并点击关闭图标移除，最后仅追加缺失词汇，确保页面标签总数 $\le 7$ 个。
+阶段完成链必须是：
 
-### 5. 提交选项受限功能异步等待 (Restricted Capabilities Async Invariant)
-- MSIX 声明了 unFullTrust 时，页面中的 <section>受限的功能</section> 是由 Angular 异步拉取后台接口后动态渲染的；
-- 必须使用 Waiter.RequireAsync 显式等待 	extarea.text-area-width 渲染出现后再取值/填报；
-- 填入理由必须通过属性描述符 Setter 写入并触发 input/change。
+```text
+PageKind 已识别
+→ ObservedState 完整
+→ 完整阶段 Diff 为零
+→ 冷导航重新加载
+→ 重新 Observe 与 Diff 仍为零
+→ 对应 Submission Overview 模块为 Complete
+→ checkpoint 写入 Converged
+```
 
-### 6. 安全导航与绝对 URL 定位 (Absolute URL Navigation Invariant)
-- 严禁通过页面上的模糊相对链接（如  [href*=/overview]）返回概览页（防止误跳微软外部 Learn 文档）；
-- 必须使用由 ${baseUrl}//overview 显式构造的绝对控制台 URL 导航。
+只读运行发现差异时返回退出码 4，不写入完成状态。`Unknown`、`Processing`、错误页、加载骨架和 selector 歧义都保持未完成。
 
-### 7. 干净编译与 DLL 锁处理 (Clean Build & Compilation Invariant)
-- 每次修改 C# 驱动代码后，建议使用 -p:UseSharedCompilation=false 进行编译；
-- 若遇文件时间戳或增量编译未命中，先清理 bin/ 与 obj/ 目录再执行构建。
+## 页面与等待规则
 
-### 8. MSIX DisplayName 与商店预留名称强一致性铁律 (MSIX DisplayName Matching Invariant)
-- **微软后台强制校验**：MSIX 的 `Package.appxmanifest` 中的 `<Properties><DisplayName>` 以及 `<Application ... uap:VisualElements DisplayName="...">`，**必须与微软开发者后台该产品已预留的名称 100% 完全一致**；
-- 若预留了 `Qiangua - 牵挂桌面记事与倒数日`，本地清单绝不能只写短名称“牵挂”，否则微软后台上传时会直接报错拒包：`此软件包的清单（Package/Properties/DisplayName）使用了你未保留的显示名称`；
-- **自动化回填原则**：在 STORE -1 用户预留名称成功后，驱动必须将从后台抓取到的实际完整产品名称，自动同步回填至 `edge-store.json` 与 `Package.appxmanifest`，然后再触发 Release 编译与 MSIX 打包。
+1. 等待控件前先识别 `PageKind`。
+2. `inspect` 只读当前页面，不导航。
+3. SPA 持久化验证使用当前绝对 URL 的冷导航，不使用 `Page.reload` 作为最终证据。
+4. 表单控件存在性与可见性分开判断；隐藏的原生 input 仍可能是有效业务控件。
+5. 每个等待都有具体信号、截止时间和进度心跳；首个谓词异常进入诊断证据。
+6. 节点与 runtime ID 只在当前动作内有效；页面变化后重新定位。
 
-### 9. 程序包上传实时负反馈与异常自动清理铁律 (Packages Realtime Error Trap & Auto-Clean Invariant)
-- **拒绝单向死等**：包上传验证轮询期间，每 500ms 必须同时监听 `.alert-error`、`.alert-danger`、`.faulty-package-message` 等负反馈报警；
-- **即时秒级中断**：一旦发现微软后台报错（如“未保留的显示名称”或“包验证错误”），必须立即提取具体错误文本，自动点击 `Delete` 清理异常包，并秒级抛出异常中断，绝不盲等 12 分钟超时；
-- **上传前环境自愈**：每次上传前，自动扫描页面是否存在残留的 Faulty Package 并自动清理。
+## 上传与组件规则
 
-### 10. 严禁在 PowerShell 5.1 中使用 Add-Type 混合 .NET 10 代码铁律 (No Cross-Runtime Add-Type Invariant)
-- Windows PowerShell 5.1 运行在传统的 .NET Framework 4.8 运行时，缺少现代 .NET 10 的核心程序集（如 `System.Text.Json` 等）；
-- **绝对禁止**：严禁在 PowerShell 中使用 `Add-Type` 拼凑或加载基于 .NET 10 编译的 DLL，这会导致 `Metadata file 'System.Text.Json.dll' could not be found` 或类型丢失错误；
-- **唯一正确调用方式**：所有 CLI 工具调用、状态探测、DOM Dump 必须统一通过项目自带的 `Invoke-EdgeStore.ps1`（底层由绿色免安装 .NET 10 SDK 驱动）执行：
-  ```powershell
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action <action> -Manifest .\<app>\build\edge-store.json
-  ```
+- 包状态按“文件名 + 状态”建模。
+- 同名包为 `Processing` 时只等待；为 `Validated` 时跳过上传；出现 `Error` 或重复行时停止本阶段并清理冲突。
+- 上传成功的充分证据是唯一同名行达到 `Validated`，随后冷加载回读且概览模块完成。
+- Shadow DOM 文件 input 每次重新解析；设置文件后派发 `input` 与 `change` 事件。
+- `he-select`、`he-checkbox` 等响应式组件使用真实交互事件，并在动作后重新读取状态。
+- 大型 SPA 使用浅 DOM、局部 `requestNode` 和 Accessibility Tree；避免整棵深 DOM 序列化。
 
-### 11. 绝对禁止机器硬编码检查成功与报错铁律 (Agent-Driven DOM Verification Invariant)
-- **绝对禁止机器判死**：严禁 CLI 驱动在执行各板块保存后，通过硬编码的 `AssertComplete` 盲目抛出异常阻断流程；
-- **完整 DOM 结构化提取**：驱动在完成表单提交或导航到概览页后，必须定位提审卡片（`#collapseSubmissionSetup`, `.accordion-body`, `he-card`），提取包含所有模块 `app-module-status`、`he-badge`、`aria-label` 的真实完整 DOM 并输出；
-- **由 Agent 确权与决策**：各个模块是否完成、是否存在警告、是否可以进入下一阶段，**必须完全由 Agent 人工智能通过真实 DOM 证据审查来最终裁决**。
+## 业务不变量
 
-### 12. MSIX 资源语言声明与 Store Listing 动态路由铁律 (MSIX Language & Listing Dynamic Routing Invariant)
-- **MSIX 资源语言主声明**：在 `Package.appxmanifest` 中必须显式配置目标语言（如 `<Resource Language="zh-CN"/>`），避免回退为默认 `en-US` 导致商店后台语言错位；
-- **Store Listing 动态进入**：在进入 Store 一览填报时，严禁写死 `languageid=5` 静态 URL，必须通过 DOM 选择器（`[slot^="Name-"] a` 或 `a[href*="/listings?languageid="]`）动态点击当前表格中真实存在的语言槽位进入。
+- manifest 的两个 `DisplayName` 与 Partner Center 实际预留名称完全一致。
+- manifest 明确声明目标资源语言和 `Windows.Desktop` 设备系列。
+- 关键词最多 7 个；保存前先清理旧标签并核对最终数量。
+- Listing 截图和 Logo 上传后，页面必须出现缩略图或数量变化再保存。
+- `runFullTrust` 存在时，提交选项填写对应用途说明。
+- 最终提交按钮由用户亲自点击。
 
-### 13. 提审选项受限功能理由输入与 Shadow DOM 8 秒持久化铁律 (Options Shadow DOM Save & 8s Persistence Invariant)
-- **受限功能理由填报**：针对 `runFullTrust` 等受限权限，必须递归穿透 Shadow DOM 定位文本域，使用原生属性描述符 Setter 写入理由并派发 `input`/`change` 事件；
-- **Shadow DOM 穿透保存与 8 秒等待**：底部【保存】按钮必须穿透 `he-button` 的 Shadow DOM 触发原生点击，且点击后必须显式等待 8 秒完成后台持久化，方可离开页面。
+## 编译与文件锁
 
-### 14. 最终提审必须由用户手动点击铁律 (User-Driven Final Submission Invariant)
-- **绝对禁止自动化代点提交**：全流程 6 大表单自动填报完成后，概览页达到全绿「完成」状态即为工具链自动化执行边界；
-- **用户亲自审核确权**：最后一步提交审核（点击【提交进行认证】按钮）属于最终法律与发布确权，必须且只能由用户自己在浏览器中仔细审核确认后手动点击提交，严禁 Agent 或自动化脚本代点提交；
-- **明确结束语规范**：Agent 必须明确向用户汇报：“自动填报已结束，请仔细审核后，点击 提交进行认证 按钮。”
+修改 Edge Store CLI 源码后：
 
----
+1. 停止本轮记录的精确 CLI PID；
+2. 执行 `dotnet build-server shutdown`；
+3. 确认没有进程仍在写同一 `bin/obj`；
+4. 仅在明确的增量缓存或锁错误后清理输出目录；
+5. 前台执行：
 
-## 四、 退出状态与结构化证据输出
+```powershell
+dotnet build toolchain/edge-store-cli/EdgeStore.Cli.csproj `
+  -c Release `
+  --nologo `
+  /p:UseSharedCompilation=false
+```
 
-每次执行完毕，Agent 必须向用户输出包含以下字段的清晰结构化状态表：
-1. 当前阶段与执行命令；
-2. 页面 URL 与 DOM 探针状态；
-3. 6 大模块现场真实完成情况；
-4. 退出码（0 = 成功，非 0 = 异常并附带报错根因）。
+编译、运行和状态轮询保持分离，避免后台编译与同目录重建重叠。
 
+## 每阶段汇报字段
+
+1. 当前阶段与实际命令；
+2. 页面 URL、标题和 `PageKind`；
+3. Observe/Diff/冷加载回读结果；
+4. 对应概览模块现场状态；
+5. 错误区域、包行或关键控件证据；
+6. 退出码与 checkpoint 状态。

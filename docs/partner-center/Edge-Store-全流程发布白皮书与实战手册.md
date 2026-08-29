@@ -64,9 +64,9 @@ Edge Store 自动化工具链（`toolchain/edge-store-cli/`）采用**纯轻量�
 | **Stage 5** | 年龄分级问卷 | 自动填写 IARC 调查问卷（非暴力/离线工具），生成评级徽标并保存 | `-Action step -Phase ageRatings -Apply` |
 | **Stage 6** | 程序包上传与确权 | 穿透上传 MSIX，清理历史残余包，确权 `Validated` 并退回概览页验绿勾 | `-Action cleanpackages` 或 `-Action step -Phase packages -Apply` |
 | **Stage 7** | Store 一览双层填报 | ①在 `managelanguages` 批量删除 80+ 冗余语言并保存网格；②进入 `中文(中国)` 表单填报 302 字描述与截图 | `-Action cleanlanguages` 接着 `-Action filllisting` |
-| **Stage 8** | 提审选项 | 配置认证备注与通过后立即上架策略，保存草稿并自检 | `-Action step -Phase options -Apply` |
+| **Stage 8** | 提审选项 | 先只读提取现场状态，审查后配置发布模式与受限功能理由并保存 | `-Action inspectoptions` 后执行 `-Action filloptions` |
 | **Stage 9** | 概览页 6 大模块总检 | 强制冷加载概览页，断言 6 大模块全绿勾且无「未启动」/「未完成」 | `-Action verify` |
-| **Stage 10** | 显式双确认提交 | 用户确认后点击「提交进行认证」，确认提交模态弹窗 | `-Action submit -ConfirmSubmit` |
+| **Stage 10** | 用户提交交付 | Agent 汇报六大模块证据，用户在浏览器中复核并点击「提交进行认证」 | 用户手动操作 |
 
 ---
 
@@ -155,8 +155,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
 # 7. 概览页 6 大模块冷加载总检
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action verify -Manifest .\qiangua\build\edge-store-EXXE.json -StateDir .\.cache\edge-store-state
 
-# 8. 显式双确认提交审核
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action submit -ConfirmSubmit -Manifest .\qiangua\build\edge-store-EXXE.json -StateDir .\.cache\edge-store-state
+# 8. 提交交付
+# verify 通过后，Agent 汇报现场证据；用户在已打开的浏览器中复核并点击「提交进行认证」。
 ```
 
 ---
@@ -178,5 +178,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
    - 在系统确认对话框中点击确定，即可彻底从 Partner Center 中删除该产品。
 6. **刷新页面验证（⚠️ 关键注意点）**：
    - Partner Center 属于单页应用（SPA），删除操作提交后前端可能存在局部视图缓存，**必须手动按 F5 刷新（或强制刷新）页面**，产品列表中才会同步更新并消失。
-
 

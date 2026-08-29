@@ -76,13 +76,15 @@
 
 ---
 
-## 6. 产品预留名称交互式建项与名称占用排障 (Product Name Reservation Protocol)
+## 6. 产品预留名称自动建项与名称占用排障 (Product Name Reservation Protocol)
 
 - **错误现象**：在预留名称阶段，页面出现红字警告：`名称不可用。如果已保留此名称用于其他产品，请将其更新为不使用此名称。`
 - **根本原因**：微软商店中的产品名称具有全球唯一性。常用词、单字词（如“牵挂”、“记事本”）通常已被其他开发者占用或受微软官方保留。
 - **重构后的标准工作流**：
-  - 由脚本为用户拉起预留弹窗，交由用户在 Edge 浏览器中直接输入心仪名称并点击保留；
-  - 脚本后台自动监听 URL 进入产品页，全自动提取 ProductId 与 3 大 Identity 并回填本地。
+  1. Agent 使用用户已确认的名称执行 `Invoke-EdgeStore.ps1 -Action reserve -AppName "<AppName>" -Manifest <manifest>`；
+  2. 驱动自动检查可用性、预留名称、进入产品页、提取 ProductId 与 3 大 Identity，并回填 manifest；
+  3. 名称占用时保留微软原始错误与退出码，回到产品命名决策，不向用户输出 Partner Center 手工点击步骤；
+  4. 用户确认新名称后再执行一次 reserve，避免脚本自行改变公开品牌名。
 
 ---
 
@@ -97,7 +99,7 @@
 - **正确自愈与闭环规范**：
   1. 在 STORE -1 用户预留名称成功后，脚本从页面抓取到实际预留的产品名称（`actualProductName`）；
   2. 自动将 `actualProductName` 同步更新到 `edge-store.json` 的 `productName` 以及 `Package.appxmanifest` 中的所有 `DisplayName` 节点；
-  3. 执行 `dotnet publish` 与 `winapp package` 重新打包 MSIX。
+  3. 按 `references/toolchain/v1/commands.md` 的自包含 Store 路线执行一次 `dotnet publish` 与 `winapp package`。
 
 ---
 
@@ -116,8 +118,9 @@
 - **错误现象**：网页上某模块（如属性）实际上已经成功保存并渲染出绿色的 `<he-badge class="text-green">完成</he-badge>`，但 C# 驱动在 `AssertComplete` 中全局匹配链接时误命中了左侧导航栏的菜单链接，导致驱动抛出 `Overview verification rejected phase [properties]: module status is Incomplete` 异常中断流程。
 - **根本原因**：机器硬编码的 CSS 选择器在复杂 Angular SPA 中极易受到侧边栏、面包屑或隐藏元素的污染，不能代替 Agent 对现场真实 DOM 的综合审查。
 - **正确规范与自愈**：
-  1. **驱动移除硬编码中断**：CLI 驱动在各板块保存后，只负责提取提审卡片（`#collapseSubmissionSetup` / `.accordion-body` / `he-card`）的真实完整 DOM 并输出，绝不在驱动层私自抛错中断；
-  2. **Agent 审查确权**：填报是否成功、各模块是否达到「完成」状态，**必须完全由 Agent 通过现场提取的完整 DOM 结构化证据来最终裁决**。
+  1. **驱动输出结构化证据**：CLI 在各板块保存后提取提审卡片（`#collapseSubmissionSetup` / `.accordion-body` / `he-card`）及模块状态；
+  2. **Agent 审查确权**：Agent 根据现场 DOM、错误区域、冷加载回读和概览模块状态裁决；
+  3. **完成语义**：只有完整阶段 Diff 为零、冷加载回读仍为零且对应概览模块为 `Complete` 时，checkpoint 才进入 `Converged`。选择器歧义、`Unknown`、`Processing` 和错误行都保持未完成。
 
 ---
 
@@ -143,7 +146,12 @@
 
 - **错误现象**：修改 C# 代码后执行 `dotnet build` 提示 `error MSB3027: Could not copy obj to bin... The file is locked by: .NET Host`。
 - **根本原因**：后台运行的 CLI 进程尚未完全释放程序集句柄。
-- **正确规范**：在重新编译前，必须使用 `Stop-Process -Name "EdgeStore.Cli", "dotnet"` 确保进程完全退出，并使用 `/p:UseSharedCompilation=false` 进行构建。
+- **正确规范**：
+  1. 停止本轮启动记录中的精确 CLI/App PID；
+  2. 执行 `dotnet build-server shutdown` 释放 MSBuild/VBCSCompiler 节点；
+  3. 确认没有仍在写同一 `bin/obj` 的命令后，再按需清理；
+  4. 使用前台 `dotnet build ... /p:UseSharedCompilation=false` 重试一次；
+  5. 避免按进程名批量结束机器上的全部 `dotnet`，以免影响其他任务。
 
 ---
 
@@ -152,5 +160,4 @@
 - **错误现象**：在 `options` 页面填报 `runFullTrust` 理由后，保存按钮未被点击或跳转过快导致后台数据未持久化。
 - **根本原因**：Partner Center 底部的【保存】按钮封装在 `he-button` 的 Shadow DOM 内部，且异步保存需要时间完成服务端落库。
 - **正确规范**：必须通过 Shadow DOM 穿透递归查找按钮并触发内部原生 button 点击，并在保存后显式等待 8 秒再跳转离开。
-
 

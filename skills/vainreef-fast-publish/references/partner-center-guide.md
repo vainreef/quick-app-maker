@@ -39,7 +39,7 @@
 
 本阶段由 Edge Store CLI 驱动全自动完成，**严禁向用户提出任何控制台操作要求或输出手动点击步骤**。Agent 只需执行命令：
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName "<应用名称>" -Manifest .\<app>\build\edge-store.json
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName "<应用名称>" -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state
 ```
 
 驱动内部 CDP 自动化执行标准（仅供驱动内部实现参考）：
@@ -51,14 +51,30 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 
 ---
 
-## 阶段三：商店 6 大表单全自动声明式填报 (Store 0~7)
+## 阶段三：商店 6 大表单离散填报与证据核验 (Store 0~9)
 
-本阶段由 Edge Store CLI 编排器全自动执行，**严禁人工在网页中逐项填报**。Agent 只需执行：
+本阶段由 Edge Store CLI 分阶段执行。每个命令结束后，Agent 必须审查当前页面类型、DOM 证据、错误信息和概览模块状态，再进入下一阶段。标准顺序为：
+
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
+$edgeStore = '.\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1'
+$manifest = '.\<app>\build\edge-store.json'
+$state = '.\.cache\edge-store-state'
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action preflight -Manifest $manifest -StateDir $state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action launch -Manifest $manifest -StateDir $state -KeepOpen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action discover -Manifest $manifest -StateDir $state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action step -Phase availability -Manifest $manifest -StateDir $state -Apply
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action step -Phase properties -Manifest $manifest -StateDir $state -Apply
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action step -Phase ageRatings -Manifest $manifest -StateDir $state -Apply
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action step -Phase packages -Manifest $manifest -StateDir $state -Apply
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action cleanlanguages -Manifest $manifest -StateDir $state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action filllisting -Manifest $manifest -StateDir $state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action inspectoptions -Manifest $manifest -StateDir $state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action filloptions -Manifest $manifest -StateDir $state
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $edgeStore -Action verify -Manifest $manifest -StateDir $state
 ```
 
-编排器将全自动根据 `edge-store.json` 声明式收敛以下 6 大表单模块：
+`inspect` 和 `status` 用于只读探测；`run -Phase all` 会执行全部阶段，不作为状态查询。
 
 ---
 
@@ -86,12 +102,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
      - 主类别：根据应用性质选择（如：`生产率 Productivity` 或 `实用工具 + 工具 Utilities`）；
      - 子类别：选择对应的细分项；
   2. **隐私策略 (Privacy Policy)**：
-     - **推荐模式 A（纯离线应用/无用户数据收集，最快通过）**：
-       - 下拉框选择 **「否，我的产品不使用任何个人信息」**；
-       - ⚠️ **实测铁律**：选「否」时下方**绝不存在任何输入框或文本域**，切勿试图寻找或填写不存在的 textarea，直接保存即可。
-     - **模式 B（声明使用个人信息或需提供合规声明文本）**：
-       - 下拉框选择 **「是，我的产品使用个人信息」**；
-       - 下方单选框必须点击 **「提供隐私策略文本」**，此时页面会动态展开 `<textarea>`，填入本地隐私政策声明文本后，“保存”按钮才会高亮激活。
+     - quick-app-maker 的默认声明选择 **「是，包含隐私策略」**；
+     - 选择 **「提供隐私策略文本」** 后等待 `<textarea>` 动态出现；
+     - 填入：`本应用为本地运行工具，不收集、不存储、不上传任何用户个人隐私数据或使用习惯。`；
+     - 页面控件是否出现由所选模式决定，先识别页面状态再等待对应控件。
   3. **产品声明 (Product Declarations)**：
      - 勾选：`storage`（本地数据存储）、`windows`、`backups`（本地备份支持）；
      - ⚠️ **避坑警示**：若应用未接入端侧 AI 模型，**绝对不要勾选 `usesGenAI`**，防止被审核要求提供 AI 演示与合规证明；
@@ -118,12 +132,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 - **Agent 推荐填报标准**：
   1. **构建商店包与资源质检**：Agent 执行本地打包，必须确保 `Assets/*.png`（StoreLogo、Square150x150 等）完整拷贝入发布目录：
      ```powershell
-     dotnet publish -c Release -r win-x64 --self-contained true -o ./publish
-     # 确保 Assets 完整打包，避免 Partner Center 报图像缺失
-     if (Test-Path ./Assets) { Copy-Item -Recurse -Force ./Assets ./publish/ }
+     dotnet publish <App>.csproj -c Release -r win-x64 --self-contained true -o ./publish /p:WindowsAppSDKSelfContained=true /p:UseSharedCompilation=false
+     # 将 Assets 精确复制到 publish\Assets，先删除旧目标以避免 Assets\Assets 嵌套
+     if (Test-Path ./publish/Assets) { Remove-Item -Recurse -Force ./publish/Assets }
+     if (Test-Path ./Assets) { Copy-Item -Recurse -Force ./Assets ./publish/Assets }
      New-Item -ItemType Directory -Force ./store-package | Out-Null
-     winapp package ./publish --executable <AppName>.exe --publisher "<Publisher>" --generate-cert --output ./store-package/<Identity>_<Version>_x64.msix
+     winapp package ./publish --manifest ./Package.appxmanifest --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix
      ```
+     该 MSIX 是 Partner Center 上传工件，省略开发证书生成、本机证书安装和本地 `Add-AppxPackage`。
   2. **上传程序包**：驱动通过 Shadow DOM 穿透自动绑定 `.msix` 文件；
   3. **排障与保存铁律**：页面上**只能保留唯一一行状态为 `Validated` 的有效包**；若有历史残留的 `Analyzing` 或 `Error` 行，必须先点击 Delete / Cancel 清理干净；刷新页面（冷加载）确认 Save 按钮高亮后点击保存。
   4. **设备系列可用性 (Device family availability)**：
@@ -133,19 +149,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
      - 模板默认若声明 `Windows.Universal` 会导致多设备矩阵全 rank 1 报错，必须在源码清单中删除 Universal 声明，只保留 `Windows.Desktop`；
      - 程序包页出现的 `runFullTrust` 警告属于桌面应用常态，无需人工申请。
   5. **保存**：上传并校验通过后，点击底部的 **「Save」** 按钮。
-
----
-
-### 表单 2：属性 (App Properties)
-- **页面 URL**：`.../submissions/<submission-id>/properties`
-- **Agent 推荐填报标准**：
-  1. **类别**：一级分类通常选择 **「工具和生产力」(Developer / Utilities / Productivity)**；
-  2. **隐私策略（⚠️ 全局强制铁律）**：
-     - `quick-app-maker` 生态下**所有 App 必须选择「是，包含隐私策略」(Privacy Policy: Yes)**；
-     - 隐私策略文本栏中填入本地离线声明标准文本：
-       `本应用为本地运行工具，不收集、不存储、不上传任何用户个人隐私数据或使用习惯。`
-  3. **网站与支持联系信息**：按需选填；
-  4. **保存**：点击底部的 **「保存」** 按钮。
 
 ---
 
@@ -197,7 +200,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 ## 阶段四：最终提交与审核追踪
 
 1. 返回提交概览页面，确认 6 大表单模块均已显示**绿色勾选标记**；
-2. 点击右上角的 **「提交到应用商店 (Submit to the Store)」**；
+2. Agent 汇报 6 大模块现场状态并结束自动填报；用户在浏览器中复核后亲自点击 **「提交进行认证」**；
 3. **审核流程与周期**：
    - **自动化安全扫描与预处理**：约 10~30 分钟；
    - **人工审核与合规检查**：通常 **24 ~ 72 小时**；

@@ -18,6 +18,7 @@ description: "Turn a natural-language Windows app idea into a working WinUI proj
 5. Capability 资料只给建议和历史经验，不承担准入职责。
 6. 先执行最直接的构建路径；出现错误后读日志、检查环境、检查缓存并修复。
 7. 新发现的 Windows 行为经过复现后，再写回 `commands.md`。
+8. 本机试用、商店上传包、商店外直接侧载是三条独立路线。一次任务只走当前目标对应的路线，避免把运行时、包签名和证书信任混成一个排障循环。
 
 ## 对用户的语言与心智规则
 
@@ -41,6 +42,7 @@ Bootstrap 当前准备：
 | Runtime | .NET 10 SDK 官方 Binaries 绿色免安装版 (零 UAC 提权, 零写C盘) |
 | UI 起点 | WinUI 3 C# template |
 | 构建 | `dotnet` CLI (挂载工作区 DOTNET_ROOT) |
+| 本机试用 | `winapp run --detach` loose-layout 开发注册 |
 | 包工具 | `winapp` CLI |
 | 默认包格式 | MSIX |
 | 默认发布目标 | Microsoft Store |
@@ -89,10 +91,10 @@ Agent 工作根目录（WORKSPACE_ROOT，例如 Project/）
 4. 用户确认后进入工程阶段。
 5. **【双窗口并行机制】启动构建时向用户输出友好非阻塞提示**：
    ```text
-   我已开始为你全自动编写代码、生成界面、打包并进行自动化测试（大约需要 15~20 分钟）。
+   我已开始为你全自动编写、生成界面并进行完整测试（大约需要 15~20 分钟）。
    这段时间如果你想提前准备微软开发者账号，可以随时新开一个对话窗口向我提问：“我要如何创建 Partner 开发者账号？”，我会指引你完成免费个人认证。发布时的名称验重、建项与商店提审将由工具链全自动完成。
    ```
-6. **构建主会话保持极致专注**：本会话专注于代码生成、编译、自包含 MSIX 打包、`winapp ui` 自动化黑盒测试与本地安装，绝不在同一会话里混杂交互问答，避免上下文污染与任务中断。
+6. **构建主会话保持极致专注**：本会话专注于代码生成、前台编译、`winapp run --detach` 本机启动与 `winapp ui` 自动化黑盒测试。商店包只在用户明确进入发布阶段后生成，避免开发验证提前进入证书和侧载路线。
 
 ## 2. Read the Windows build notes
 
@@ -139,7 +141,7 @@ Set-Location APP_NAME
 
 1. **设计只做一遍，写完决策就动手**：把架构决策（存储方案、通知方案、模型字段、UI 结构）写进项目 README 的「已确定」一节，然后直接进入编码。禁止在思考里从头重推整套设计（第二轮同一套设计被完整重推 4 次、占日志 39%，第一行代码在第 2527 行才落盘）。
 2. **API 行为不确定时禁止纯思考猜测**：最多思考 1 个回合，然后查官方文档或写最小实验验证。不要靠回忆猜（ScheduledToast 时限猜 6 轮、MicaBackdrop 平台要求猜 11 轮，全不如一次实测）。
-3. **先最小闭环再叠加功能（MVP-first）**：第一版先跑通「启动 → 数据存取 → 渲染 → 打包安装」最小闭环，再逐个叠加通知等特性。不要为"可能不会发生的场景"预设预案（unpackaged 运行、重复 toast、闰年边界——第二轮三层通知状态机、双路径存储 fallback 都是这类臆想预案）。
+3. **先最小闭环再叠加功能（MVP-first）**：第一版先跑通「启动 → 数据存取 → 渲染 → 本机注册运行」最小闭环，再逐个叠加通知等特性。不要为"可能不会发生的场景"预设预案（重复 toast、闰年边界——第二轮三层通知状态机、双路径存储 fallback 都是这类臆想预案）。
 4. **调试脚手架完工即拆**：StartupProbe、路径自报日志、双路径 fallback 为排障加的代码，问题定位后必须删除或移出产品路径（第二轮探针进产品，每次启动写 7+ 行日志）。
 5. **catch 必须留痕**：禁止空 catch，至少写一条日志。否则"功能静默失效"无法排查。
 
@@ -158,9 +160,10 @@ Set-Location APP_NAME
 3. **【铁律 3】计划通知的标准调度范式（防 CS0117 与空消息异常）**：
    - `ScheduledToastNotification` 没有 `Recurrence` 属性（写了必报 CS0117）；每年重复提醒通过 `for` 循环为未来几年分别构造单次通知调度；
    - 使用 `Windows.UI.Notifications.ToastNotificationManager.CreateToastNotifier().AddToSchedule(...)`；XML 特殊字符（`&`, `<`, `>`, `"`）必须转义；catch 时必须打印 `ex.HResult`（提权环境 0x803E0120 时 Message 为空）。
-4. **【铁律 4】全生命周期零 UAC 提权 & 零 C 盘系统目录写入（免安装 MinGit + 免安装 .NET SDK + CurrentUser 证书 + 严禁写 HKLM）**：
+4. **【铁律 4】默认开发链零提权、零本地证书循环、零 C 盘系统目录写入**：
    - **底层机制（坑 62）**：AI Runner 执行线程位于私有桌面 `WinSta0\exebox-*`，而用户在 `WinSta0\Default`，UAC 在 `WinSta0\Winlogon`。跨 Desktop 直接调用 `runas` 会被底层直接报 `0x80070032 (ERROR_NOT_SUPPORTED)` 拦截；
-   - **工程铁律**：Git 与 .NET 10 SDK 全程使用工作区根目录下同级的 `git\` 与 `dotnet\` 绿色免安装版，绝不运行任何 EXE 安装器；证书只导入 `Cert:\CurrentUser\TrustedPeople`，严禁写入 `HKLM:` 或 `Cert:\LocalMachine\`，全生命周期在 Medium Integrity 下顺畅运行，杜绝触发提权。若极特殊场景确需提权，严禁关闭系统安全，必须使用 `lpDesktop="WinSta0\Default"` 桥接启动。
+   - **工程铁律**：Git 与 .NET 10 SDK 全程使用工作区根目录下同级的 `git\` 与 `dotnet\` 绿色免安装版，开发验证统一使用 `winapp run --detach`，该路线使用 loose-layout 开发注册，不创建 MSIX 签名证书；
+   - Microsoft Store 上传包与本机试用分开处理：上传包按商店身份生成并交给 Partner Center，商店负责最终签名。本机直接侧载精确 MSIX 属于单独的显式任务，进入前读取 `commands.md` 的侧载章节并在机器信任步骤等待用户确认。
 5. **【铁律 5】国内 NuGet 还原镜像源（防 restore 超时卡死）**：
    - 还原依赖必须指定国内源：`dotnet restore --source https://nuget.azure.cn/v3/index.json`，严禁直连境外 `api.nuget.org`。
 
@@ -215,7 +218,14 @@ Agent 根据当前需求自由选择：
    - **如果某项资源找不到可用的国内源，必须彻底放弃下载该资源！绝对禁止尝试海外下载，必须换用本地生成、系统自带或 XAML 控件拟态等替代方案！**
 5. 素材文件一律放在工作根目录内的项目目录下（如 `<app-slug>/Assets/`、`<app-slug>/testdata/`），不写工作区外。
 
-**执行命令的硬规则：见 `references/toolchain/v1/commands.md`「命令执行硬规则」——这是权威完整版，每条都经过实机验证。** 最重要的一条：禁止把 `dotnet run` 挂在后台等待（会卡死整个会话，已发生 7 次）。每次执行命令前先对照该清单，遇到问题再回来查「Confirmed Windows findings」的 36 条坑点。
+**执行命令的硬规则：见 `references/toolchain/v1/commands.md`「命令执行硬规则」——这是权威完整版。** 核心要求：
+
+1. 同一项目同一时刻只有一个 restore/build/publish/package 进程；
+2. 编译命令用 `& dotnet ... /p:UseSharedCompilation=false` 前台直接执行，保留真实退出码；
+3. 应用通过 `winapp run <project> --no-build --detach --json` 启动，保存返回的 PID，后台 `dotnet run`、后台 publish 和 `Start-Process -Wait` 不进入工作流；
+4. 删除 `bin/obj/publish` 前先停止该 App 的精确 PID，并执行 `dotnet build-server shutdown`；
+5. 每个等待都绑定可观察状态和截止时间；同一根因只做一次证据化重试；
+6. `0x800B0109`、缺少 .NET Runtime、缺少 Windows App SDK Runtime 分属不同层，按错误层处理，禁止同时改证书、CA、运行时、自包含、裁剪和缓存。
 
 遇到问题时依次查看：
 
@@ -225,7 +235,7 @@ Agent 根据当前需求自由选择：
 4. `references/toolchain/v1/commands.md` 已记录的实测经验。
 5. 缓存文件、安装包或 nupkg 是否在失败环节表现异常。
 
-正常路径直接执行。安装或包读取失败后，再记录文件大小与 SHA-256，清理对应缓存并重新下载一次。Bootstrap 对外部安装包采用这一失败后诊断策略。
+正常路径直接执行。失败后先记录证据并识别所属层，再做一次对应修复。清理缓存和重新下载只适用于已有文件大小或哈希异常的外部工件，不适用于证书信任、应用运行时和源代码错误。
 
 ## 6. Smoke test
 
@@ -236,10 +246,10 @@ Agent 根据当前需求自由选择：
 1. Bootstrap 完成。
 2. 创建一次性 WinUI App。
 3. Debug/Release 构建。
-4. 启动并关闭 App。
-5. Publish。
-6. 使用当前 `winapp` 命令打包。
-7. 安装、启动、卸载和重新安装 MSIX。
+4. 通过 `winapp run --detach` 启动、UI 验证并按 PID 关闭 App。
+5. 自包含 Publish，检查运行时文件和资源目录。
+6. 生成不带开发证书的 Microsoft Store 上传包并执行离线预检。
+7. 商店外精确 MSIX 侧载仅在该路线被明确要求时单独验证。
 
 每次测试记录 Windows build、工具版本、命令、退出码、输出路径和结果。实际踩到的稳定坑点写回 `commands.md`。
 
@@ -260,7 +270,7 @@ Agent 根据当前 App 增加针对性测试。
 
 ## 8. Deliver MVP, invite play, and co-create iterations
 
-打包安装完成后，Agent 进入交付与共创循环：
+本机注册、核心测试和关闭重开验证完成后，Agent 进入交付与共创循环：
 
 1. **第一版交付话术规范**：
    - 告知用户应用已经安装在电脑上（可从开始菜单打开）；
@@ -270,7 +280,7 @@ Agent 根据当前 App 增加针对性测试。
    - 绝不主动提“要不要看看上架的事”；
    - 用户的心理节奏是先玩、先改、改满意后才考虑分享与发布。
 3. **用户反馈迭代循环**：
-   - 接收用户体验反馈 → 更新 README（用户需要/调整） → 极简修改代码 → 本地构建与升级重装（递增 manifest Version） → 再次请用户体验。
+   - 接收用户体验反馈 → 更新 README（用户需要/调整） → 极简修改代码 → 前台构建 → `winapp run --detach` 更新开发注册 → 再次请用户体验。manifest 版本只在生成新 Store 包或精确侧载包时递增。
 
 ## 9. Microsoft Partner Center onboarding and operation guide
 
@@ -294,12 +304,12 @@ Agent 根据当前 App 增加针对性测试。
       - properties:   Invoke-EdgeStore.ps1 -Action step -Phase properties -Manifest ... -Apply
       - ageRatings:   Invoke-EdgeStore.ps1 -Action step -Phase ageRatings -Manifest ... -Apply
       - packages:     Invoke-EdgeStore.ps1 -Action step -Phase packages -Manifest ... -Apply
-      - listing:      Invoke-EdgeStore.ps1 -Action filllisting -Manifest ...
-      - options:      Invoke-EdgeStore.ps1 -Action filloptions -Manifest ...
+      - listing:      Invoke-EdgeStore.ps1 -Action cleanlanguages ...，再执行 -Action filllisting ...
+      - options:      Invoke-EdgeStore.ps1 -Action inspectoptions ...，审查后执行 -Action filloptions ...
     STORE 9: 提审卡片 6 大模块现场完整 DOM 审查总检 (由 Agent 审查 #collapseSubmissionSetup 全绿)
     STORE 10: 最终提审交付 (严禁 Agent 代点提交！自动填报已结束，由用户在浏览器中仔细审核后手动点击【提交进行认证】按钮)
     ```
-  - **核心铁律：绝对禁止机器硬编码检查成功与报错**：CLI 驱动只负责执行表单填写并提取提审卡片（`#collapseSubmissionSetup` / `he-card`）的真实完整 DOM 返回；各个板块是否「完成」、是否可以进入下一阶段，**必须完全由 Agent 审查现场 DOM 证据来裁决**。
+  - **核心铁律：结构化证据与 Agent 审查共同完成裁决**：CLI 输出 PageKind、Observed State、Diff、错误区域和提审卡片 DOM；Agent 审查冷加载回读与概览模块状态。只有完整阶段 Diff 为零且对应模块为 `Complete` 时写入 `Converged`。
 
 ## 10. Package and publish for Microsoft Store
 
@@ -307,24 +317,25 @@ Agent 根据当前 App 增加针对性测试。
 
 1. **全新应用自动建项与身份回填**：
    ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -KeepOpen
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName <AppName> -Manifest .\<app>\build\edge-store.json
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -StateDir .\.cache\edge-store-state -KeepOpen
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName <AppName> -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state
    ```
-2. **构建商店发布包（显式声明语言与全图标质检）**：
+2. **构建商店发布包（显式声明语言、双层自包含与全图标质检）**：
    - 确保 `Package.appxmanifest` 包含 `<Resources><Resource Language="zh-CN"/></Resources>`，避免默认回退为 `en-US`；
    - 确保 `<Properties><DisplayName>` 与后台预留的完整名称 100% 一致；
-   - 编译生成官方自包含 MSIX 包：
+   - `.csproj` 明确包含 `<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>`；
+   - 前台发布自包含目录，精确重建 `publish\Assets`，再生成不带开发证书的 Store 上传包：
    ```powershell
-   .\dotnet\dotnet.exe publish <app>\<App>.csproj -c Release -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageDir="<app>\store-package\" -p:AppxBundle=Never /p:UseSharedCompilation=false
+   .\dotnet\dotnet.exe publish <app>\<App>.csproj -c Release -r win-x64 --self-contained true -o <app>\publish /p:WindowsAppSDKSelfContained=true /p:UseSharedCompilation=false
+   winapp package <app>\publish --manifest <app>\Package.appxmanifest --self-contained --executable <App>.exe --output <app>\store-package\<Identity>_<Version>_x64.msix
    ```
-3. **多阶段离散步进与 Agent DOM 审查确权**：
-   - STORE 2: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action discover -Manifest <edge-store.json>`
-   - STORE 3: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase availability -Manifest <edge-store.json> -Apply`
-   - STORE 4: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase properties -Manifest <edge-store.json> -Apply`
-   - STORE 5: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase ageRatings -Manifest <edge-store.json> -Apply`
-   - STORE 6: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase packages -Manifest <edge-store.json> -Apply`
-   - STORE 7: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action filllisting -Manifest <edge-store.json>`
-   - STORE 8: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action filloptions -Manifest <edge-store.json>`
+   - Store 上传包省略 `--generate-cert`、`--install-cert` 与本地 `Add-AppxPackage`；完成后执行 `Invoke-EdgeStore.ps1 -Action preflight`。
+3. **多阶段离散步进与 Agent DOM 审查确权**：具体命令只从 [commands.md 的 Store automation 章节](references/toolchain/v1/commands.md) 复制，每次显式传入 launcher、manifest 与 `StateDir`。
+   - STORE 2: `discover`；
+   - STORE 3~6: 分别执行 `step -Phase availability/properties/ageRatings/packages -Apply`；
+   - STORE 7: 先执行 `-Action cleanlanguages`，再执行 `-Action filllisting`；
+   - STORE 8: 先执行 `-Action inspectoptions`，审查后执行 `-Action filloptions`；
+   - STORE 9: `verify`。
 4. **最终交付与用户手动提交（绝对红线）**：
    - 审查提审卡片现场 DOM 确认 6 项全部处于「完成」状态；
    - **绝对禁止 Agent 或自动化脚本代用户点击【提交进行认证】**！最后提交必须且只能由用户自己在浏览器中仔细复核 6 大板块后亲自点击；
@@ -339,7 +350,7 @@ Agent 根据当前 App 增加针对性测试。
 - 项目目录和主要文件。
 - Windows、.NET、模板和 `winapp` 版本。
 - 实际执行命令、stdout/stderr 摘要与退出码。
-- Debug、Release、Publish、MSIX 和安装结果。
+- Debug、Release、本机运行、UI 验证、Publish 和 Store MSIX 结果；精确侧载被选择时再记录安装结果。
 - 依赖、native 文件、子进程与许可证说明。
 - 最终包路径、架构、版本和 SHA-256。
 - 新发现的 Windows 坑点及复现条件。
