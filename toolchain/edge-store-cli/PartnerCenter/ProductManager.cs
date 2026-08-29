@@ -26,55 +26,227 @@ public class ProductManager
 
         if (!initialMatch.Success)
         {
+            string appsUrl = "https://partner.microsoft.com/zh-cn/dashboard/apps-and-games/overview";
             if (!currentUrl.Contains("/apps-and-games/overview"))
             {
-                string appsUrl = "https://partner.microsoft.com/zh-cn/dashboard/apps-and-games/overview";
-                Console.WriteLine($"[INFO] Navigating to Partner Center Apps & Games overview: {appsUrl}");
-                await _waiter.NavigateAsync(appsUrl, "Apps and Games Overview", allowOverviewRedirect: true);
-                await _waiter.RequireAsync(async () =>
-                {
-                    return await _client.EvaluateAsync<bool>("(document.body ? document.body.innerText : '').includes('新产品') || (document.body ? document.body.innerText : '').includes('应用和游戏')");
-                }, TimeSpan.FromSeconds(30), "Wait for Apps & Games overview");
-                await Task.Delay(1500);
+                Console.WriteLine($"[INFO] 正在导航至合作伙伴中心应用总览: {appsUrl}");
+                await _waiter.NavigateAsync(appsUrl, "Apps & Games Overview", allowOverviewRedirect: true);
             }
 
-            // 检查弹窗是否已经打开，若未打开则帮用户点开
-            bool isModalOpen = await _client.EvaluateAsync<bool>("""
+            var loadStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Console.WriteLine("[INFO] 开始检测 Partner Center 页面加载状态...");
+
+            // 阶段 1：等待 document.readyState === 'complete'
+            Console.WriteLine("[LOAD-CHECK 1/3] 检测 DOM readyState 状态...");
+            await _waiter.RequireAsync(async () =>
+            {
+                return await _client.EvaluateAsync<bool>("document.readyState === 'complete'");
+            }, TimeSpan.FromSeconds(30), "等待 document.readyState === 'complete'");
+            Console.WriteLine($"[LOAD-CHECK 1/3] [OK] DOM readyState 已完成 ({loadStopwatch.Elapsed.TotalSeconds:F1}s)");
+
+            // 阶段 2：等待主内容区与页面文本挂载完毕
+            Console.WriteLine("[LOAD-CHECK 2/3] 等待主内容区与标题挂载...");
+            await _waiter.RequireAsync(async () =>
+            {
+                return await _client.EvaluateAsync<bool>("""
+                (() => {
+                    const text = (document.body ? document.body.innerText : '') || '';
+                    return text.includes('应用和游戏') || text.includes('产品') || text.includes('Apps & games');
+                })()
+                """);
+            }, TimeSpan.FromSeconds(30), "等待主内容区与标题挂载");
+            Console.WriteLine($"[LOAD-CHECK 2/3] [OK] 主内容区与标题已挂载 ({loadStopwatch.Elapsed.TotalSeconds:F1}s)");
+
+            // 阶段 3：等待【+ 新产品】按钮与搜索栏渲染就绪
+            Console.WriteLine("[LOAD-CHECK 3/3] 等待【+ 新产品】按钮与操作栏渲染就绪...");
+            await _waiter.RequireAsync(async () =>
+            {
+                return await _client.EvaluateAsync<bool>("""
+                (() => {
+                    const btns = Array.from(document.querySelectorAll('button, he-button, [role="button"]'));
+                    return btns.some(b => {
+                        const t = (b.innerText || b.getAttribute('aria-label') || '').trim();
+                        const r = b.getBoundingClientRect();
+                        return (t.includes('新产品') || t.includes('新建产品') || t.includes('New product')) && r.width > 0 && r.height > 0 && !b.disabled;
+                    });
+                })()
+                """);
+            }, TimeSpan.FromSeconds(30), "等待【+ 新产品】按钮就绪");
+            Console.WriteLine($"[LOAD-CHECK 3/3] [OK] 【+ 新产品】按钮已渲染就绪 ({loadStopwatch.Elapsed.TotalSeconds:F1}s)");
+
+            // 额外留出 3 秒确保 Angular 指令与事件监听器全部绑定完毕
+            Console.WriteLine("[INFO] 正在等待 3 秒以确保 Angular 事件监听全部绑定完成...");
+            await Task.Delay(3000);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"\n[CONFIRM] ================================================================================");
+            Console.WriteLine($"[CONFIRM] [OK] 确认页面已完全加载完毕并就绪！总耗时: {loadStopwatch.Elapsed.TotalSeconds:F1} 秒");
+            Console.WriteLine($"[CONFIRM] ================================================================================\n");
+            Console.ResetColor();
+
+            // 2. 循环触发【+ 新产品】下拉菜单展开，直到菜单项切实可见
+            Console.WriteLine("[INFO] 正在触发【+ 新产品】按钮并确认下拉菜单展开...");
+            for (int attempt = 1; attempt <= 10; attempt++)
+            {
+                bool isItemVisible = await _client.EvaluateAsync<bool>("""
+                (() => {
+                    const allRoots = [document];
+                    for (let i = 0; i < allRoots.length; i++) {
+                        try { for (const e of allRoots[i].querySelectorAll('*')) if (e.shadowRoot) allRoots.push(e.shadowRoot); } catch (_) {}
+                    }
+                    for (const r of allRoots) {
+                        const items = Array.from(r.querySelectorAll('button, [role="menuitem"], li, a, span'));
+                        const target = items.find(x => {
+                            const t = (x.innerText || x.getAttribute('aria-label') || '').trim();
+                            const rect = x.getBoundingClientRect();
+                            return t.includes('MSIX') && (t.includes('应用') || t.includes('App')) && rect.width > 50 && rect.height > 15;
+                        });
+                        if (target) return true;
+                    }
+                    return false;
+                })()
+                """);
+
+                if (isItemVisible)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("[CONFIRM] [OK] 确认【+ 新产品】下拉菜单已成功展开！");
+                    Console.ResetColor();
+                    break;
+                }
+
+                Console.WriteLine($"[INFO] 正在执行第 {attempt} 次点击【+ 新产品】按钮（坐标派发 + 按键交互）...");
+                try
+                {
+                    await PhysicalClickElementAsync("""
+                    () => {
+                        const btns = deepAll('button, he-button, [role="button"], a');
+                        return btns.find(x => {
+                            const t = (((x.innerText||'') + ' ' + (x.getAttribute('aria-label')||'') + ' ' + (x.getAttribute('title')||''))).trim();
+                            return /新建产品|新产品|New product/i.test(t) && visible(x);
+                        });
+                    }
+                    """, "【+ 新产品】按钮");
+                }
+                catch
+                {
+                    // Fallback to JS click
+                    await _client.EvaluateAsync<bool>("""
+                    (() => {
+                        const btns = Array.from(document.querySelectorAll('button, he-button, [role="button"], a'));
+                        const b = btns.find(x => /新建产品|新产品|New product/i.test((x.innerText || x.getAttribute('aria-label') || '').trim()));
+                        if (b) { b.click(); return true; }
+                        return false;
+                    })()
+                    """);
+                }
+
+                await Task.Delay(1000);
+            }
+
+            // 3. 循环点击【MSIX 或 PWA 应用】菜单项，直到真实弹窗（包含检查可用性按钮与输入框）出现在屏幕上
+            Console.WriteLine("[INFO] 正在点击【MSIX 或 PWA 应用】菜单项并确权弹窗出现...");
+            bool modalOpened = false;
+            for (int attempt = 1; attempt <= 10; attempt++)
+            {
+                bool isDialogTrulyVisible = await _client.EvaluateAsync<bool>("""
+                (() => {
+                    const allRoots = [document];
+                    for (let i = 0; i < allRoots.length; i++) {
+                        try { for (const e of allRoots[i].querySelectorAll('*')) if (e.shadowRoot) allRoots.push(e.shadowRoot); } catch (_) {}
+                    }
+                    for (const r of allRoots) {
+                        const dialogs = Array.from(r.querySelectorAll('[role="dialog"], .ms-Dialog, .modal-dialog, name-input, he-dialog, .ms-Modal'));
+                        for (const d of dialogs) {
+                            const rect = d.getBoundingClientRect();
+                            if (rect.width > 200 && rect.height > 150) {
+                                const text = (d.innerText || '').trim();
+                                const inputs = Array.from(d.querySelectorAll('input:not([type="hidden"])'));
+                                const hasCheckBtn = text.includes('检查可用性') || text.includes('Check availability') || text.includes('保留产品名称') || text.includes('Reserve product name');
+                                if (inputs.length > 0 && hasCheckBtn) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                })()
+                """);
+
+                if (isDialogTrulyVisible)
+                {
+                    modalOpened = true;
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("[CONFIRM] [OK] 确认名称预留对话框（含输入框与【检查可用性】按钮）已切实渲染在屏幕正中央！");
+                    Console.ResetColor();
+                    break;
+                }
+
+                Console.WriteLine($"[INFO] 正在执行第 {attempt} 次点击【MSIX 或 PWA 应用】菜单项...");
+                try
+                {
+                    await PhysicalClickElementAsync("""
+                    () => {
+                        const items = deepAll('button, [role="menuitem"], li, a, span');
+                        return items.find(x => {
+                            const t = (x.innerText || x.getAttribute('aria-label') || '').trim();
+                            return t.includes('MSIX') && (t.includes('应用') || t.includes('App')) && visible(x);
+                        });
+                    }
+                    """, "【MSIX 或 PWA 应用】菜单项");
+                }
+                catch
+                {
+                    await _client.EvaluateAsync<bool>("""
+                    (() => {
+                        const items = Array.from(document.querySelectorAll('button, [role="menuitem"], li, a, span'));
+                        const msixItem = items.find(x => (x.innerText || x.getAttribute('aria-label') || '').trim().includes('MSIX'));
+                        if (msixItem) {
+                            (msixItem.closest('button, a, [role="menuitem"]') || msixItem).click();
+                            return true;
+                        }
+                        return false;
+                    })()
+                    """);
+                }
+
+                await Task.Delay(1200);
+            }
+
+            // 4. 强制断言弹窗输入框必须真实存在
+            if (!modalOpened)
+            {
+                throw new InvalidOperationException("经过多次重试，未能成功弹出【名称预留对话框】。请检查页面 DOM 状态。");
+            }
+
+            // 5. 自动将光标聚焦到弹窗内的名称输入框
+            await _client.EvaluateAsync<bool>("""
             (() => {
-                return document.querySelector('name-input, .modal-dialog, [role="dialog"]') !== null;
+                const allRoots = [document];
+                for (let i = 0; i < allRoots.length; i++) {
+                    try { for (const e of allRoots[i].querySelectorAll('*')) if (e.shadowRoot) allRoots.push(e.shadowRoot); } catch (_) {}
+                }
+                for (const r of allRoots) {
+                    const dialogs = Array.from(r.querySelectorAll('[role="dialog"], .ms-Dialog, .modal-dialog, name-input, he-dialog, .ms-Modal'));
+                    for (const d of dialogs) {
+                        const input = d.querySelector('input:not([type="hidden"])');
+                        if (input && !input.disabled) {
+                            input.focus();
+                            input.click();
+                            return true;
+                        }
+                    }
+                }
+                return false;
             })()
             """);
-
-            if (!isModalOpen)
-            {
-                Console.WriteLine("[INFO] 正在为您点开【+ 新产品】 -> 【MSIX 或 PWA 应用】名称预留弹窗...");
-                await PhysicalClickElementAsync("""
-                () => {
-                    return deepAll('button[data-automation-id="create-new-button"], [data-automation-id="create-new-Application"], [data-automation-id="create-new-application"], [uitestid="createNewApplicationButton"]')
-                        .concat(deepAll('button,he-button,a,[role="button"],span'))
-                        .find(e => {
-                          if (!visible(e)) return false;
-                          const t = (((e.innerText||'') + ' ' + (e.getAttribute('aria-label')||'') + ' ' + (e.getAttribute('title')||''))).trim();
-                          return /新建产品|新产品/.test(t) && t.length < 25;
-                        });
-                }
-                """, "新产品 按钮");
-                await Task.Delay(1000);
-                await PhysicalClickElementAsync("""
-                () => {
-                    return deepAll('button[value="MSIX_PWA_App"], [data-automation-id="create-new-Application"] button, button[value*="MSIX"]')
-                        .concat(deepAll('button[role="menuitem"], li[role="none"] > button'))
-                        .find(e => visible(e) && (e.innerText || '').includes('MSIX 或 PWA'));
-                }
-                """, "MSIX 或 PWA 应用 菜单项");
-            }
 
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("\n================================================================================");
             Console.WriteLine("【用户操作指引：请在已打开的 Edge 浏览器中完成名称预留】");
             Console.WriteLine("--------------------------------------------------------------------------------");
-            Console.WriteLine("1. 浏览器中名称预留弹窗已准备就绪；");
-            Console.WriteLine("2. 请在输入框中输入您期望的应用名称（建议加副标题/定位，如：牵挂 - 桌面便签...）；");
+            Console.WriteLine("1. 浏览器中名称预留弹窗已 100% 确认打开，光标已聚焦到输入框；");
+            Console.WriteLine("2. 请在输入框中输入您期望的应用名称（如：Qiangua - 牵挂桌面记事与倒数日）；");
             Console.WriteLine("3. 点击【检查可用性】确认绿标通过；");
             Console.WriteLine("4. 点击【保留产品名称】创建应用；");
             Console.WriteLine("--------------------------------------------------------------------------------");

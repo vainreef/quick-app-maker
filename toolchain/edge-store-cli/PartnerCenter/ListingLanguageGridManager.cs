@@ -37,40 +37,39 @@ public class ListingLanguageGridManager
 
     public async Task<List<LanguageItem>> DetectLanguagesAsync(DesiredState desired)
     {
-        var wanted = desired.Site.SupportedLanguageCodes.Count > 0
-            ? desired.Site.SupportedLanguageCodes
-            : [desired.Site.LanguageCode];
-
-        var items = await _client.EvaluateAsync<List<LanguageItem>>($$"""
+        var items = await _client.EvaluateAsync<List<LanguageItem>>("""
         (() => {
-          const wanted = {{JsonSerializer.Serialize(wanted.Select(x => x.ToLowerInvariant()).ToArray())}};
-          const actionSlots = Array.from(document.querySelectorAll('[slot^="Action-"]'));
+          const nameSlots = Array.from(document.querySelectorAll('div[slot^="Name-"]'));
           const results = [];
-          for (const slotDiv of actionSlots) {
-            const slot = slotDiv.getAttribute('slot') || '';
-            const id = slot.replace(/^Action-/, '');
-            const nameDiv = document.querySelector('[slot="Name-' + CSS.escape(id) + '"]');
-            const a = nameDiv ? nameDiv.querySelector('a') : null;
-            if (!a) continue;
-            const m = (a.href || '').match(/[?&]languagecode=([^&#]+)/i);
-            const code = m ? decodeURIComponent(m[1]).toLowerCase() : '';
-            const name = (a.innerText || a.textContent || '').trim();
-            const b = slotDiv.querySelector('he-button, button') || slotDiv;
-            const action = (b.innerText || b.textContent || '').trim();
-            const isChinese = code === "zh-cn" || name === "中文(中国)" || /(?:[?&])languageid=5(?:&|$)/.test(a.href || "") || /(?:[?&])languagecode=zh-cn(?:&|$)/i.test(a.href || "");
-            const shouldKeep = wanted.includes(code) || (wanted.includes("zh-cn") && isChinese);
-            results.push({ id, code, name, href: a.href || '', action, shouldKeep });
+
+          for (const nameSlot of nameSlots) {
+            const slotAttr = nameSlot.getAttribute('slot') || '';
+            const id = slotAttr.replace('Name-', '').trim();
+            const name = (nameSlot.innerText || nameSlot.textContent || '').trim();
+
+            const actionSlot = document.querySelector(`div[slot="Action-${id}"]`);
+            const actionText = actionSlot ? (actionSlot.innerText || actionSlot.textContent || '').trim() : '';
+
+            const isChinese = id === '5' || name.includes('中文(中国)') || name.includes('中文（中国）');
+            results.push({
+              id: id,
+              code: isChinese ? 'zh-cn' : 'other',
+              name: name,
+              href: '',
+              action: actionText,
+              shouldKeep: isChinese
+            });
           }
           return results;
         })()
         """) ?? [];
 
         Console.WriteLine("\n=======================================================");
-        Console.WriteLine($"[WORKFLOW STEP 1] DOM 语言检测完成：当前共检测到 {items.Count} 种语言");
+        Console.WriteLine($"[WORKFLOW STEP 1] DOM 语言检测完成：当前共检测到 {items.Count} 种语言槽位");
         var toKeep = items.Where(x => x.ShouldKeep).ToList();
         var toDelete = items.Where(x => !x.ShouldKeep).ToList();
-        Console.WriteLine($"[WORKFLOW STEP 1] 保留目标 ({toKeep.Count}项): {string.Join(", ", toKeep.Select(x => $"{x.Name}({x.Code}, ID:{x.Id})"))}");
-        Console.WriteLine($"[WORKFLOW STEP 1] 待删语言 ({toDelete.Count}项)");
+        Console.WriteLine($"[WORKFLOW STEP 1] 保留目标 ({toKeep.Count}项): {string.Join(", ", toKeep.Select(x => x.Name))}");
+        Console.WriteLine($"[WORKFLOW STEP 1] 非保留语言 ({toDelete.Count}项)");
         Console.WriteLine("=======================================================\n");
 
         return items;
@@ -78,44 +77,101 @@ public class ListingLanguageGridManager
 
     public async Task<int> DeleteUnwantedLanguagesAsync(DesiredState desired)
     {
-        var items = await DetectLanguagesAsync(desired);
-        var toDelete = items.Where(x => !x.ShouldKeep).ToList();
-        if (toDelete.Count == 0)
-        {
-            Console.WriteLine("[WORKFLOW STEP 2] 没有需要删除的语言，当前语言列表已收敛。");
-            return 0;
-        }
+        Console.WriteLine("[WORKFLOW STEP 2] 正在执行自收敛删除循环（彻底清空非中文语言）...");
+        int deleted = await _client.EvaluateAsync<int>("""
+        (async () => {
+          let count = 0;
+          for (let round = 0; round < 25; round++) {
+            const remainingSpans = Array.from(document.querySelectorAll('[data-l10n-key="appsubmission_manage_languages_remove"], [data-l10n-key*="remove"]')).filter(span => {
+              const slot = span.closest('[slot^="Action-"]');
+              const id = slot ? (slot.getAttribute('slot') || '').replace('Action-', '').trim() : '';
+              return id && id !== '5'; // 坚决保留中文(中国) (ID=5)
+            });
 
-        Console.WriteLine($"[WORKFLOW STEP 2] 开始批量执行删除 {toDelete.Count} 项语言...");
-        int deletedCount = 0;
+            if (remainingSpans.length === 0) break;
 
-        for (int i = 0; i < toDelete.Count; i++)
-        {
-            var item = toDelete[i];
-            bool clicked = await _client.EvaluateAsync<bool>($$"""
-            (() => {
-              const slotDiv = document.querySelector('[slot="Action-{{item.Id}}"]');
-              if (!slotDiv) return false;
-              const b = slotDiv.querySelector('he-button, button') || slotDiv;
-              if (b.shadowRoot) {
-                const inner = b.shadowRoot.querySelector('button');
-                if (inner) inner.click();
+            for (const span of remainingSpans) {
+              span.scrollIntoView({ block: 'center', behavior: 'instant' });
+              await new Promise(r => setTimeout(r, 40));
+
+              const heBtn = span.closest('he-button, button');
+              if (heBtn) {
+                if (heBtn.shadowRoot) {
+                  const inner = heBtn.shadowRoot.querySelector('button');
+                  if (inner) inner.click();
+                }
+                heBtn.click();
+                heBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
               }
-              b.click();
-              b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
-              return true;
-            })()
-            """);
-
-            if (clicked)
-            {
-                deletedCount++;
-                Console.WriteLine($"  [DELETE {deletedCount}/{toDelete.Count}] 成功触发删除: {item.Name} ({item.Code}, ID: {item.Id})");
+              span.click();
+              span.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+              count++;
             }
-            await Task.Delay(100);
-        }
 
-        Console.WriteLine($"[WORKFLOW STEP 2] 语言删除触发完成，共删除 {deletedCount} 种语言。");
-        return deletedCount;
+            window.scrollTo(0, document.body.scrollHeight);
+            await new Promise(r => setTimeout(r, 500));
+          }
+          return count;
+        })()
+        """);
+
+        Console.WriteLine($"[WORKFLOW STEP 2] 自收敛删除执行完毕，累计处理 {deleted} 次删除点击。");
+        return deleted;
+    }
+
+    public async Task<bool> SaveLanguagesAsync()
+    {
+        Console.WriteLine("[WORKFLOW STEP 3] 保存管理语言页面更改...");
+        var saveDiagnostics = await _client.EvaluateAsync<string>("""
+        (() => {
+          window.scrollTo(0, document.body.scrollHeight);
+          const allRoots = [document];
+          for (let i = 0; i < allRoots.length; i++) {
+            try { for (const e of allRoots[i].querySelectorAll('*')) if (e.shadowRoot) allRoots.push(e.shadowRoot); } catch (_) {}
+          }
+
+          const foundButtons = [];
+          let clicked = false;
+
+          for (const r of allRoots) {
+            const btns = Array.from(r.querySelectorAll('he-button, button, input[type="button"], input[type="submit"], a[role="button"]'));
+            for (const b of btns) {
+              const t = (b.innerText || b.value || b.getAttribute('aria-label') || '').trim();
+              const key = (b.getAttribute('data-l10n-key') || '').toLowerCase();
+              const rct = b.getBoundingClientRect();
+              const isSave = t.includes('保存') || t.toLowerCase().includes('save') || key.includes('save');
+              const isDraft = t.includes('草稿') || key.includes('draft');
+
+              foundButtons.push({
+                text: t,
+                key: key,
+                tag: b.tagName,
+                disabled: b.disabled || b.getAttribute('disabled') !== null,
+                isSave: isSave,
+                isDraft: isDraft,
+                width: rct.width,
+                height: rct.height
+              });
+
+              if (isSave && !isDraft && !clicked) {
+                b.scrollIntoView({ block: 'center', behavior: 'instant' });
+                if (b.shadowRoot) {
+                  const inner = b.shadowRoot.querySelector('button');
+                  if (inner) inner.click();
+                }
+                b.click();
+                b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+                clicked = true;
+              }
+            }
+          }
+
+          return JSON.stringify({ clicked, foundButtons }, null, 2);
+        })()
+        """);
+
+        Console.WriteLine($"[DEBUG-SAVE] 底部按钮探测与保存结果:\n{saveDiagnostics}");
+        await Task.Delay(3000);
+        return saveDiagnostics.Contains("\"clicked\": true");
     }
 }

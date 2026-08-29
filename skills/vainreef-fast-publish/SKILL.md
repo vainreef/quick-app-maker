@@ -1,4 +1,4 @@
-﻿---
+---
 name: vainreef-fast-publish
 description: "Turn a natural-language Windows app idea into a working WinUI project, then build, run, package, and prepare it for Microsoft Store submission. Use the repository bootstrap for the Windows toolchain, use the versioned command notes for known Windows behavior, let the agent design and write each app from its requirements, and feed newly observed build problems back into the command notes."
 ---
@@ -277,7 +277,7 @@ Agent 根据当前 App 增加针对性测试。
 本模块为 Agent 向用户提供微软开发者中心（Partner Center）全流程协助的标准规范。支持**独立咨询会话（窗口 2）**与**发布时刻智能断点续接**：
 
 - **详细权威操作手册与架构白皮书**：严格查阅 [Edge-Store-全流程发布白皮书与实战手册](../../docs/partner-center/Edge-Store-全流程发布白皮书与实战手册.md)、[partner-center-guide.md](references/partner-center-guide.md) 及 `docs/partner-center/` 内的真实表单 DOM 快照。
-- **声明式 Edge 自动化入口 (V2)**：先读取 [Agent 运行契约](../../docs/partner-center/Agent-运行契约.md) 和 [可靠性重构](../../docs/partner-center/Edge-Store-可靠性重构.md)，再使用唯一正式入口 `toolchain/edge-store-cli/Invoke-EdgeStore.ps1`。`apps/Project/edge-store-cli-fast` 只是一轮旧诊断副本，不执行其中的 DLL。大 SPA 禁止 `DOM.getDocument(depth:-1,pierce:true)`；采用浅根、局部 `DOM.requestNode`、组件 Shadow Root 与 Accessibility Tree 语义化定位，严禁硬编码绝对坐标。
+- **声明式 Edge 自动化入口 (V2)**：先读取 [Agent 运行契约](../../docs/partner-center/Agent-运行契约.md) 和 [可靠性重构](../../docs/partner-center/Edge-Store-可靠性重构.md)，再使用唯一正式入口 `quick-app-maker/toolchain/edge-store-cli/Invoke-EdgeStore.ps1`。大 SPA 禁止 `DOM.getDocument(depth:-1,pierce:true)`；采用浅根、局部 `DOM.requestNode`、组件 Shadow Root 与 Accessibility Tree 语义化定位，严禁硬编码绝对坐标。
 - **独立咨询会话与自动化建项规范**：
   1. 当用户新开窗口提问“如何创建 Partner 账号 / 如何起名验重”时，Agent 专注提供咨询服务；
   2. 指引用户通过 Xbox 应用注册避开真人验证码异常，选择免费「个人开发者」并完成身份证照片上传；
@@ -289,17 +289,17 @@ Agent 根据当前 App 增加针对性测试。
     STORE 0: 离线静态质检 (Invoke-EdgeStore.ps1 -Action preflight -Manifest ...)
     STORE 1: 建立独立常驻 Edge 会话并在用户桌面确权 (Invoke-EdgeStore.ps1 -Action launch -KeepOpen)
     STORE 2: 动态 DOM 探测与基线快照 (Invoke-EdgeStore.ps1 -Action discover / inspect)
-    STORE 3~8: 逐表离散单步步进与阶段后强制 DOM 自检：
+    STORE 3~8: 逐表离散单步步进、提取现场卡片 DOM 并由 Agent 审查确权：
       - availability: Invoke-EdgeStore.ps1 -Action step -Phase availability -Manifest ... -Apply
       - properties:   Invoke-EdgeStore.ps1 -Action step -Phase properties -Manifest ... -Apply
       - ageRatings:   Invoke-EdgeStore.ps1 -Action step -Phase ageRatings -Manifest ... -Apply
       - packages:     Invoke-EdgeStore.ps1 -Action step -Phase packages -Manifest ... -Apply
-      - listing:      Invoke-EdgeStore.ps1 -Action step -Phase listing -Manifest ... -Apply
-      - options:      Invoke-EdgeStore.ps1 -Action step -Phase options -Manifest ... -Apply
-    STORE 9: 概览页 6 大模块冷加载全绿勾总检 (Invoke-EdgeStore.ps1 -Action verify)
-    STORE 10: 显式双确认提交审核 (Invoke-EdgeStore.ps1 -Action submit -ConfirmSubmit)
+      - listing:      Invoke-EdgeStore.ps1 -Action filllisting -Manifest ...
+      - options:      Invoke-EdgeStore.ps1 -Action filloptions -Manifest ...
+    STORE 9: 提审卡片 6 大模块现场完整 DOM 审查总检 (由 Agent 审查 #collapseSubmissionSetup 全绿)
+    STORE 10: 最终提审交付 (严禁 Agent 代点提交！自动填报已结束，由用户在浏览器中仔细审核后手动点击【提交进行认证】按钮)
     ```
-  - **断点续接与 DOM 自检闭环**：每个阶段执行后，必须触发专属的 DOM 探针比对 DOM 真实值与 DesiredState，并确认概览模块明确完成后，才记录 `PRODUCT_VERIFIED` 并进入下一步。
+  - **核心铁律：绝对禁止机器硬编码检查成功与报错**：CLI 驱动只负责执行表单填写并提取提审卡片（`#collapseSubmissionSetup` / `he-card`）的真实完整 DOM 返回；各个板块是否「完成」、是否可以进入下一阶段，**必须完全由 Agent 审查现场 DOM 证据来裁决**。
 
 ## 10. Package and publish for Microsoft Store
 
@@ -307,35 +307,29 @@ Agent 根据当前 App 增加针对性测试。
 
 1. **全新应用自动建项与身份回填**：
    ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -KeepOpen
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName <AppName> -Manifest .\<app>\build\edge-store.json
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -KeepOpen
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName <AppName> -Manifest .\<app>\build\edge-store.json
    ```
-2. **构建商店发布包（含 Assets 图标资源质检）**：
+2. **构建商店发布包（显式声明语言与全图标质检）**：
+   - 确保 `Package.appxmanifest` 包含 `<Resources><Resource Language="zh-CN"/></Resources>`，避免默认回退为 `en-US`；
+   - 确保 `<Properties><DisplayName>` 与后台预留的完整名称 100% 一致；
+   - 编译生成官方自包含 MSIX 包：
    ```powershell
-   dotnet publish -c Release -r win-x64 --self-contained true -o ./publish
-   # 确保 Assets 图标完整拷贝，杜绝 Partner Center 接受验证时报图像缺失错误
-   if (Test-Path ./Assets) { Copy-Item -Recurse -Force ./Assets ./publish/ }
-   New-Item -ItemType Directory -Force ./store-package | Out-Null
-   winapp package ./publish --executable <AppName>.exe --publisher "<Publisher>" --generate-cert --output ./store-package/<Identity>_<Version>_x64.msix
+   .\dotnet\dotnet.exe publish <app>\<App>.csproj -c Release -r win-x64 -p:GenerateAppxPackageOnBuild=true -p:AppxPackageDir="<app>\store-package\" -p:AppxBundle=Never /p:UseSharedCompilation=false
    ```
-3. **清理权限声明与多设备依赖**：
-   - 移除 manifest 中模板自带的未用特权（如 `systemAIModels`）；
-   - **删除 `Windows.Universal` 依赖，确保仅声明 `Windows.Desktop`**（杜绝 Mobile/Xbox 设备全列 rank 1 报错）。
-4. **多阶段离散步进与 DOM 深度自检（严禁一冲到底）**：
-   - 先执行 Store 0 静态预检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest <edge-store.json>`
-   - 逐表单步执行并自检 DOM 状态：
-     ```powershell
-     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase availability -Manifest <edge-store.json> -Apply
-     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase properties -Manifest <edge-store.json> -Apply
-     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase ageRatings -Manifest <edge-store.json> -Apply
-     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase packages -Manifest <edge-store.json> -Apply
-     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase listing -Manifest <edge-store.json> -Apply
-     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase options -Manifest <edge-store.json> -Apply
-     ```
-   - 概览页总检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action verify -Manifest <edge-store.json>`
-5. **最终提交**：
-   - 概览页六项均完成后，只有显式 `-Action submit -ConfirmSubmit` 才点击「提交到应用商店」；
-   - 记录 CLI 退出码、阶段 checkpoint、页面标题和最终 URL。
+3. **多阶段离散步进与 Agent DOM 审查确权**：
+   - STORE 2: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action discover -Manifest <edge-store.json>`
+   - STORE 3: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase availability -Manifest <edge-store.json> -Apply`
+   - STORE 4: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase properties -Manifest <edge-store.json> -Apply`
+   - STORE 5: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase ageRatings -Manifest <edge-store.json> -Apply`
+   - STORE 6: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase packages -Manifest <edge-store.json> -Apply`
+   - STORE 7: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action filllisting -Manifest <edge-store.json>`
+   - STORE 8: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action filloptions -Manifest <edge-store.json>`
+4. **最终交付与用户手动提交（绝对红线）**：
+   - 审查提审卡片现场 DOM 确认 6 项全部处于「完成」状态；
+   - **绝对禁止 Agent 或自动化脚本代用户点击【提交进行认证】**！最后提交必须且只能由用户自己在浏览器中仔细复核 6 大板块后亲自点击；
+   - Agent 必须明确向用户汇报：“自动填报已结束，请仔细审核后，点击 提交进行认证 按钮。”
+   - 记录阶段 checkpoint 与最终控制台 URL。
 
 ## 11. Technical run report
 

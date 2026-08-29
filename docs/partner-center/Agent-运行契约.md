@@ -33,7 +33,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
 | **STORE 7** | **Store 一览 (Listing)** | **分步执行**：<br>1. -Action cleanlanguages -Manifest ...<br>2. -Action filllisting -Manifest ... | **阶段1**：严格正则 languageid=5 清理 85 门外语并保存网格；<br>**阶段2**：自动展开折叠面板，自愈关键词至 $\le 7$ 个，CDP派发上传事件上传截图/图标并保存 |
 | **STORE 8** | **提交选项 (Options)** | **分步执行**：<br>1. -Action inspectoptions -Manifest ...<br>2. 经用户批准后执行 -Action filloptions -Manifest ... | **阶段1**：等待受限功能 API 返回，提取 DOM 向用户汇报；<br>**阶段2**：选择发布模式 (Manual)，填报 unFullTrust 桌面进程理由并保存 |
 | **STORE 9** | **概览页全绿校验** | -Action verify -Manifest .\<app>\build\edge-store.json | 冷加载 Overview 页面，断言 6 大模块 100% 全部处于「完成」状态 |
-| **STORE 10** | **最终提交认证** | -Action submit -ConfirmSubmit -Manifest .\<app>\build\edge-store.json | 向用户展示全绿总览，经用户明确同意后触发最终提审 |
+| **STORE 10** | **最终提审交付 (用户手动提交)** | 自动填报收尾与证据汇报 | 向用户展示全绿总览与 6 大模块完成证据。**绝对禁止 Agent 代点提交**，由用户在浏览器仔细审核后手动点击【提交进行认证】按钮 |
 
 ---
 
@@ -87,6 +87,32 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
 - **即时秒级中断**：一旦发现微软后台报错（如“未保留的显示名称”或“包验证错误”），必须立即提取具体错误文本，自动点击 `Delete` 清理异常包，并秒级抛出异常中断，绝不盲等 12 分钟超时；
 - **上传前环境自愈**：每次上传前，自动扫描页面是否存在残留的 Faulty Package 并自动清理。
 
+### 10. 严禁在 PowerShell 5.1 中使用 Add-Type 混合 .NET 10 代码铁律 (No Cross-Runtime Add-Type Invariant)
+- Windows PowerShell 5.1 运行在传统的 .NET Framework 4.8 运行时，缺少现代 .NET 10 的核心程序集（如 `System.Text.Json` 等）；
+- **绝对禁止**：严禁在 PowerShell 中使用 `Add-Type` 拼凑或加载基于 .NET 10 编译的 DLL，这会导致 `Metadata file 'System.Text.Json.dll' could not be found` 或类型丢失错误；
+- **唯一正确调用方式**：所有 CLI 工具调用、状态探测、DOM Dump 必须统一通过项目自带的 `Invoke-EdgeStore.ps1`（底层由绿色免安装 .NET 10 SDK 驱动）执行：
+  ```powershell
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action <action> -Manifest .\<app>\build\edge-store.json
+  ```
+
+### 11. 绝对禁止机器硬编码检查成功与报错铁律 (Agent-Driven DOM Verification Invariant)
+- **绝对禁止机器判死**：严禁 CLI 驱动在执行各板块保存后，通过硬编码的 `AssertComplete` 盲目抛出异常阻断流程；
+- **完整 DOM 结构化提取**：驱动在完成表单提交或导航到概览页后，必须定位提审卡片（`#collapseSubmissionSetup`, `.accordion-body`, `he-card`），提取包含所有模块 `app-module-status`、`he-badge`、`aria-label` 的真实完整 DOM 并输出；
+- **由 Agent 确权与决策**：各个模块是否完成、是否存在警告、是否可以进入下一阶段，**必须完全由 Agent 人工智能通过真实 DOM 证据审查来最终裁决**。
+
+### 12. MSIX 资源语言声明与 Store Listing 动态路由铁律 (MSIX Language & Listing Dynamic Routing Invariant)
+- **MSIX 资源语言主声明**：在 `Package.appxmanifest` 中必须显式配置目标语言（如 `<Resource Language="zh-CN"/>`），避免回退为默认 `en-US` 导致商店后台语言错位；
+- **Store Listing 动态进入**：在进入 Store 一览填报时，严禁写死 `languageid=5` 静态 URL，必须通过 DOM 选择器（`[slot^="Name-"] a` 或 `a[href*="/listings?languageid="]`）动态点击当前表格中真实存在的语言槽位进入。
+
+### 13. 提审选项受限功能理由输入与 Shadow DOM 8 秒持久化铁律 (Options Shadow DOM Save & 8s Persistence Invariant)
+- **受限功能理由填报**：针对 `runFullTrust` 等受限权限，必须递归穿透 Shadow DOM 定位文本域，使用原生属性描述符 Setter 写入理由并派发 `input`/`change` 事件；
+- **Shadow DOM 穿透保存与 8 秒等待**：底部【保存】按钮必须穿透 `he-button` 的 Shadow DOM 触发原生点击，且点击后必须显式等待 8 秒完成后台持久化，方可离开页面。
+
+### 14. 最终提审必须由用户手动点击铁律 (User-Driven Final Submission Invariant)
+- **绝对禁止自动化代点提交**：全流程 6 大表单自动填报完成后，概览页达到全绿「完成」状态即为工具链自动化执行边界；
+- **用户亲自审核确权**：最后一步提交审核（点击【提交进行认证】按钮）属于最终法律与发布确权，必须且只能由用户自己在浏览器中仔细审核确认后手动点击提交，严禁 Agent 或自动化脚本代点提交；
+- **明确结束语规范**：Agent 必须明确向用户汇报：“自动填报已结束，请仔细审核后，点击 提交进行认证 按钮。”
+
 ---
 
 ## 四、 退出状态与结构化证据输出
@@ -96,3 +122,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolch
 2. 页面 URL 与 DOM 探针状态；
 3. 6 大模块现场真实完成情况；
 4. 退出码（0 = 成功，非 0 = 异常并附带报错根因）。
+

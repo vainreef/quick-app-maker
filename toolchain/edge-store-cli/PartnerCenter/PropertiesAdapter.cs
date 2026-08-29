@@ -51,22 +51,27 @@ public class PropertiesAdapter
             if (opt.includes('使用个人信息') || opt.includes('是')) return 'Yes';
             return v;
           }
-          const r = document.querySelector('input[name="privacyPolicySelection"]:checked');
-          if (r) return r.id === 'privacyPolicyURL' ? 'Yes' : 'No';
-          return '';
+          const r = document.querySelector('input[name="privacyPolicySelection"]:checked, input[type="radio"]:checked');
+          if (r) {
+            const id = (r.id || '').toLowerCase();
+            const val = (r.value || '').toLowerCase();
+            if (id.includes('url') || id.includes('text') || val.includes('yes') || val.includes('text') || val.includes('url')) return 'Yes';
+            if (id.includes('none') || id.includes('no') || val.includes('no')) return 'No';
+          }
+          return 'Yes';
         })()
         """) ?? "";
 
         obs.PrivacyPolicyText = await _client.EvaluateAsync<string>("""
         (() => {
           const e = document.querySelector('support-info textarea, textarea[aria-label*="隐私" i], textarea[aria-label*="Privacy" i], textarea');
-          return e ? e.value : '';
+          return e ? (e.value || '').trim() : '';
         })()
         """) ?? "";
         obs.PrivacyPolicyUrl = await _client.EvaluateAsync<string>("""
         (() => {
           const e = document.querySelector('input[type="url"], #privacyPolicyUrl, input[aria-label*="URL" i], input[placeholder*="URL" i]');
-          return e ? e.value : '';
+          return e ? (e.value || '').trim() : '';
         })()
         """) ?? "";
         obs.HasPrivacyTextChoice = await _client.EvaluateAsync<bool>("document.querySelector('#privacyPolicyText') !== null");
@@ -159,19 +164,14 @@ public class PropertiesAdapter
         {
             await _client.EvaluateAsync<object>("""
             (() => {
-                const r = Array.from(document.querySelectorAll('input[type="radio"], input[name*="privacy" i], label')).find(e => {
-                    return (e.innerText || e.textContent || '').includes('提供隐私策略文本') || e.id === 'privacyPolicyText' || (e.getAttribute('value')||'').toLowerCase().includes('text');
-                });
-                if (r) {
-                    if (r.tagName === 'LABEL') {
-                        const inp = r.querySelector('input') || document.getElementById(r.htmlFor);
-                        if (inp) { inp.checked = true; inp.click(); inp.dispatchEvent(new Event('change', {bubbles: true})); }
-                        else { r.click(); }
-                    } else {
-                        r.checked = true;
-                        r.click();
-                        r.dispatchEvent(new Event('change', {bubbles: true}));
-                    }
+                const textRadio = document.querySelector('#privacyPolicyText, input[type="radio"][value*="text" i], input[type="radio"][id*="Text" i]');
+                if (textRadio) {
+                    textRadio.checked = true;
+                    textRadio.click();
+                    textRadio.dispatchEvent(new Event('change', {bubbles: true}));
+                } else {
+                    const r = Array.from(document.querySelectorAll('label, span, input[type="radio"]')).find(e => (e.innerText || e.textContent || '').includes('提供隐私策略文本'));
+                    if (r) r.click();
                 }
                 return null;
             })()
@@ -182,11 +182,12 @@ public class PropertiesAdapter
                 const ta = document.querySelector('textarea[name*="privacy" i], textarea[id*="privacy" i], support-info textarea, textarea[aria-label*="隐私" i], textarea[aria-label*="Privacy" i], textarea');
                 if (ta) {
                     ta.focus();
+                    const val = {{JsonSerializer.Serialize(desired.Properties.PrivacyPolicyText)}};
                     const prop = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
                     if (prop && prop.set) {
-                        prop.set.call(ta, {{JsonSerializer.Serialize(desired.Properties.PrivacyPolicyText)}});
+                        prop.set.call(ta, val);
                     } else {
-                        ta.value = {{JsonSerializer.Serialize(desired.Properties.PrivacyPolicyText)}};
+                        ta.value = val;
                     }
                     ta.dispatchEvent(new Event('input', {bubbles: true}));
                     ta.dispatchEvent(new Event('change', {bubbles: true}));
@@ -225,20 +226,42 @@ public class PropertiesAdapter
         await _checkbox.SetCheckedAsync("usesGenAI-checkbox", false, "usesGenAI declaration");
 
         // Save
-        await _native.ClickStrictAsync([
-            "input[type=\"button\"][value=\"保存\"]",
-            "input[type=\"button\"][value=\"Save\"]",
-            "input.btn-primary[value=\"保存\"]",
-            "input.btn-primary[value=\"Save\"]",
-            "button[name=\"save_button\"]",
-            "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
-            "button[data-l10n-key=\"appsubmission_savebutton\"]",
-            "button[uitestid=\"saveButtonProperties\"]",
-            "input#saveButtonProperties",
-            "button#saveButtonProperties"
-        ], "Save properties");
+        bool clicked = await _client.EvaluateAsync<bool>("""
+        (() => {
+            const allRoots=[document];
+            for(let i=0;i<allRoots.length;i++){ try{ for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); }catch(_){} }
+            for(const r of allRoots){
+                for(const b of r.querySelectorAll('button, input[type="button"], input[type="submit"], he-button, a[role="button"], input.btn-primary')) {
+                    const txt = (b.innerText || b.value || b.getAttribute('aria-label') || '').trim();
+                    if (/^(保存|Save|保存草稿|Save draft)$/i.test(txt)) {
+                        b.scrollIntoView({ block: 'center', inline: 'center' });
+                        b.click();
+                        b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+                        return true;
+                    }
+                }
+            }
+            return false;
+        })()
+        """);
 
-        await Task.Delay(2000);
+        if (!clicked)
+        {
+            await _native.ClickStrictAsync([
+                "input[type=\"button\"][value=\"保存\"]",
+                "input[type=\"button\"][value=\"Save\"]",
+                "input.btn-primary[value=\"保存\"]",
+                "input.btn-primary[value=\"Save\"]",
+                "button[name=\"save_button\"]",
+                "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
+                "button[data-l10n-key=\"appsubmission_savebutton\"]",
+                "button[uitestid=\"saveButtonProperties\"]",
+                "input#saveButtonProperties",
+                "button#saveButtonProperties"
+            ], "Save properties");
+        }
+
+        await Task.Delay(8000);
         await _native.AssertNoVisibleErrorsAsync();
     }
 

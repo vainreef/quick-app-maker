@@ -16,22 +16,47 @@ public class SubmissionDiscovery
         _native = native;
     }
 
-    public async Task<DiscoveryResult> DiscoverAsync(string baseUrl, string productId, bool autoCreateIfMissing = true)
+    public async Task<DiscoveryResult> DiscoverAsync(string baseUrl, string productId, string knownSubmissionId = "", bool autoCreateIfMissing = true)
     {
+        string currentUrl = await _client.EvaluateAsync<string>("location.href") ?? "";
+        string submissionId = knownSubmissionId;
+
+        // 1. 如果当前页面已经在 submission 路由下，直接提取 submissionId
+        var m = System.Text.RegularExpressions.Regex.Match(currentUrl, @"/submissions/(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (m.Success)
+        {
+            submissionId = m.Groups[1].Value;
+        }
+
+        // 2. 如果已知 submissionId，直接加载确定的 6 大表单直达 URL
+        if (!string.IsNullOrEmpty(submissionId))
+        {
+            string b = baseUrl.TrimEnd('/'), root = $"{b}/{productId}/submissions/{submissionId}";
+            var known = new DiscoveryResult
+            {
+                SubmissionId = submissionId,
+                Hrefs = new Dictionary<string, string>
+                {
+                    ["availability"] = root + "/availability",
+                    ["properties"] = root + "/properties",
+                    ["ageRatings"] = root + "/ageratings",
+                    ["packages"] = root + "/packages",
+                    ["listing"] = root + "/managelanguages?producttype=app",
+                    ["options"] = root + "/options"
+                }
+            };
+            Console.WriteLine($"[PASS] 已加载已知提审 SubmissionId: {submissionId}");
+            return known;
+        }
+
+        // 3. 只有在完全没有 submissionId 时，才访问产品总概览去寻找或创建
         string overviewUrl = $"{baseUrl.TrimEnd('/')}/{productId}/overview";
-        Console.WriteLine($"[NAV] Navigating to Product Overview: {overviewUrl}");
+        Console.WriteLine($"[NAV] 未检测到活跃 SubmissionId，导航至产品概览: {overviewUrl}");
         await _waiter.NavigateAsync(overviewUrl, "Product Overview for Discovery");
 
-        await _waiter.RequireAsync(async () =>
-        {
-            var len = await _client.EvaluateAsync<int>("document.body ? document.body.innerText.length : 0");
-            return len > 100;
-        }, TimeSpan.FromSeconds(30), "Wait for overview SPA content");
-
-        // Wait up to 15 seconds for either the 6 module links to mount, or the '开始提交' button to appear
         DiscoveryResult current = new();
         bool hasStartBtn = false;
-        var deadline = DateTime.UtcNow.AddSeconds(15);
+        var deadline = DateTime.UtcNow.AddSeconds(20);
 
         while (DateTime.UtcNow < deadline)
         {

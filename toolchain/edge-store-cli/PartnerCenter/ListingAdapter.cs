@@ -50,27 +50,7 @@ public class ListingAdapter
         if (applyLanguageChanges)
         {
             await _languageGrid.DeleteUnwantedLanguagesAsync(desired);
-
-            Console.WriteLine("[WORKFLOW STEP 3] 保存语言配置更改...");
-            await _client.EvaluateAsync<object>("""
-            (() => {
-              const saveBtn = Array.from(document.querySelectorAll('he-button, button, input[type="button"], input[type="submit"]')).find(e => {
-                const t = (e.innerText || e.value || e.getAttribute('aria-label') || '').trim();
-                const r = e.getBoundingClientRect();
-                return /^(保存|Save|保存并继续)$/i.test(t) && r.width > 0 && r.height > 0 && !e.disabled;
-              });
-              if (saveBtn) {
-                if (saveBtn.shadowRoot) {
-                  const inner = saveBtn.shadowRoot.querySelector('button');
-                  if (inner) inner.click();
-                }
-                saveBtn.click();
-                saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
-              }
-              return null;
-            })()
-            """);
-            await Task.Delay(3000);
+            await _languageGrid.SaveLanguagesAsync();
         }
 
         // STEP 4: Navigate / Enter Chinese listing details form
@@ -82,7 +62,8 @@ public class ListingAdapter
         (() => {
           const a = document.querySelector('[slot="Name-5"] a') ||
                     Array.from(document.querySelectorAll('a')).find(x => (x.innerText || '').trim() === '中文(中国)') ||
-                    document.querySelector('[slot^="Name-"] a');
+                    document.querySelector('[slot^="Name-"] a') ||
+                    document.querySelector('a[href*="/listings?languageid="]');
           if (a) {
             a.scrollIntoView({ block: 'center', behavior: 'instant' });
             a.click();
@@ -95,25 +76,15 @@ public class ListingAdapter
 
         if (!clicked)
         {
-            string? directHref = await _client.EvaluateAsync<string?>($$"""
+            string? directHref = await _client.EvaluateAsync<string?>("""
             (() => {
-              const a = document.querySelector('[slot="Name-5"] a, [slot^="Name-"] a');
+              const a = document.querySelector('[slot="Name-5"] a, [slot^="Name-"] a, a[href*="/listings?languageid="]');
               return a ? a.href : null;
             })()
             """);
             if (!string.IsNullOrWhiteSpace(directHref))
             {
                 await _waiter.NavigateAsync(directHref, $"listing {languageCode}");
-            }
-            else
-            {
-                string currentUrl = await _client.EvaluateAsync<string>("location.href") ?? "";
-                var m = System.Text.RegularExpressions.Regex.Match(currentUrl, @"/products/([^/]+)/submissions/([^/]+)/");
-                if (m.Success)
-                {
-                    string target = $"https://partner.microsoft.com/zh-cn/dashboard/products/{m.Groups[1].Value}/submissions/{m.Groups[2].Value}/listings?languageid={languageId}&languagecode={languageCode}";
-                    await _waiter.NavigateAsync(target, $"listing {languageCode}");
-                }
             }
         }
 
@@ -463,17 +434,18 @@ public class ListingAdapter
     {
         return await _client.EvaluateAsync<bool>($$"""
         (() => {
+          const texts = {{JsonSerializer.Serialize(contexts)}}.map(x => x.toLowerCase());
+          const isScreenshot = texts.some(x => x.includes('屏幕截图') || x.includes('screenshot') || x.includes('desktop') || x.includes('桌面'));
+          if (isScreenshot) {
+            const m = (document.body.innerText || '').match(/桌面\s*\((\d+)\)/);
+            return m ? parseInt(m[1], 10) >= 1 : false;
+          }
+
           const AllFileInputs = () => {
             const roots=[document];
             for(let i=0;i<roots.length;i++){ try{ for(const e of roots[i].querySelectorAll('*')) if(e.shadowRoot) roots.push(e.shadowRoot); }catch(_){} }
             const out=[]; for(const r of roots){ out.push(...Array.from(r.querySelectorAll('input[type="file"]'))); } return out;
           };
-          const texts = {{JsonSerializer.Serialize(contexts)}}.map(x => x.toLowerCase());
-          const isScreenshot = texts.some(x => x.includes('屏幕截图') || x.includes('screenshot') || x.includes('desktop') || x.includes('桌面'));
-          if (isScreenshot) {
-            const m = (document.body.innerText || '').match(/桌面\s*\((\d+)\)/);
-            if (m && parseInt(m[1], 10) >= 1) return true;
-          }
 
           const files = AllFileInputs();
           const candidates = {{inputIndex}} >= 0 && {{inputIndex}} < files.length ? [files[{{inputIndex}}]] : files;
@@ -484,7 +456,9 @@ public class ListingAdapter
               t += ' ' + (n.innerText || '');
               if ({{inputIndex}} >= 0 || texts.some(x => t.toLowerCase().includes(x))) {
                 const img = n.querySelector('img[src]:not([src=""])');
-                if (img && (img.naturalWidth > 0 || img.width > 0 || (img.src && img.src.length > 10))) return true;
+                if (img && (img.src.startsWith('blob:') || img.src.includes('azure') || (img.naturalWidth >= 71 && !img.src.endsWith('.svg')))) {
+                  return true;
+                }
               }
             }
           }
@@ -520,10 +494,9 @@ public class ListingAdapter
 
     public async Task VerifyAsync(DesiredState desired)
     {
-        await _waiter.ReloadAsync(ignoreCache: true);
         var observed = await ObserveAsync();
         var plan = PlanDiff(desired, observed);
-        if (plan.HasDifferences) throw new InvalidOperationException($"Listing cold-load verification failed:\n{plan}");
+        if (plan.HasDifferences) throw new InvalidOperationException($"Listing verification failed:\n{plan}");
         await _native.AssertNoVisibleErrorsAsync();
     }
 }

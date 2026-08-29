@@ -90,10 +90,13 @@ public class Waiter
         Ops.Nav(url + (label.Length > 0 ? "  (" + label + ")" : ""));
         await _client.SendAsync("Page.navigate", new { url });
         string pathOnly = url.Split('?')[0];
+        string routePath = System.Text.RegularExpressions.Regex.Replace(pathOnly, @"https?://[^/]+(/[^/]+)?/dashboard", "/dashboard");
         await RequireAsync(async () =>
         {
             string current = await _client.EvaluateAsync<string>("location.href") ?? "";
+            string currentRoute = System.Text.RegularExpressions.Regex.Replace(current, @"https?://[^/]+(/[^/]+)?/dashboard", "/dashboard");
             return current.Contains(pathOnly, StringComparison.OrdinalIgnoreCase) ||
+                   currentRoute.Contains(routePath, StringComparison.OrdinalIgnoreCase) ||
                    (allowOverviewRedirect && current.Contains("/overview", StringComparison.OrdinalIgnoreCase));
         }, TimeSpan.FromSeconds(45), $"Navigate to {label} ({pathOnly})");
         await Task.Delay(500); // Give JS microtasks a brief breath

@@ -100,6 +100,19 @@ public sealed class PackagesAdapter
             if (string.IsNullOrWhiteSpace(fileInputObj)) throw new InvalidOperationException("No live package file input is present.");
             Console.WriteLine($"[INFO] Uploading MSIX package [{desired.Assets.Msix}] via CDP file input...");
             await _dom.SetFileInputFilesByObjectIdAsync(fileInputObj, [desired.Assets.Msix]);
+            await _client.EvaluateAsync<object>("""
+            (() => {
+                const roots=[document];
+                for(let i=0;i<roots.length;i++){ try{ for(const e of roots[i].querySelectorAll('*')) if(e.shadowRoot) roots.push(e.shadowRoot); }catch(_){} }
+                for(const r of roots){
+                    for(const inp of r.querySelectorAll('input[type="file"]')) {
+                        inp.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                        inp.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                    }
+                }
+                return null;
+            })()
+            """);
         }
 
         Console.WriteLine($"[INFO] Waiting for package {fileName} to be verified by Partner Center (with realtime error trap)...");
@@ -157,6 +170,7 @@ public sealed class PackagesAdapter
             "input#saveButtonPackages",
             "button#saveButtonPackages"
         ], "Save packages");
+        await Task.Delay(8000);
         await _native.AssertNoVisibleErrorsAsync();
     }
 
@@ -173,8 +187,11 @@ public sealed class PackagesAdapter
     {
         await _client.EvaluateAsync<bool>("""
         (() => {
-            const btns = Array.from(document.querySelectorAll('a.upload-action, a[data-l10n-key*="delete" i], button.upload-action, a'))
-                .filter(e => /Delete|删除|Remove/.test(e.innerText || e.getAttribute('data-l10n-key') || ''));
+            const btns = Array.from(document.querySelectorAll('a.upload-action[data-l10n-key="app_package_action_delete"], a.upload-action, .packages-table a.delete-button'))
+                .filter(e => {
+                    const txt = (e.innerText || e.getAttribute('data-l10n-key') || '').toLowerCase();
+                    return (txt.includes('delete') || txt.includes('删除')) && !txt.includes('submission') && !txt.includes('提交');
+                });
             for (const b of btns) {
                 b.click();
                 b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));

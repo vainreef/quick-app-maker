@@ -152,20 +152,35 @@ public static class FillOptionsCommand
 
         // 3. Click Save
         Console.WriteLine("[INFO] 点击底部【保存】按钮...");
-        await client.EvaluateAsync<bool>("""
+        bool saveClicked = await client.EvaluateAsync<bool>("""
         (() => {
-          const save = document.querySelector('button[data-l10n-key="optionsSave"], button[dcl10n="optionsSave"], .btn-primary');
-          if (save) {
-            save.scrollIntoView({ block: 'center', behavior: 'instant' });
-            save.click();
-            save.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
-            return true;
+          const allRoots = [document];
+          for (let i = 0; i < allRoots.length; i++) {
+            try { for (const e of allRoots[i].querySelectorAll('*')) if (e.shadowRoot) allRoots.push(e.shadowRoot); } catch (_) {}
+          }
+          for (const r of allRoots) {
+            const btns = Array.from(r.querySelectorAll('button, he-button, input[type="button"], input[type="submit"]'));
+            const save = btns.find(b => {
+              const t = (b.innerText || b.value || b.getAttribute('data-l10n-key') || '').trim().toLowerCase();
+              return t.includes('保存') || t.includes('save') || t.includes('optionssave');
+            });
+            if (save) {
+              save.scrollIntoView({ block: 'center', behavior: 'instant' });
+              if (save.shadowRoot) {
+                const inner = save.shadowRoot.querySelector('button');
+                if (inner) inner.click();
+              }
+              save.click();
+              save.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+              return true;
+            }
           }
           return false;
         })()
         """);
 
-        await Task.Delay(3000);
+        Console.WriteLine($"[INFO] 提交选项保存按钮点击结果: {saveClicked}，等待后台数据持久化...");
+        await Task.Delay(8000);
 
         // 4. Return to Overview and verify
         string overviewUrl = $"{baseUrl}/{desired.ProductId}/overview";

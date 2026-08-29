@@ -177,7 +177,7 @@ public class Program
                     return await DomDumpCommand.ExecuteAsync(stateRoot, baseDir);
 
                 case "probelanguages":
-                    return await ProbeLanguagesCommand.ExecuteAsync(stateRoot);
+                    return await ProbeLanguagesCommand.ExecuteAsync(stateRoot, desired, checkpoint);
 
                 case "cleanlanguages":
                     return await LanguageGridCleanerCommand.ExecuteAsync(desired, stateRoot);
@@ -202,6 +202,9 @@ public class Program
 
                 case "verify":
                     return await orchestrator.VerifyAsync();
+
+                case "submit":
+                    return await SubmitCommand.ExecuteAsync(desired, stateRoot, confirmSubmit);
 
                 case "reserve":
                 case "identity":

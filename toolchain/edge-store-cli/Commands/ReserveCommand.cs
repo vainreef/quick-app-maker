@@ -33,8 +33,8 @@ public static class ReserveCommand
         ProductIdentityResult result;
         if (isReserve)
         {
-            Console.WriteLine($"[INFO] Creating and reserving new product [{effectiveAppName}] in Partner Center...");
-            result = await prodManager.CreateAndReserveProductAsync(desired.Site.BaseUrl, effectiveAppName);
+            Console.WriteLine($"[INFO] 正在启动用户交互式名称预留监听流程...");
+            result = await prodManager.UserAssistedReserveProductAsync(desired.Site.BaseUrl, effectiveAppName);
         }
         else
         {

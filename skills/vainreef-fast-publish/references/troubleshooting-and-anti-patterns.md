@@ -109,3 +109,48 @@
   1. **实时负反馈拦截器**：每 500ms 扫描 `.alert-error`、`.alert-danger`、`.faulty-package-message`，一旦微软返回校验失败，秒级捕获具体错误并抛出异常中断；
   2. **自动清理异常包（Auto-clean Faulty Packages）**：在重新上传前，自动扫描并点击页面上的 `a.upload-action[data-l10n-key="app_package_action_delete"]` / `Delete` 按钮，清理掉所有残留的损坏包，恢复纯净上传环境。
 
+---
+
+## 9. 绝对禁止机器硬编码检查成功与报错 (Agent-Driven DOM Verification Invariant)
+
+- **错误现象**：网页上某模块（如属性）实际上已经成功保存并渲染出绿色的 `<he-badge class="text-green">完成</he-badge>`，但 C# 驱动在 `AssertComplete` 中全局匹配链接时误命中了左侧导航栏的菜单链接，导致驱动抛出 `Overview verification rejected phase [properties]: module status is Incomplete` 异常中断流程。
+- **根本原因**：机器硬编码的 CSS 选择器在复杂 Angular SPA 中极易受到侧边栏、面包屑或隐藏元素的污染，不能代替 Agent 对现场真实 DOM 的综合审查。
+- **正确规范与自愈**：
+  1. **驱动移除硬编码中断**：CLI 驱动在各板块保存后，只负责提取提审卡片（`#collapseSubmissionSetup` / `.accordion-body` / `he-card`）的真实完整 DOM 并输出，绝不在驱动层私自抛错中断；
+  2. **Agent 审查确权**：填报是否成功、各模块是否达到「完成」状态，**必须完全由 Agent 通过现场提取的完整 DOM 结构化证据来最终裁决**。
+
+---
+
+## 10. 提审草稿概览 URL 重定向与死循环探测排障 (Submission URL Router & Discovery Loop)
+
+- **错误现象**：在已有活跃提交草稿的情况下，脚本导航到 `.../submissions/{id}/overview` 会被微软后台前端路由自动重定向为 `.../overview`，导致旧版脚本超时误判为“无活跃提交”而跳转到总概览寻找不存在的【开始提交】按钮，最终抛出 `Failed to discover submission links or create new submission draft` 异常。
+- **根本原因**：微软 Partner Center 对当前唯一草稿的 URL 进行了重写；
+- **正确规范**：一旦已知 `submissionId`（存在于 `checkpoint.json` 或 `edge-store.json` 中），直接使用确定的 6 大模块直达 URL（`${root}/availability`、`${root}/properties` 等）进行导航，杜绝任何多余的概览盲等和备用草稿创建探测。
+
+---
+
+## 11. MSIX 资源语言声明与 Store Listing 语言联动机制 (MSIX Resource Languages & Listing Languages)
+
+- **错误现象**：在 `managelanguages` 页面中只显示 `英语(美国)`，没有 `中文(中国)`，导致脚本硬编码跳转 `languageid=5&languagecode=zh-cn` 时出现空白或等待超时。
+- **根本原因**：`Package.appxmanifest` 中配置的是 `<Resource Language="x-generate"/>`，缺少独立资源字典目录时默认被打包为单语言 `en-US`；微软后台扫描后仅创建了默认的 `英语(美国)` 槽位。
+- **正确规范**：
+  1. 在 `Package.appxmanifest` 中显式声明 `<Resource Language="zh-CN"/>`，确保打包出的 PRI 资源主语言与目标语言一致；
+  2. `ListingAdapter` 详情页跳转严禁写死 `languageid=5`，必须动态读取当前表格中实际存在的语言槽位行（`[slot^="Name-"] a` 或 `a[href*="/listings?languageid="]`）进行点击进入。
+
+---
+
+## 12. .NET Host 进程文件句柄占用与干净编译 (DLL Locking & Process Cleanliness)
+
+- **错误现象**：修改 C# 代码后执行 `dotnet build` 提示 `error MSB3027: Could not copy obj to bin... The file is locked by: .NET Host`。
+- **根本原因**：后台运行的 CLI 进程尚未完全释放程序集句柄。
+- **正确规范**：在重新编译前，必须使用 `Stop-Process -Name "EdgeStore.Cli", "dotnet"` 确保进程完全退出，并使用 `/p:UseSharedCompilation=false` 进行构建。
+
+---
+
+## 13. 提审选项受限功能理由输入与全阴影 DOM 穿透保存 (Options Shadow DOM Save & 8s Wait)
+
+- **错误现象**：在 `options` 页面填报 `runFullTrust` 理由后，保存按钮未被点击或跳转过快导致后台数据未持久化。
+- **根本原因**：Partner Center 底部的【保存】按钮封装在 `he-button` 的 Shadow DOM 内部，且异步保存需要时间完成服务端落库。
+- **正确规范**：必须通过 Shadow DOM 穿透递归查找按钮并触发内部原生 button 点击，并在保存后显式等待 8 秒再跳转离开。
+
+

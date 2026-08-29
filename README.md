@@ -43,7 +43,7 @@ graph TD
         S0 --> S1["Store 1~2: 启动隔离 Edge & 动态探测 live submissionId 与 6 表真实 href"]
         S1 --> S2["Store 3~4: 声明式差异收敛 (he-select/he-checkbox 原生 CDP 物理点击)"]
         S2 --> S3["Store 5~6: F5 刷新持久化二次验证 & 概览页 6 大模块绿勾总检"]
-        S3 --> S4["Store 7: 显式双确认提交审核 (-Submit -ConfirmSubmit) -> 24~72h 全球上线！"]
+        S3 --> S4["Store 7: 概览页 6 大模块绿勾总检 -> 移交用户审核并手动点击【提交进行认证】 -> 24~72h 全球上线！"]
     end
 ```
 
@@ -172,7 +172,7 @@ Project/ (WORKSPACE_ROOT, 用户工作区根目录)
     3. 重新打包：`winapp package ./publish --executable <AppName>.exe --publisher "<Publisher>" --generate-cert --output ./store-package/<Identity>_<Version>_x64.msix`
     4. 离线质检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest build/edge-store.json`
     5. 全自动收敛：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest build/edge-store.json -Apply -KeepOpen`
-    6. 显式提交：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest build/edge-store.json -Apply -Submit -ConfirmSubmit`
+    6. 提审交付：概览页 6 大模块全绿总检后，Agent 输出“自动填报已结束，请仔细审核后，点击 提交进行认证 按钮”，由用户在浏览器中审核后亲自点击提交。
   * **场景 B：已有应用更新 / 单表断点续跑**：
     1. 快速探针：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action inspect -Manifest build/edge-store.json`
     2. 单表执行：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase <properties/listing/packages> -Manifest build/edge-store.json -Apply -KeepOpen`

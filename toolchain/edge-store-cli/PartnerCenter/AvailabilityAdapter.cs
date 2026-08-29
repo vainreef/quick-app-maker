@@ -146,14 +146,44 @@ public class AvailabilityAdapter
         }
 
         // Save
-        await _native.ClickStrictAsync([
-            "input#saveButtonPricing",
-            "button#saveButtonPricing",
-            "input[uitestid=\"saveButtonPricing\"]",
-            "button[data-l10n-key=\"AppSubmission_SaveButton\"]"
-        ], "Save availability");
+        bool clicked = await _client.EvaluateAsync<bool>("""
+        (() => {
+            const allRoots=[document];
+            for(let i=0;i<allRoots.length;i++){ try{ for(const e of allRoots[i].querySelectorAll('*')) if(e.shadowRoot) allRoots.push(e.shadowRoot); }catch(_){} }
+            for(const r of allRoots){
+                for(const b of r.querySelectorAll('button, input[type="button"], input[type="submit"], he-button, a[role="button"], input.btn-primary')) {
+                    const txt = (b.innerText || b.value || b.getAttribute('aria-label') || '').trim();
+                    if (/^(保存|Save|保存草稿|Save draft)$/i.test(txt)) {
+                        b.scrollIntoView({ block: 'center', inline: 'center' });
+                        b.click();
+                        b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+                        return true;
+                    }
+                }
+            }
+            return false;
+        })()
+        """);
 
-        await Task.Delay(2000);
+        if (!clicked)
+        {
+            await _native.ClickStrictAsync([
+                "input[type=\"button\"][value=\"保存\"]",
+                "input[type=\"button\"][value=\"Save\"]",
+                "input.btn-primary[value=\"保存\"]",
+                "input.btn-primary[value=\"Save\"]",
+                "button[name=\"save_button\"]",
+                "button[data-l10n-key=\"AppSubmission_SaveButton\"]",
+                "button[data-l10n-key=\"appsubmission_savebutton\"]",
+                "button[uitestid=\"saveButtonPricing\"]",
+                "input#saveButtonPricing",
+                "button#saveButtonPricing",
+                "input[value=\"保存\"]",
+                "button[value=\"保存\"]"
+            ], "Save availability");
+        }
+
+        await Task.Delay(8000);
         await _native.AssertNoVisibleErrorsAsync();
     }
 

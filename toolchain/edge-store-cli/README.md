@@ -82,7 +82,7 @@ STORE 5: RELOAD VERIFICATION     # 强制 F5 刷新页面二次读取，验证�
     ↓
 STORE 6: SUBMISSION INTEGRITY    # 概览页确认 6 大模块均显示绿色已完成状态
     ↓
-STORE 7: EXPLICIT SUBMIT         # 必须显式传入 -Submit -ConfirmSubmit 触发终审
+STORE 7: USER SUBMIT DELIVERY    # 自动化填报结束，移交用户仔细审核后手动点击【提交进行认证】
 ```
 
 ---
@@ -130,10 +130,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-c
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -KeepOpen
 ```
 
-### 4. 显式最终提交
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action run -Phase all -Manifest .\<app>\build\edge-store.json -Apply -Submit -ConfirmSubmit
-```
+### 4. 提审交付（由用户手动点击）
+- 概览页 6 大模块全绿总检通过后，自动化填报全部结束；
+- Agent 向用户汇报：“自动填报已结束，请仔细审核后，点击 提交进行认证 按钮”；
+- 最终提交必须且只能由用户在已打开的浏览器中亲自审核后手动点击【提交进行认证】。
 
 ---
 

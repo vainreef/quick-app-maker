@@ -51,40 +51,21 @@ public static class FillListingCommand
             throw new InvalidOperationException("Could not resolve active Submission ID for Store Listing.");
         }
 
-        // 2. Commit any pending deletions on managelanguages if we are currently there
-        string currentUrl = await client.EvaluateAsync<string>("location.href") ?? "";
-        if (currentUrl.Contains("managelanguages", StringComparison.OrdinalIgnoreCase))
-        {
-            Console.WriteLine("[INFO] Committing language grid changes (clicking Save on managelanguages)...");
-            await client.EvaluateAsync<bool>("""
-            (() => {
-              const saveBtn = Array.from(document.querySelectorAll('he-button, button, input[type="button"], input[type="submit"]')).find(e => {
-                const t = (e.innerText || e.value || e.getAttribute('aria-label') || '').trim();
-                const r = e.getBoundingClientRect();
-                return /^(保存|Save|保存并继续)$/i.test(t) && r.width > 0 && r.height > 0 && !e.disabled;
-              });
-              if (saveBtn) {
-                if (saveBtn.shadowRoot) {
-                  const inner = saveBtn.shadowRoot.querySelector('button');
-                  if (inner) inner.click();
-                }
-                saveBtn.click();
-                saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
-                return true;
-              }
-              return false;
-            })()
-            """);
-            await Task.Delay(3500);
-        }
+        // 2. Navigate to managelanguages to clean any unwanted languages and save
+        string targetGridUrl = $"{baseUrl}/{desired.ProductId}/submissions/{submissionId}/managelanguages?producttype=app";
+        Console.WriteLine($"[NAV] Navigating to manage languages: {targetGridUrl}");
+        await waiter.NavigateAsync(targetGridUrl, "Manage Store Listing Languages");
+        await Task.Delay(2500);
 
-        // 3. Navigate directly to the Chinese listing form
-        string chineseListingUrl = $"{baseUrl}/{desired.ProductId}/submissions/{submissionId}/listings?languageid=5&languagecode=zh-cn";
-        Console.WriteLine($"[NAV] Navigating directly to Chinese Store Listing form: {chineseListingUrl}");
-        await waiter.NavigateAsync(chineseListingUrl, "Chinese Store Listing Form");
-        await Task.Delay(3000);
+        var gridManager = new ListingLanguageGridManager(client, input);
+        Console.WriteLine("[INFO] Clearing any non-Chinese languages...");
+        await gridManager.DeleteUnwantedLanguagesAsync(desired);
+        await Task.Delay(4000);
 
+        // 3. Enter the active listing form
         var adapter = new ListingAdapter(client, dom, waiter, native, input);
+        Console.WriteLine("[INFO] Entering active Store Listing form...");
+        await adapter.EnterLanguageFormAsync(desired, applyLanguageChanges: false);
         Console.WriteLine("[INFO] Observing listing form state...");
         var observed = await adapter.ObserveAsync();
         var plan = adapter.PlanDiff(desired, observed);
@@ -98,13 +79,15 @@ public static class FillListingCommand
         Console.WriteLine("[INFO] Applying listing changes and uploading assets...");
         await adapter.ApplyChangesAsync(plan, desired);
 
-        await Task.Delay(4000);
+        Console.WriteLine("[INFO] Waiting for listing save and backend synchronization...");
+        await Task.Delay(10000);
+        await native.AssertNoVisibleErrorsAsync();
 
         // 4. Navigate strictly back to Overview and verify
         string overviewUrl = $"{baseUrl}/{desired.ProductId}/overview";
         Console.WriteLine($"[INFO] Navigating strictly to Product Overview: {overviewUrl}");
         await waiter.NavigateAsync(overviewUrl, "Product Overview after listing save");
-        await Task.Delay(2500);
+        await Task.Delay(3500);
 
         var inspector = new PageInspector(client);
         var snapshot = await inspector.CaptureAsync();
