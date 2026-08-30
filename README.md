@@ -1,28 +1,31 @@
 # Quick App Maker V2
 
-用自然语言做出可试用的 Windows Electron 应用，再生成 MSIX 并完成 Microsoft Store 提交资料。
+用自然语言对话做出可试用的 Windows Electron 桌面应用，生成 MSIX 并自动化完成 Microsoft Store 提交资料。
 
-## 一条主线
+---
 
-```text
-bootstrap → 需求访谈 → create → dev → test → 用户试用
-→ reserve → package → preflight → Store 六阶段 → verify → 用户提交
-```
+## 核心设计哲学
 
-默认 App 使用 **Node.js 24 LTS + Electron 44 + JavaScript + Vue Runtime**。开发过程直接运行源码，不执行实时编译；只有发布 MSIX 时做一次 production layout 和封装。
+- **零系统环境依赖**：执行前**严禁且无需检查**用户系统是否安装了 Git 或 Node.js，严禁要求用户手动安装任何全局环境；
+- **全链路便携独立沙箱**：Node.js 24 LTS、MinGit、npm 缓存、Playwright、Electron 镜像全部自动下载并隔离在当前工作区根目录下；
+- **业务与引擎解耦**：
+  - `Project/`：用户的工作区根目录；
+  - `Project/node/` & `Project/git/`：工作区内置便携运行环境；
+  - `Project/quick-app-maker/`：核心工具链与自动化 CLI；
+  - `Project/.agent/`：注入给 AI Agent 的规则、技能包与工作流 SOP；
+  - `Project/<app-slug>/`：实际开发生成的具体业务应用。
 
-## 一条命令入场
+---
 
-> [!IMPORTANT]
-> **统一使用内置独立环境，禁止检查与使用系统全局环境**：
-> 1. 执行前**不需要检查**用户机器是否预装了 Node.js 或 Git，严禁让用户手动去系统安装任何依赖；
-> 2. **严禁调用用户系统全局的 Node.js/Git/npm**，所有操作必须统一使用 bootstrap 部署在当前工作区内的独立便携环境（`WORKSPACE_ROOT/node/`、`WORKSPACE_ROOT/git/`）；
-> 3. Agent 与开发者直接按照文档流程执行入场脚本，环境准备与沙箱配置全部由脚本自动完成。
+## 第 0 步：一键入场（从全新空目录开始）
 
-在一个全新的 Windows 工作目录执行：
+在一个全新的 Windows 工作区目录（如 `C:\Workspace\Project`）中，打开 PowerShell 运行以下指令：
 
 ```powershell
+# 1. 允许当前用户运行 PowerShell 脚本
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
+
+# 2. 下载并执行一键引导脚本（全自动安装 Node 24、Git 并克隆 quick-app-maker）
 $entry = Join-Path (Get-Location).Path '.qam-entry.ps1'
 Invoke-WebRequest -UseBasicParsing `
   -Uri 'https://gitee.com/freevian/quick-app-maker/raw/main/bootstrap/entry.ps1' `
@@ -30,97 +33,147 @@ Invoke-WebRequest -UseBasicParsing `
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 ```
 
-入口只负责下载工作区 portable Node，之后所有流程由 `node bin/qam.mjs` 执行。
-
-## 快速命令
-
-```powershell
-node .\bin\qam.mjs doctor
-node .\bin\qam.mjs create --name "我的应用" --slug my-app
-node .\bin\qam.mjs dev .\my-app
-node .\bin\qam.mjs test .\my-app
-```
-
-创建完成后，使用 `my-app/README.md` 记录需求和验收标准。`dev` 监视 JS/HTML/CSS，renderer 变更自动刷新，main/preload 变更自动重启。
-
-## 发布命令
-
-```powershell
-node .\bin\qam.mjs store launch --app .\my-app
-node .\bin\qam.mjs store reserve --app .\my-app --name "我的应用"
-node .\bin\qam.mjs package .\my-app --profile store
-node .\bin\qam.mjs store preflight --app .\my-app
-node .\bin\qam.mjs store discover --app .\my-app
-node .\bin\qam.mjs store run --app .\my-app --apply --confirm-age-ratings --deadline 3600000
-```
-
-需要逐阶段审查时，用下面的断点命令替代 `store run`：
-
-```powershell
-node .\bin\qam.mjs store apply --app .\my-app --phase availability
-node .\bin\qam.mjs store apply --app .\my-app --phase properties
-node .\bin\qam.mjs store apply --app .\my-app --phase age-ratings --confirm-age-ratings
-node .\bin\qam.mjs store apply --app .\my-app --phase packages
-node .\bin\qam.mjs store apply --app .\my-app --phase listing
-node .\bin\qam.mjs store apply --app .\my-app --phase options
-node .\bin\qam.mjs store verify --app .\my-app
-```
-
-`verify` 只在六个模块冷加载后均为 `Complete` 时返回 0。最终“提交进行认证”由用户在浏览器中审核后点击，CLI 不提供自动提交命令。
-
-## 目录
+### 执行后自动生成的目录结构
 
 ```text
-bin/qam.mjs                         CLI 入口
-packages/core/                      路径、日志、下载、进程和配置
-packages/generator-electron/        Electron 模板生成
-packages/store-core/                Desired/Diff/Checkpoint/证据状态机
-packages/store-playwright/          Edge 会话、PageKind、六个阶段
-packages/store-preflight/           MSIX、manifest、素材静态预检
-templates/electron-vue-runtime/     默认无编译 Electron App 模板
-skills/vainreef-fast-publish/       V2 Skill 和短命令手册
-docs/v2/                             架构、迁移、Windows smoke test
+Project/                                 <- 工作区根目录 ($workspaceRoot)
+├── node/                                <- 【自动下载】内置 Node.js 24 LTS 便携环境
+│   └── node.exe
+├── git/                                 <- 【自动下载】内置 MinGit 便携环境
+│   └── cmd/git.exe
+├── .cache/                              <- 【工作区缓存】npmrc、electron 缓存，不污染系统全局
+└── quick-app-maker/                     <- 【自动克隆】核心工具链仓库
+    ├── bin/qam.mjs
+    ├── packages/
+    ├── skills/
+    └── docs/
 ```
 
-## 国内网络
+---
 
-版本、URL 和 SHA-256 只在 `qam-toolchain.lock.json` 中维护：
+## 第 1 步：初始化 Agent 规则与技能（配置 `.agent` 目录）
 
-- Node portable：npmmirror；
-- npm registry：npmmirror；
-- Electron binary：Electron China mirror；
-- npm cache、Electron cache、下载日志：当前工作区 `.cache/`；
-- Playwright 使用 `playwright-core`，不下载额外浏览器。
-
-所有下载先写 `.part`，成功校验后原子改名；同一损坏工件最多重试一次。
-
-## 开发效率目标
-
-| 项目 | V2 门槛 |
-| --- | --- |
-| 日常显式编译 | 0 次 |
-| renderer 修改生效 | ≤ 1.5 秒 |
-| main/preload 修改生效 | ≤ 3 秒 |
-| 第二次 bootstrap | 零下载 |
-| Store 完成 | cold diff=0 + Overview Complete |
-| 默认包上传 | 同名唯一 `Validated` |
-| 工具状态 | 全部在工作区 `.cache/` |
-
-## 质量命令
+引导完成后，在根目录执行以下指令，将 `quick-app-maker` 内的规则与技能复制到工作区根目录的 `.agent/`，让 AI Agent（Antigravity / Cursor / Claude 等）一打开项目即具备全套专家能力：
 
 ```powershell
-node .\bin\qam.mjs check
-node --test
-git diff --check
+# 1. 创建 .agent 目录结构
+New-Item -ItemType Directory -Force -Path .agent\rules, .agent\skills\fast-publish, .agent\workflows | Out-Null
+
+# 2. 复制规则与约束
+Copy-Item -Force quick-app-maker\AGENTS.md .agent\rules\AGENTS.md
+Copy-Item -Force quick-app-maker\docs\partner-center\运行契约.md .agent\rules\store-contract.md
+
+# 3. 复制 fast-publish 核心技能包
+Copy-Item -Recurse -Force quick-app-maker\skills\vainreef-fast-publish\* .agent\skills\fast-publish\
+
+# 4. 复制标准工作流 SOP
+Copy-Item -Force quick-app-maker\docs\v2\one-hour-runbook.md .agent\workflows\
+Copy-Item -Force quick-app-maker\docs\v2\windows-smoke-test.md .agent\workflows\
 ```
 
-真实 Windows 验收见 `docs/v2/windows-smoke-test.md`。Partner Center 执行边界见 `docs/partner-center/运行契约.md`。
+### 配置完成后的完整工作区
 
-## 官方资料
+```text
+Project/
+├── .agent/                              <- 【Agent 专属大脑】自动加载规则、技能与工作流
+│   ├── rules/                           <- 运行约束（工具链沙箱、Store 契约）
+│   ├── skills/fast-publish/             <- 核心技能（访谈、命令速查、Store 指南、README 模板）
+│   └── workflows/                       <- 1 小时极速发布 runbook、冒烟验收清单
+├── node/                                <- 便携 Node.js 运行时
+├── git/                                 <- 便携 Git 运行时
+├── .cache/                              <- 沙箱缓存
+├── quick-app-maker/                     <- 自动化工具链引擎
+└── my-app/                              <- 随后生成的具体业务应用
+```
 
-- [Node.js Releases](https://nodejs.org/en/about/previous-releases)
-- [Electron 安装与镜像](https://www.electronjs.org/docs/latest/tutorial/installation)
-- [Microsoft Electron + WinApp CLI](https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/guides/electron-setup)
-- [Microsoft Electron MSIX](https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/guides/electron-packaging)
-- [Microsoft Store Win32 分发](https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-distribute-your-win32-app-through-microsoft-store)
-- [Playwright Locators](https://playwright.dev/docs/locators)
+---
+
+## 第 2 步：自然语言开发应用（零显式编译、纯源码直接运行）
+
+> [!NOTE]
+> 默认技术栈使用 **Node.js 24 LTS + Electron 44 + JavaScript + Vue 3 浏览器原生运行时**。日常开发直接运行源码，无需 Webpack/Vite 编译打包，保存即刷新。
+
+### 开发指令清单
+
+```powershell
+# 1. 验证工具链与环境健康状态
+node .\quick-app-maker\bin\qam.mjs doctor
+
+# 2. 创建新应用（例如：倒计时时钟应用）
+node .\quick-app-maker\bin\qam.mjs create --name "倒计时时钟" --slug countdown-app
+
+# 3. 启动开发模式（监视 HTML/JS/CSS 自动刷新窗口，修改 main/preload 自动重启进程）
+node .\quick-app-maker\bin\qam.mjs dev .\countdown-app
+
+# 4. 运行单元与冒烟自动化测试
+node .\quick-app-maker\bin\qam.mjs test .\countdown-app
+```
+
+开发完成后，先邀请用户直接在电脑上打开体验，收集反馈并持续迭代。
+
+---
+
+## 第 3 步：Microsoft Store 自动化发布（用户明确提出发布后触发）
+
+当用户明确提出要上架发布时，触发完整的 Store 自动化流水线：
+
+```powershell
+# 1. 启动独立隔离的 Edge 浏览器，引导用户登录 Partner Center（不接管用户日常浏览器）
+node .\quick-app-maker\bin\qam.mjs store launch --app .\countdown-app
+
+# 2. 自动化保留应用名称，并自动回填应用 Identity 信息到 appxmanifest
+node .\quick-app-maker\bin\qam.mjs store reserve --app .\countdown-app --name "倒计时时钟"
+
+# 3. 生产封装生成符合 Store 规范的 MSIX 程序包
+node .\quick-app-maker\bin\qam.mjs package .\countdown-app --profile store
+
+# 4. 离线静态预检（严格校验 MSIX 格式、manifest 字段、图标资产尺寸与文案）
+node .\quick-app-maker\bin\qam.mjs store preflight --app .\countdown-app
+
+# 5. 发现或创建本次提交的草稿会话
+node .\quick-app-maker\bin\qam.mjs store discover --app .\countdown-app
+
+# 6. 一键自动化填写 Store 六大阶段（定价与可用性、属性、年龄分级、程序包、Store 一览与提交选项）
+node .\quick-app-maker\bin\qam.mjs store run --app .\countdown-app --apply --confirm-age-ratings --deadline 3600000
+
+# 7. 冷加载总体验证（确认六个模块冷加载后状态均为 Complete 绿标）
+node .\quick-app-maker\bin\qam.mjs store verify --app .\countdown-app
+```
+
+> [!IMPORTANT]
+> **人工提交安全边界**：
+> `store verify` 全部通过后，CLI 不会自动点击最终的“提交进行认证”按钮。由用户在已打开的浏览器页面中审核各项资料，确认无误后亲自点击提交。
+
+---
+
+## 阶段断点与排错命令速查
+
+在自动化过程中，如需对单个模块进行针对性审查或调试，可使用阶段断点命令：
+
+```powershell
+# 逐模块审查与填报
+node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase availability
+node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase properties
+node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase age-ratings --confirm-age-ratings
+node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase packages
+node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase listing
+node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase options
+
+# 查看当前检查点与会话状态
+node .\quick-app-maker\bin\qam.mjs store status --app .\my-app
+
+# 停止当前 Edge 会话
+node .\quick-app-maker\bin\qam.mjs store stop --app .\my-app
+```
+
+---
+
+## 质量与网络保障
+
+- **国内网络全量镜像**：Node 便携包与 npm 使用 npmmirror，Electron 二进制使用 China mirror，锁文件 `qam-toolchain.lock.json` 固化版本与 SHA-256；
+- **原子下载与缓存保护**：所有下载先写 `.part` 临时文件，哈希校验一致后原子重命名；
+- **全套自动化测试**：
+  ```powershell
+  node .\quick-app-maker\bin\qam.mjs check
+  node --test
+  ```
