@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 let child;
 let restarting = false;
 function start() {
-  child = spawn(electron, ['.'], { cwd: root, env: { ...process.env, QAM_DEVTOOLS: '1' }, stdio: 'inherit', windowsHide: false });
+  child = spawn(electron, ['.'], { cwd: root, env: { ...process.env }, stdio: 'inherit', windowsHide: false });
   child.once('exit', code => { if (!restarting) process.exit(code ?? 0); });
 }
 function restart() {

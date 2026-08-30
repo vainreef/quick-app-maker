@@ -34,6 +34,8 @@ Git 不读取系统 PATH；MinGit 缺失时下载 ZIP、校验 SHA-256、验证 
 
 `qam.cmd` 会检查便携 Node 路径并设置 `QAM_WORKSPACE_ROOT`，同时在依赖缺失时先执行一次 workspace `npm ci`，避免后续命令落到系统 Node/npm。
 
+工具链 lock 位于 `quick-app-maker/qam-toolchain.lock.json`，由引擎命令显式加载。首次 bootstrap 不需要把 lock 手工复制到工作区根目录；在空工作区直接执行 `create` 也应通过。
+
 如果仓库本身就在工作区根目录，命令前缀使用 `.\bootstrap\qam.cmd`。
 
 ## 发布入口同步

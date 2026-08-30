@@ -13,7 +13,8 @@ if (process.platform !== 'win32') throw new Error('Store MSIX packaging runs on 
 const winappCli = path.join(root, 'node_modules', '@microsoft', 'winappcli', 'dist', 'cli.js');
 if (!fs.existsSync(winappCli)) throw new Error(`WinApp CLI is missing: ${winappCli}. Run the portable bootstrap first.`);
 const workspaceNode = process.env.QAM_WORKSPACE_ROOT ? path.join(process.env.QAM_WORKSPACE_ROOT, 'node', 'node.exe') : '';
-const nodeRuntime = workspaceNode && fs.existsSync(workspaceNode) ? workspaceNode : process.execPath;
+if (!workspaceNode || !fs.existsSync(workspaceNode)) throw new Error('Portable Node is required; run package through bootstrap\\qam.cmd.');
+const nodeRuntime = workspaceNode;
 function run(args) {
   const result = spawnSync(nodeRuntime, [winappCli, ...args], { cwd: root, stdio: 'inherit', env: { ...process.env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' } });
   if (result.error) throw new Error(`WinApp CLI failed to start: ${result.error.message}`);

@@ -16,4 +16,8 @@
 
 `PageKind → Observe → Diff → Apply → 冷加载 → Diff=0 → Overview Complete → Converged`
 
-提交认证由用户亲自复核并点击。
+`store run` 的 deadline 是整轮总预算，不能在每个 phase 重新计时。未知、Processing、Error、重复包和缺少证据都保持未完成。
+
+## 资料
+
+产品文案、截图和 Identity 在用户确认前不得视作已完成；占位文字只能作为模板。最终认证提交由用户亲自复核并点击。

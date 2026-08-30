@@ -17,6 +17,8 @@
 
 Windows 命令统一通过 `bootstrap/qam.cmd` 进入；该包装器固定解析工作区 `node/node.exe` 与其内置 npm CLI。业务代码不直接启动 `npm.cmd`、`npx.cmd`，也不依赖 PATH 中的 Node/npm。
 
+`qam-toolchain.lock.json` 从引擎目录加载：命令调用 `configureNpmEnvironment` 时必须传入引擎 lock，空工作区不需要手工复制一份到根目录。Edge 与 PowerShell 视为 Windows 内置能力；下载桥不探测系统 Git、Node 或 curl。
+
 唯一保留的 PowerShell 是 bootstrap 下载桥和 Windows 默认桌面启动桥；业务状态、页面定位、编排、验证全部用 Node。
 
 ## 工作区边界
@@ -57,14 +59,18 @@ PageKind → 完整 Observe → Diff → Apply
 6. 会话使用工作区独立 profile，不接管用户日常 Edge。
 7. CLI 不实现最终认证提交点击。
 
+8. 开发模式默认关闭 DevTools；排查时显式设置 `QAM_DEVTOOLS=1`。
+
 ## 运行要求
 
 - 同一 App 同时只允许一个 dev/package/store writer；
 - 每次命令生成 run id 和结构化证据；
 - checkpoint 原子写入并校验 manifest hash、productId、submissionId；
 - 页面错误保存 screenshot、ARIA snapshot、DOM 摘要、console/network 诊断；
+- 进程清理只针对当前 run 的 PID/lock，不按名称批量结束 Electron 或 Node；
 - 日常 App 开发零显式编译；MSIX 仅在发布阶段封装一次。
 - 首次 bootstrap 先用便携 npm 建立 workspace 依赖，再加载 `bin/qam.mjs`；Electron 运行时下载完成并验证文件存在后才报告就绪。
+- 源码正则或进程列表只算静态/启动证据；交付前必须完成真实窗口的输入、持久化、错误和关闭路径，并在 run-report 中保留证据。
 
 ## 交付
 

@@ -1,27 +1,36 @@
 # V2 命令速查
 
+从工作区根目录先解析引擎目录；已进入 `quick-app-maker/` 时 `$qamRoot` 为 `.`：
+
 ```powershell
-.\bootstrap\qam.cmd doctor
-.\bootstrap\qam.cmd bootstrap
-.\bootstrap\qam.cmd self-test
-.\bootstrap\qam.cmd create --name "名称" --slug slug
-.\bootstrap\qam.cmd dev .\slug
-.\bootstrap\qam.cmd test .\slug
-.\bootstrap\qam.cmd store launch --app .\slug
-.\bootstrap\qam.cmd store reserve --app .\slug --name "名称"
-.\bootstrap\qam.cmd package .\slug --profile store
-.\bootstrap\qam.cmd store preflight --app .\slug
-.\bootstrap\qam.cmd store discover --app .\slug
-.\bootstrap\qam.cmd store run --app .\slug --apply --confirm-age-ratings --deadline 3600000
-.\bootstrap\qam.cmd store apply --app .\slug --phase availability
-.\bootstrap\qam.cmd store apply --app .\slug --phase properties
-.\bootstrap\qam.cmd store apply --app .\slug --phase age-ratings --confirm-age-ratings
-.\bootstrap\qam.cmd store apply --app .\slug --phase packages
-.\bootstrap\qam.cmd store apply --app .\slug --phase listing
-.\bootstrap\qam.cmd store apply --app .\slug --phase options
-.\bootstrap\qam.cmd store verify --app .\slug
-.\bootstrap\qam.cmd store status --app .\slug
-.\bootstrap\qam.cmd store stop --app .\slug
+$qamRoot = if (Test-Path .\quick-app-maker\bootstrap\qam.cmd) { '.\quick-app-maker' } else { '.' }
+& "$qamRoot\bootstrap\qam.cmd" doctor
+& "$qamRoot\bootstrap\qam.cmd" bootstrap
+& "$qamRoot\bootstrap\qam.cmd" self-test
+& "$qamRoot\bootstrap\qam.cmd" create --name "名称" --slug slug
+& "$qamRoot\bootstrap\qam.cmd" test .\slug
+& "$qamRoot\bootstrap\qam.cmd" dev .\slug
 ```
 
-`store plan` 为只读动作，发现差异返回 4；`store apply` 才执行写入。最终认证按钮由用户点击。
+Store 仅在用户明确提出发布后执行：
+
+```powershell
+& "$qamRoot\bootstrap\qam.cmd" store launch --app .\slug
+& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\slug --name "名称"
+& "$qamRoot\bootstrap\qam.cmd" package .\slug --profile store
+& "$qamRoot\bootstrap\qam.cmd" store preflight --app .\slug
+& "$qamRoot\bootstrap\qam.cmd" store discover --app .\slug
+& "$qamRoot\bootstrap\qam.cmd" store run --app .\slug --apply --confirm-age-ratings --deadline 3600000
+& "$qamRoot\bootstrap\qam.cmd" store verify --app .\slug
+```
+
+阶段调试：
+
+```powershell
+& "$qamRoot\bootstrap\qam.cmd" store plan --app .\slug --phase availability
+& "$qamRoot\bootstrap\qam.cmd" store apply --app .\slug --phase availability
+& "$qamRoot\bootstrap\qam.cmd" store status --app .\slug
+& "$qamRoot\bootstrap\qam.cmd" store stop --app .\slug
+```
+
+`store plan` 为只读动作，发现差异返回 4；`store apply` 才执行写入。最终认证按钮由用户点击。进程存在只证明启动，不证明窗口已渲染；运行报告必须附动态操作或页面证据。

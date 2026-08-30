@@ -1,120 +1,107 @@
 ---
 name: vainreef-fast-publish
-description: 用 Node.js、Electron 和 Playwright 在 Windows 工作区内快速生成、试用、打包并准备 Microsoft Store 提交的完整流程。
+description: 用工作区内置的 Node.js、Git、Electron 和 Playwright 生成、试用、打包并准备 Microsoft Store 提交资料。
 ---
 
 # Vainreef Fast Publish V2
 
-## 核心规则
+## 0. 入场硬约束
 
-- **绝对使用工作区环境，禁止检查系统环境**：事先**无需检查**用户是否安装 Node.js/Git，**严禁使用**用户系统全局环境，所有操作统一使用 bootstrap 在工作区内准备的便携 Node/Git 沙箱，直接按流程执行；
-- 默认技术栈：Node.js 24 LTS、Electron 44、JavaScript、Vue Runtime；
-- 默认模板 `electron-vue-runtime` 不使用 bundler，不使用 TypeScript emit；
-- 所有命令通过 `bootstrap/qam.cmd` 进入；该包装器固定使用工作区便携 Node。
-- 下载、cache、日志、测试 profile 和证据都位于当前工作区；
-- 首版先交付试用，用户明确提出发布后才进入 Store；
-- 商店自动化到 `verify` 结束，最终认证提交由用户审核并点击。
-
-## 开始
-
-用户只需要描述想做的 App。按照访谈顺序记录到生成项目的 `README.md`：
-
-1. 做什么；
-2. 谁会用、何时打开；
-3. 打开后的第一眼和核心闭环；
-4. 风格、素材、数据和网络需求；
-5. 第一版验收条件；
-6. 暂定名称和不做范围。
-
-用户确认后立即生成，不重复推演整套设计。
-
-## 开发流程
+- Edge 和 PowerShell 按 Windows 内置能力处理；不把它们列为待安装依赖。
+- Node.js 和 Git 只使用当前工作区的便携副本：`WORKSPACE_ROOT/node/`、`WORKSPACE_ROOT/git/cmd/git.exe`。Git 永远取工作区路径，不调用系统 Git，也不通过 `Get-Command git` 选取版本。
+- 首次入场只运行下载桥 `entry.ps1`；之后所有项目、测试和 Store 命令统一走 `bootstrap/qam.cmd`。不执行全局 npm 安装，不手工复制 lock 文件来绕过错误。
+- `qam-toolchain.lock.json` 属于 `quick-app-maker/` 引擎目录。命令会从引擎目录加载它，并把缓存固定到工作区；工作区根目录没有此文件也应能执行 `create`。
+- `$qamRoot` 兼容“仓库直接在当前目录”和“仓库位于工作区/quick-app-maker”两种布局：
 
 ```powershell
-.\bootstrap\qam.cmd bootstrap
-.\bootstrap\qam.cmd create --name "应用名称" --slug app-slug
-.\bootstrap\qam.cmd dev .\app-slug
-.\bootstrap\qam.cmd test .\app-slug
+$qamRoot = if (Test-Path .\quick-app-maker\bootstrap\qam.cmd) { '.\quick-app-maker' } else { '.' }
+& "$qamRoot\bootstrap\qam.cmd" doctor
 ```
 
-`dev` 直接运行源码。renderer 的 JS/HTML/CSS 变化刷新窗口；main/preload 变化重启进程。日常修改不执行 build、不生成 MSIX。
+- 不使用 `Get-Process electron | Stop-Process`、按名称批量杀进程或固定秒数等待。停止开发会话只操作该会话记录的 PID/终端；等待使用窗口、URL、日志或带截止时间的条件。
+- 工作区已存在时先读取本地 `README.md`、`AGENTS.md`、skill 和 lock；不要把 Gitee HTML 整页抓回再重复阅读。先建立文件清单和验收矩阵，再按矩阵读取相关源码。
 
-实现规则：
+## 1. 需求与生成
 
-- 先实现启动 → 数据存取 → 渲染 → 关闭重开；
-- 再逐项加入通知、文件、网络或系统能力；
-- IPC 采用白名单、sender 校验和参数校验；
-- `contextIsolation=true`、`sandbox=true`、`nodeIntegration=false`；
-- 默认依赖保持纯 JS，原生 addon 单独建立 capability profile；
-- 每一小步更新项目 README 和 `build/run-report.md`。
+先完成一次短访谈，并把答案写入生成项目的 `README.md`：
 
-## Store 发布
+1. 做什么、谁使用、何时打开；
+2. 打开后的第一眼和一次完整操作；
+3. 成功结果、错误提示和空状态；
+4. 风格、素材、声音、网络与本地数据策略；
+5. 第一版必须有、明确暂不做、暂定名称。
 
-用户表达“发布到商店”后按顺序执行：
+确认后直接生成，不重复推演设计。生成后先按这个顺序验证基础闭环：
 
 ```powershell
-.\bootstrap\qam.cmd store launch --app .\app-slug
-.\bootstrap\qam.cmd store reserve --app .\app-slug --name "应用名称"
-.\bootstrap\qam.cmd package .\app-slug --profile store
-.\bootstrap\qam.cmd store preflight --app .\app-slug
-.\bootstrap\qam.cmd store discover --app .\app-slug
-.\bootstrap\qam.cmd store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000
+& "$qamRoot\bootstrap\qam.cmd" bootstrap
+& "$qamRoot\bootstrap\qam.cmd" doctor
+& "$qamRoot\bootstrap\qam.cmd" self-test
+& "$qamRoot\bootstrap\qam.cmd" create --name "应用名称" --slug app-slug
+& "$qamRoot\bootstrap\qam.cmd" test .\app-slug
 ```
 
-需要逐阶段审查时，用下面的命令替代 `store run`：
+## 2. App 实现契约
+
+- 先做“启动 → 读取 → 渲染 → 添加/修改/删除 → 保存 → 关闭重开”，再增加通知、文件或网络能力。
+- Vue 的所有插值 `{{ }}`、`v-*` 指令和 `@*` 事件必须位于 `#app` 挂载树内；弹层也必须在树内，或使用经过测试的 Vue Teleport。脚本顺序必须是 Vue → 领域逻辑 → App。
+- 每个异步读取、保存、通知和启动调用都要 `await` 或显式处理错误；保存失败时回滚内存状态并显示可操作的错误提示。
+- 日期输入必须校验真实日历日期；倒计时按本地日历日计算，并在跨午夜后刷新。提醒范围和去重规则写入 README，测试中固定 `now`，不依赖机器当前时间。
+- 必须提供加载中、空数据、输入错误、读取失败和保存失败状态。源码正则命中只算契约检查，不代表 UI 功能已通过。
+- 开发模式默认不打开 DevTools；排查控制台时显式设置 `QAM_DEVTOOLS=1`，结束后恢复普通启动。
+- `contextIsolation=true`、`sandbox=true`、`nodeIntegration=false`；IPC 使用白名单、发送方校验和参数校验。
+- 每个小步同步项目 README 与 `build/run-report.md`，记录真实命令、退出码、耗时和证据路径。
+
+## 3. 试用与验收闸门
+
+日常源码运行：
 
 ```powershell
-.\bootstrap\qam.cmd store apply --app .\app-slug --phase availability
-.\bootstrap\qam.cmd store apply --app .\app-slug --phase properties
-.\bootstrap\qam.cmd store apply --app .\app-slug --phase age-ratings --confirm-age-ratings
-.\bootstrap\qam.cmd store apply --app .\app-slug --phase packages
-.\bootstrap\qam.cmd store apply --app .\app-slug --phase listing
-.\bootstrap\qam.cmd store apply --app .\app-slug --phase options
-.\bootstrap\qam.cmd store verify --app .\app-slug
+& "$qamRoot\bootstrap\qam.cmd" dev .\app-slug
 ```
 
-`--confirm-age-ratings` 表示用户已检查问卷；缺失时年龄分级阶段停在配置检查。
+交付“可试用”前必须完成真实窗口检查，而不是只看 Electron 进程存在：
 
-### 每阶段裁决
+1. 空状态打开且控件可操作；
+2. 正确输入能添加，空名称/非法日期能给出提示；
+3. 未来、过去、今天三种日期显示正确；
+4. 编辑、删除和清除操作可见且保存成功；
+5. 关闭后重新打开，数据仍在；
+6. 当天庆祝层的文本已渲染，按钮、背景点击和 Esc 至少有一种关闭路径；
+7. 读取失败和保存失败不会把页面锁死；
+8. 修改 renderer 后刷新，修改 main/preload 后重启。
 
-必须满足：
+截图、控制台、网络诊断或自动化操作证据缺失时，在报告中标记“待动态验证”，不要勾选运行验收。
+
+## 4. Store 流程
+
+只有用户明确提出发布时才进入：
+
+```powershell
+& "$qamRoot\bootstrap\qam.cmd" store launch --app .\app-slug
+& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称"
+& "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store
+& "$qamRoot\bootstrap\qam.cmd" store preflight --app .\app-slug
+& "$qamRoot\bootstrap\qam.cmd" store discover --app .\app-slug
+& "$qamRoot\bootstrap\qam.cmd" store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000
+& "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug
+```
+
+每阶段都执行：
 
 ```text
-PageKind → Observe → Diff → Apply
-→ 当前 URL 冷导航 → Observe → Diff=0
-→ Overview 对应模块 Complete → checkpoint=Converged
+PageKind → 完整 Observe → Diff → Apply
+→ 当前 URL 冷导航 → 完整 Observe + Diff=0
+→ Overview 模块 Complete → Converged
 ```
 
-退出码：`0` 已验证，`1` 执行错误，`2` 配置错误，`3` 会话错误，`4` 只读发现差异，`5` 页面 schema 漂移，`6` 超出时间预算。
+一轮 `store run` 使用同一个总截止时间；阶段切换不得重置预算。未知页面、Processing、Error、重复包、缺少模块或缺少证据都保持未完成。最终认证提交由用户在浏览器复核后点击。
 
-### 上传规则
+Store 文案、截图和 Identity 在用户确认前保持待填状态；通用占位文案不算发布资料完成。
 
-- 0 个同名包：上传一次；
-- 1 个 Processing：等待；
-- 1 个 Validated：跳过上传；
-- Error 或重复：停止并执行 repair；
-- 文件名出现不代表成功；唯一 `Validated` 才算成功。
+## 5. 证据与时间
 
-### 证据
-
-每次命令生成 `.cache/qam/runs/<run-id>/`，包含 `events.jsonl`、`result.json`、阶段 JSON、截图、ARIA 和 DOM 摘要。凭据、cookie、token 和用户浏览器 profile 不写入证据。
-
-## 时间预算
-
-默认总预算 60 分钟：
-
-- bootstrap 10 分钟；
-- 生成和 MVP 20 分钟；
-- smoke/E2E 10 分钟；
-- package/preflight 8 分钟；
-- Store 六阶段 12 分钟。
-
-任何等待都带截止时间和进度日志。超出预算返回 6，并保留 checkpoint，下一次从当前阶段继续。
-
-## 国内网络
-
-只使用 `qam-toolchain.lock.json` 的版本和镜像。npm、Electron、Node 下载使用工作区 cache；Playwright 使用 `playwright-core`，不下载额外浏览器。镜像不可用时读取已有 cache 和诊断日志，不临时更换依赖版本。
-
-## 交付话术
-
-首版完成后只告诉用户应用已经生成并邀请试用。收到反馈后小步修改并重新 `dev/test`。用户确认满意并提出发布，再进入商店链路。
+- 每次命令生成 `.cache/qam/runs/<run-id>/`，至少有 `events.jsonl`、`run.log` 和 `result.json`；页面错误再保存 screenshot、ARIA snapshot、DOM 摘要、console/network 诊断。
+- 证据不得包含凭据、cookie、token 或用户日常浏览器 profile；工作区外不写缓存和临时产物。
+- 默认 60 分钟只作预算，不以计时器代替验证：bootstrap 10 分钟、MVP 20 分钟、动态验收 10 分钟、package/preflight 8 分钟、Store 12 分钟。超时保留 checkpoint 并明确返回码 6。
+- 首版完成后邀请用户试用；收到反馈后小步修改并重新执行动态验收。用户确认满意且明确提出发布，再进入 Store。

@@ -13,8 +13,10 @@
     <section class="card">
       <label for="note">先写下一个想法</label>
       <textarea id="note" v-model="draft" placeholder="输入内容，点击保存即可验证完整闭环"></textarea>
-      <div class="actions"><button class="primary" type="button" @click="save">保存</button><button type="button" @click="reload">重新读取</button><span class="status" role="status">{{ status }}</span></div>
+      <div class="actions"><button class="primary" type="button" :disabled="loading || saving" @click="save">保存</button><button type="button" :disabled="loading || saving" @click="reload">重新读取</button><span class="status" role="status">{{ status }}</span></div>
     </section>
+    <p v-if="loading" class="status" role="status">正在读取…</p>
+    <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
     <section class="card"><h2>已保存内容</h2><ul v-if="state.items.length"><li v-for="item in state.items" :key="item.id">{{ item.text }}<small>{{ item.createdAt }}</small></li></ul><p v-else class="muted">还没有内容。</p></section>
   </main>
   <script src="../../node_modules/vue/dist/vue.global.js"></script>

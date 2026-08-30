@@ -15,6 +15,8 @@
   - `Project/.agent/`：注入给 AI Agent 的规则、技能包与工作流 SOP；
   - `Project/<app-slug>/`：实际开发生成的具体业务应用。
 
+> Edge 与 PowerShell 视为 Windows 内置能力；Git、Node.js 和 npm 只取工作区便携副本。`qam-toolchain.lock.json` 保留在 `quick-app-maker/` 引擎目录，命令会显式加载，不要求把它复制到工作区根目录。
+
 ---
 
 ## 第 0 步：一键入场（从全新空目录开始）
@@ -97,6 +99,8 @@ Project/
 ```powershell
 # 1. 验证工具链与环境健康状态
 .\quick-app-maker\bootstrap\qam.cmd doctor
+.\quick-app-maker\bootstrap\qam.cmd bootstrap
+.\quick-app-maker\bootstrap\qam.cmd self-test
 
 # 2. 创建新应用（例如：倒计时时钟应用）
 .\quick-app-maker\bootstrap\qam.cmd create --name "倒计时时钟" --slug countdown-app
@@ -176,3 +180,5 @@ Project/
   .\quick-app-maker\bootstrap\qam.cmd check
   .\quick-app-maker\bootstrap\qam.cmd self-test
   ```
+
+进程列表只证明命令启动；交付前还要完成真实窗口的输入、保存、关闭重开、错误和庆祝路径，并把截图/控制台或自动化证据写入 `build/run-report.md`。开发模式默认不打开 DevTools，需要排查时再显式设置 `QAM_DEVTOOLS=1`。

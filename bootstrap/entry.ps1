@@ -45,13 +45,7 @@ function Download-Verified([string]$Url, [string]$OutputPath, [string]$ExpectedS
     }
     if (-not (Test-Path -LiteralPath $OutputPath)) {
         Write-Step "Downloading $([IO.Path]::GetFileName($OutputPath)) from the China mirror"
-        $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
-        if ($curl) {
-            & $curl.Source --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 1800 -o $part $Url
-            if ($LASTEXITCODE -ne 0) { throw "Download failed: $Url (exit $LASTEXITCODE)" }
-        } else {
-            Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $part
-        }
+        Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $part
         if (-not (Test-Path -LiteralPath $part)) { throw "Download produced no file: $part" }
         if ($ExpectedSha256) {
             $actual = (Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash.ToLowerInvariant()

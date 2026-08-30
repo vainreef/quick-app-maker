@@ -6,7 +6,12 @@ export function loadToolchain(root) {
   return readJson(path.join(root, 'qam-toolchain.lock.json'));
 }
 
-export function configureNpmEnvironment(root, lock = loadToolchain(root)) {
+export function configureNpmEnvironment(root, lock) {
+  if (!lock || typeof lock !== 'object') {
+    const error = new Error('toolchain lock must be supplied by the engine');
+    error.code = 'TOOLCHAIN';
+    throw error;
+  }
   const cache = path.resolve(root, lock.npm?.cacheDirectory ?? '.cache/npm');
   const userconfig = path.join(root, '.cache', 'npmrc');
   const electronCache = path.resolve(root, '.cache/electron');

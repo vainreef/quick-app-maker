@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const APP_ROOT = app.getAppPath();
 const DATA_ROOT = process.env.QAM_DATA_DIR ? path.resolve(process.env.QAM_DATA_DIR) : app.getPath('userData');
 const STATE_FILE = path.join(DATA_ROOT, 'state.json');
+const MAX_ITEMS = 500;
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
 function inside(root, candidate) {
@@ -18,12 +19,26 @@ function readState() {
   catch (error) { if (error.code === 'ENOENT') return { version: 1, items: [] }; throw error; }
 }
 function saveState(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('state must be an object');
+  const normalized = normalizeState(value);
   fs.mkdirSync(DATA_ROOT, { recursive: true });
   const temp = `${STATE_FILE}.${process.pid}.${crypto.randomBytes(3).toString('hex')}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(value, null, 2) + '\n', 'utf8');
+  fs.writeFileSync(temp, JSON.stringify(normalized, null, 2) + '\n', 'utf8');
   fs.renameSync(temp, STATE_FILE);
-  return value;
+  return normalized;
+}
+
+function normalizeState(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.items)) throw new TypeError('state.items must be an array');
+  if (value.items.length > MAX_ITEMS) throw new RangeError(`state.items exceeds ${MAX_ITEMS} records`);
+  const items = value.items.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new TypeError(`state.items[${index}] must be an object`);
+    const id = typeof item.id === 'string' ? item.id.trim() : '';
+    const text = typeof item.text === 'string' ? item.text.trim() : '';
+    if (!id || id.length > 128 || !text || text.length > 10_000) throw new TypeError(`state.items[${index}] is invalid`);
+    return { id, text, ...(typeof item.createdAt === 'string' && item.createdAt ? { createdAt: item.createdAt } : {}) };
+  });
+  if (new Set(items.map(item => item.id)).size !== items.length) throw new TypeError('state.items contains duplicate ids');
+  return { version: 1, items };
 }
 
 function registerProtocol() {

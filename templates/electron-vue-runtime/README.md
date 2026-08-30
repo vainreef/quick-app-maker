@@ -4,6 +4,10 @@
 
 初版 Electron/Vue Runtime 模板已生成。开发链不使用 bundler，源码直接运行。
 
+## 验证门槛
+
+源码正则和进程列表只算静态/启动证据。交付试用前必须记录真实窗口的添加、错误、保存、关闭重开和 UI 交互证据到 `build/run-report.md`。
+
 ## 命令
 
 从包含 `node/` 与 `quick-app-maker/` 的工作区根目录执行：
