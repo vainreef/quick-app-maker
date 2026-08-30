@@ -1,205 +1,119 @@
-# Vainreef Quick App Maker
+# Quick App Maker V2
 
-> Agent 执行发布自动化前先读取 `AGENTS.md`、`docs/partner-center/Agent-运行契约.md` 和 `docs/partner-center/Edge-Store-可靠性重构.md`。`apps/Project/edge-store-cli-fast` 不是正式源码入口。
+用自然语言做出可试用的 Windows Electron 应用，再生成 MSIX 并完成 Microsoft Store 提交资料。
 
-> **让自然语言想法在 Windows 上全自动蜕变为真实的 WinUI 3 现代桌面应用，并直通 Microsoft Store 微软应用商店。**
-> 一键自动化工具链准备 · 8层渐进式需求访谈 · 5大一次性写对黄金铁律 · 双窗口并行与名称前置验重 · 商店6大表单全套指引
+## 一条主线
 
-维护者在提交前执行：
-
-```bash
-python3 scripts/validate-skill.py
-python3 scripts/test_validate_skill.py
+```text
+bootstrap → 需求访谈 → create → dev → test → 用户试用
+→ reserve → package → preflight → Store 六阶段 → verify → 用户提交
 ```
 
-校验覆盖 Skill frontmatter、内部链接、Markdown 围栏、控制字符、WinAppCLI 版本、launcher action 与文档一致性，以及已发生过的后台编译和证书循环回归。
+默认 App 使用 **Node.js 24 LTS + Electron 44 + JavaScript + Vue Runtime**。开发过程直接运行源码，不执行实时编译；只有发布 MSIX 时做一次 production layout 和封装。
 
----
+## 一条命令入场
 
-## 架构总览：端到端全生命周期全景图
-
-```mermaid
-graph TD
-    subgraph Layer0 ["0. 一键入场层 (Bootstrap Entry)"]
-        E1["用户输入 gitee.com/freevian/quick-app-maker"] --> E2["entry.ps1 自动执行"]
-        E2 --> E3["全自动配齐: MinGit(免安装) + .NET 10(免安装) + WinAppCLI + WinUI 模板 (零UAC/零写C盘)"]
-        E3 --> E4["输出 BOOTSTRAP_READY 并移交 Skill 执行"]
-    end
-
-    subgraph Layer1 ["1. 需求与设计层 (Discovery & Design)"]
-        E4 --> D1["8 层渐进式白话需求访谈 (discovery-interview.md)"]
-        D1 --> D2["锁定暂定名与核心闭环，用户确认: '开始吧'"]
-        D2 --> D3["遵循 WinUI 3 一次性写对 5 大黄金铁律 (防 WMC9999 / 防 0xc000027b)"]
-        D3 --> D4["素材获取: 100% 国内源与系统自带 (test-assets.md)"]
-    end
-
-    subgraph Layer2 ["2. 双轨并行研发层 (Dual-Window Concurrency)"]
-        D4 --> P1["启动全自动构建流水线 (约 15~20 分钟)"]
-        P1 -->|窗口 1: 专注构建| W1["编码 -> 前台构建 -> winapp run 独立启动 -> winapp ui 自动化黑盒测试"]
-        P1 -->|友好非阻塞提示| W2["窗口 2: 独立咨询会话<br>用户提问: '如何创建 Partner 账号 / 如何起名？'"]
-        W2 --> W3["读取本地 partner-center-guide.md<br>指引 Xbox 注册免验证码 -> 身份证上传 -> 免费个人开发者"]
-        W3 --> W4["控制台前置验重: '+ 新产品' -> 'MSIX 或 PWA' -> 实时测名字并预留 -> 拿到 3 大 Package Identity"]
-    end
-
-    subgraph Layer3 ["3. 交付与共创层 (Deliver & Co-Create)"]
-        W1 --> C1["首版交付话术: '已装好，请打开把玩，哪里不顺手随时告诉我，改到满意为止'"]
-        C1 --> C2["用户本地试用体验 -> 提修改意见 -> 小步重新构建并更新本机注册"]
-    end
-
-    subgraph Layer4 ["4. 商店发布与断点续接层 (Partner Center & Store)"]
-        C2 -->|用户主动提出: '我想发布到商店'| S0["Store 0: 离线静态质检 (MSIX解包/Desktop依赖/Logo/截图/<=7关键字)"]
-        W4 -.回填 3 大 Package Identity.- -> S0
-        S0 --> S1["Store 1~2: 启动隔离 Edge & 动态探测 live submissionId 与 6 表真实 href"]
-        S1 --> S2["Store 3~8: 每次只执行一个表单阶段并提取现场 DOM 证据"]
-        S2 --> S3["Store 9: 冷导航回读 + 概览页 6 大模块总检"]
-        S3 --> S4["Store 10: 移交用户审核并手动点击【提交进行认证】"]
-    end
-```
-
----
-
-## Agent 3 步极速开工指令
-
-### 第一步：执行唯一公开入口
-用户只要说 `用 https://gitee.com/freevian/quick-app-maker README 开始`，Agent 在 Windows PowerShell 中直接**原样完整执行**下面三行（下载到当前工作目录执行，**严禁自行修改命令将文件下载到 `$env:TEMP` 等外部目录**）：
+在一个全新的 Windows 工作目录执行：
 
 ```powershell
-$entry = Join-Path (Get-Location).Path '.bootstrap-entry.ps1'
-Invoke-WebRequest -UseBasicParsing -Uri 'https://gitee.com/freevian/quick-app-maker/raw/main/bootstrap/entry.ps1' -OutFile $entry
+$entry = Join-Path (Get-Location).Path '.qam-entry.ps1'
+Invoke-WebRequest -UseBasicParsing `
+  -Uri 'https://gitee.com/freevian/quick-app-maker/raw/main/bootstrap/entry.ps1' `
+  -OutFile $entry
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 ```
 
-> **MinGit 绿色免安装铁律**：`entry.ps1` 会自动从国内镜像下载绿色免安装包 `MinGit-2.47.1-64-bit.zip` 并解压到工作区根目录下的 `git\`（与 `quick-app-maker` 同级），**全程使用该绿色免安装版 Git（`.\git\cmd\git.exe`），绝不运行任何安装程序，彻底消除 UAC 管理员提权确认框打扰！**
+入口只负责下载工作区 portable Node，之后所有流程由 `node bin/qam.mjs` 执行。
 
-### 第二步：识别就绪输出与工作目录
-一键脚本执行完毕后输出：
-```text
-BOOTSTRAP_READY
-GIT_PATH: <WORKSPACE_ROOT>\git\cmd\git.exe
-DOTNET_ROOT: <WORKSPACE_ROOT>\dotnet
-WORKSPACE_ROOT: <当前工作目录/仓库的父目录>
-NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery
-```
+## 快速命令
 
-* **工作目录铁律（绝对红线）**：严禁往任何系统目录、用户全局目录或系统临时目录（如 `$env:TEMP`、`%LOCALAPPDATA%`、`C:\Users\...`、`C:\temp`、`C:\Program Files`）写入或读取任何文件！所有新项目目录 `<app-slug>/`、`git/`、`dotnet/`、`README.md`、临时测试、工具缓存（`.cache/`）、安装包必须全部放在当前工作目录（`WORKSPACE_ROOT`）内。
-
-### 第三步：开工前更新知识库并进入需求访谈
-使用工作区绿色免安装版 MinGit 执行更新（**所有 git 命令统一使用同级免安装版**）：
 ```powershell
-# 统一使用同级绿色免安装版 MinGit（零提权、零UAC弹窗）
-.\git\cmd\git.exe -C quick-app-maker pull --ff-only origin main
+node .\bin\qam.mjs doctor
+node .\bin\qam.mjs create --name "我的应用" --slug my-app
+node .\bin\qam.mjs dev .\my-app
+node .\bin\qam.mjs test .\my-app
 ```
-随后立即读取 [`skills/vainreef-fast-publish/SKILL.md`](skills/vainreef-fast-publish/SKILL.md) 与 [`references/discovery-interview.md`](skills/vainreef-fast-publish/references/discovery-interview.md)，向用户发起白话开场问询：
+
+创建完成后，使用 `my-app/README.md` 记录需求和验收标准。`dev` 监视 JS/HTML/CSS，renderer 变更自动刷新，main/preload 变更自动重启。
+
+## 发布命令
+
+```powershell
+node .\bin\qam.mjs store launch --app .\my-app
+node .\bin\qam.mjs store reserve --app .\my-app --name "我的应用"
+node .\bin\qam.mjs package .\my-app --profile store
+node .\bin\qam.mjs store preflight --app .\my-app
+node .\bin\qam.mjs store discover --app .\my-app
+node .\bin\qam.mjs store run --app .\my-app --apply --confirm-age-ratings --deadline 3600000
+```
+
+需要逐阶段审查时，用下面的断点命令替代 `store run`：
+
+```powershell
+node .\bin\qam.mjs store apply --app .\my-app --phase availability
+node .\bin\qam.mjs store apply --app .\my-app --phase properties
+node .\bin\qam.mjs store apply --app .\my-app --phase age-ratings --confirm-age-ratings
+node .\bin\qam.mjs store apply --app .\my-app --phase packages
+node .\bin\qam.mjs store apply --app .\my-app --phase listing
+node .\bin\qam.mjs store apply --app .\my-app --phase options
+node .\bin\qam.mjs store verify --app .\my-app
+```
+
+`verify` 只在六个模块冷加载后均为 `Complete` 时返回 0。最终“提交进行认证”由用户在浏览器中审核后点击，CLI 不提供自动提交命令。
+
+## 目录
+
 ```text
-你想做一个什么样的 App？可以先随意描述你脑中的画面、玩法或感觉。
+bin/qam.mjs                         CLI 入口
+packages/core/                      路径、日志、下载、进程和配置
+packages/generator-electron/        Electron 模板生成
+packages/store-core/                Desired/Diff/Checkpoint/证据状态机
+packages/store-playwright/          Edge 会话、PageKind、六个阶段
+packages/store-preflight/           MSIX、manifest、素材静态预检
+templates/electron-vue-runtime/     默认无编译 Electron App 模板
+skills/vainreef-fast-publish/       V2 Skill 和短命令手册
+docs/v2/                             架构、迁移、Windows smoke test
 ```
 
----
+## 国内网络
 
-## 全景文件拓扑与职责矩阵
+版本、URL 和 SHA-256 只在 `qam-toolchain.lock.json` 中维护：
 
-```text
-Project/ (WORKSPACE_ROOT, 用户工作区根目录)
-├── git/                                     # 📦 MinGit 绿色免安装版 (与 quick-app-maker 同级，零 UAC 提权)
-│   ├── cmd/
-│   │   └── git.exe                          # 全程使用的 Git 绝对/相对调用入口
-│   └── ...
-├── dotnet/                                  # 📦 .NET 10 SDK 绿色免安装版 (解压即用，零 UAC 提权，零写C盘)
-│   ├── dotnet.exe                           # 全程使用的 .NET CLI 入口 (DOTNET_ROOT)
-│   └── ...
-├── quick-app-maker/                         # 🏛️ 核心工具链与知识库仓库
-│   ├── README.md                            # 🏛️ 全系统总览与上帝视角架构蓝图 (本文件)
-│   ├── bootstrap/                           # 🚀 零依赖一键初始化模块
-│   │   ├── entry.ps1                        # 公开入口：下载解压 MinGit 至 ../git (零UAC)、clone 仓库、启动安装器
-│   │   ├── install.ps1                      # 智能安装器：并行检测并解压免安装 .NET 10 / CLI / 模板
-│   │   ├── toolchain.json                   # 唯一权威版本锁清单
-│   │   └── workers/                         # 下载与解压子工作脚本
-│   ├── skills/vainreef-fast-publish/        # 🧠 核心业务大脑与执行规范
-│   │   ├── SKILL.md                         # 12 大生命周期标准流程、5 大黄金铁律、双窗口规范
-│   │   └── references/                      # 核心业务子模块与权威知识库
-│   │       ├── discovery-interview.md       # 8 层渐进式需求访谈框架与双窗口启动通知
-│   │       ├── test-assets.md               # 中国大陆 100% 畅通素材库 (音频/图标/图片/字体)
-│   │       ├── partner-center-guide.md      # 微软 Partner Center 注册、名称验重与 6 大表单全指南
-│   │       ├── delivery-considerations.md   # 交付边界、权限、离线与性能考量
-│   │       ├── official-sources.md          # 微软官方文档与 API 规范入口
-│   │       ├── edge-store-automation.md     # 声明式状态收敛与 Store 0~7 自动化标准
-│   │       └── toolchain/v1/commands.md     # 构建/运行/打包唯一命令手册、硬规则与错误收敛表
-│   ├── toolchain/edge-store-cli/            # 🚀 .NET 10 (C#) 声明式状态收敛驱动 (V2)
-│   │   ├── Invoke-EdgeStore.ps1             # 超薄启动器 (PowerShell Launcher)
-│   │   ├── EdgeStore.Cli.csproj             # C# .NET 10 控制台项目
-│   │   ├── Program.cs                       # 命令行入口与参数解析
-│   │   ├── Orchestration/                   # Store 0 ~ Store 7 全流程编排器
-│   │   ├── Cdp/                             # CdpClient, shallow DomDriver/requestNode, PageInspector, Waiter
-│   │   ├── ComponentAdapters/               # LitElement / Angular (HeSelect, HeCheckbox) 专属适配器
-│   │   ├── PartnerCenter/                   # 6 大提审表单业务适配器 (Observe/Diff/Apply/ReloadVerify)
-│   │   ├── Models/                          # 强类型 DesiredState / 字段级 ObservedState / ReconcilePlan / PageState
-│   │   ├── Validate-EdgeStoreCli.ps1         # 工程与配置预检
-│   │   ├── README.md                        # V2 架构文档、Store 0~7 流水线与退出码约定
-│   │   └── examples/store-automation.json   # 纯声明式 Desired State 配置文件样例
-│   ├── docs/                                # 📚 归档与实战证据库
-│   │   ├── windows-smoke-test.md            # 1~9 轮真实 Windows 机器全流程实测战绩记录
-│   │   └── partner-center/                  # 8 个 Partner Center 真实页面 DOM 快照与实测记录
-│   └── apps/                                # 💻 历史测试沙箱 (已加入 .gitignore，绝不上传)
-├── <app-slug>/                              # 💻 用户具体的 WinUI 3 应用项目 (与 quick-app-maker 同级)
-└── .cache/                                  # 🛠️ 本地工具与下载缓存 (只读写当前工作区)
+- Node portable：npmmirror；
+- npm registry：npmmirror；
+- Electron binary：Electron China mirror；
+- npm cache、Electron cache、下载日志：当前工作区 `.cache/`；
+- Playwright 使用 `playwright-core`，不下载额外浏览器。
+
+所有下载先写 `.part`，成功校验后原子改名；同一损坏工件最多重试一次。
+
+## 开发效率目标
+
+| 项目 | V2 门槛 |
+| --- | --- |
+| 日常显式编译 | 0 次 |
+| renderer 修改生效 | ≤ 1.5 秒 |
+| main/preload 修改生效 | ≤ 3 秒 |
+| 第二次 bootstrap | 零下载 |
+| Store 完成 | cold diff=0 + Overview Complete |
+| 默认包上传 | 同名唯一 `Validated` |
+| 工具状态 | 全部在工作区 `.cache/` |
+
+## 质量命令
+
+```powershell
+node .\bin\qam.mjs check
+node --test
+git diff --check
 ```
 
----
+真实 Windows 验收见 `docs/v2/windows-smoke-test.md`。Partner Center 执行边界见 `docs/partner-center/运行契约.md`。
 
-## 四大核心支柱机制（The 4 Pillars）
+## 官方资料
 
-### 1. 【网络与素材支柱】中国大陆 100% 畅通红线
-* **绝对红线**：开发环境 100% 位于中国境内，**严禁一切下载海外资源的尝试**（直连 GitHub releases、raw.githubusercontent、海外未镜像 API 必被墙卡死）。
-* **全工具链绿色免安装**：
-  * Git 统一采用 npmmirror 国内镜像源的 MinGit 绿色包，解压至工作区根目录 `git\`（与 `quick-app-maker` 同级）；
-  * .NET 10 SDK 统一采用官方 Binaries 绿色压缩包（`dotnet-sdk-10.0.400-win-x64.zip`），解压至工作区根目录 `dotnet\`（通过 `$env:DOTNET_ROOT` 挂载使用，绝不运行任何 EXE 安装器，绝不写 `C:\Program Files`）。
-* **素材黄金准则**：
-  * 音效优先复制系统自带 `C:\Windows\Media\*.wav`（零网络、零下载）；
-  * 图标优先使用 XAML 内置 `Segoe Fluent Icons` 字体字形与 `PersonPicture` 控件；
-  * 图片使用 `test-assets.md` 已验证的国内 CDN（清华 TUNA、阿里云 OSS、Gitee 镜像、`img.scdn.io`）；
-  * **搜不到国内可靠源立即彻底放弃下载，改为本地 PowerShell GDI+ 绘图或 XAML 控件拟态！**
-
-### 2. 【编码与质量支柱】WinUI 3 一次性写对 5 大黄金铁律
-* **【铁律 1】DataTemplate 必须显式声明 `x:DataType`**：凡使用 `{x:Bind}`，根节点必须声明 `x:DataType="models:Class"`。看到 `WMC9999 ErrorMessages.resources` 假死错误 100% 是漏写了 x:DataType，严禁改依赖换包！
-* **【铁律 2】ContentDialog 必须设置 `XamlRoot`**：打开弹窗前必须赋予 `XamlRoot = this.Content.XamlRoot`，否则底层必抛 `0xc000027b` 原生闪退！
-* **【铁律 3】计划通知标准范式**：CsWinRT 投影无 `Recurrence` 属性，每年提醒采用循环单次调度，catch 时打印 `HResult`（`0x803E0120` 为管理员会话系统限制，视为正常）。
-* **【铁律 4】默认开发链零提权、零本地证书循环、零 C 盘系统目录写入**：
-  - **底层根因（坑 62）**：AI Runner 执行线程运行在私有桌面 `WinSta0\exebox-*`，跨 Desktop 发起 `runas` 会被底层报 `0x80070032` 拦截；
-  - **工程实践**：Git 和 .NET 10 SDK 全程使用工作区根目录 `git\` 与 `dotnet\` 下的绿色免安装版；本机试用统一使用 `winapp run --detach` 开发注册，不创建 MSIX 签名证书；Store 上传包与商店外精确侧载分开处理。
-* **【铁律 5】国内 NuGet 还原极速源**：依赖还原强制指定国内 Azure CDN 源 `https://nuget.azure.cn/v3/index.json`。
-
-### 3. 【体验与协同支柱】双轨并行与自动化建项验重
-* **构建主干**：需求确认后启动构建，编译命令保持前台单实例，通过 `winapp run --detach` 启动并用 `winapp ui` 做黑盒测试；商店包在用户明确进入发布阶段后单独生成。
-* **全新产品建项与验重**：发布全新应用时，通过 `Invoke-EdgeStore.ps1 -Action reserve -AppName "应用名称" -Manifest build/edge-store.json` 自动在控制台完成 `+ 新产品 -> MSIX 或 PWA -> 检查可用性 -> 保留产品名称 -> 自动提取 3 大 Identity 并回填 Package.appxmanifest`，0 次打扰用户。
-
-### 4. 【交付与发布支柱】声明式状态收敛 & Store 全流程自动化流水线
-* **首版交付心智**：第一版安装到电脑后，Agent 热情邀请用户试用：“已装在电脑上，随时可以打开把玩，哪里不顺手随时告诉我，我们继续修改直到你满意为止”，**严禁首版主动推销上架**。
-* **声明式状态收敛标准执行流**：
-  * **场景 A：全新应用上架**：
-    1. 启动会话：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action launch -StateDir .\.cache\edge-store-state -KeepOpen`（用户完成首次登录）。
-    2. 自动建项验重：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action reserve -AppName "应用名称" -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state`（自动建项、预留、提取 Identity 并回填清单）。
-    3. 自包含发布：`dotnet publish <project> -c Release -r win-x64 --self-contained true -o ./publish /p:WindowsAppSDKSelfContained=true /p:UseSharedCompilation=false`
-    4. 生成 Store 上传包：`winapp package ./publish --manifest ./Package.appxmanifest --self-contained --executable <AppName>.exe --output ./store-package/<Identity>_<Version>_x64.msix`
-    5. 离线质检：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action preflight -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state`
-    6. 离散填报：逐次执行 `step`、`cleanlanguages`、`filllisting`、`inspectoptions`、`filloptions`，每步审查 DOM 证据。
-    7. 提审交付：`verify` 冷加载确认概览模块后，由用户在浏览器中审核并亲自点击提交。
-  * **场景 B：已有应用更新 / 单表断点续跑**：
-    1. 快速探针：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action inspect -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state`
-    2. 单表执行：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action step -Phase <phase> -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state -Apply -KeepOpen`，其中 `<phase>` 取 `availability`、`properties`、`ageRatings` 或 `packages`。
-    3. 全局核验：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\quick-app-maker\toolchain\edge-store-cli\Invoke-EdgeStore.ps1 -Action verify -Manifest .\<app>\build\edge-store.json -StateDir .\.cache\edge-store-state`
-
----
-
-## 历史实测战绩记录（Smoke Test Record）
-
-本仓库所有命令与规则均在真实 Windows x64 机器上经历多轮完整闭环实测验证：
-
-| 轮次 | 测试应用 | 测试结果 | 沉淀核心成果 |
-| :--- | :--- | :--- | :--- |
-| **轮次 1~3** | SmokeTest 基础工程 | 链路全通 | 确立自包含打包三件套、`winapp ui` 自动化黑盒测试规范 |
-| **轮次 4** | 纪念日 DaysMatter | 链路全通 | 沉淀数据预置法、ContentDialog 模式，新增 7 个坑点（26~32 条） |
-| **轮次 5** | RememberWhat 记得什么 | 31 分钟全通 | 解决计划通知底层投影问题，新增 4 个坑点（33~36 条），确立降噪屏障 |
-| **轮次 6** | OldTimes 旧时光 | 链路全通 | 攻克 XamlCompiler `WMC9999` 根因、弹窗 `XamlRoot` 崩溃，确立 5 大黄金铁律（37~41 条） |
-| **轮次 7** | 牵挂 Qiangua (App研发) | 链路全通 | 确立封面双动画、导航目录与 DatePicker 投影非空规则 |
-| **轮次 8** | 牵挂笔记 (Store表单实测) | 6表全通 | 攻克 `winapp package --output`、`Windows.Universal` 依赖污染、6 大表单全字段标准（42~46 条） |
-| **轮次 9** | 牵挂笔记 (Edge CLI 实测) | 全链收敛 | 攻克 UTF-8 BOM 编码、$PID 保留变量、VoidTaskResult 截断、CDP 粘包、Angular `he-select` 原生点击与动态 Submission ID 发现（47~53 条），建立 Store 0~7 状态收敛体系 |
+- [Node.js Releases](https://nodejs.org/en/about/previous-releases)
+- [Electron 安装与镜像](https://www.electronjs.org/docs/latest/tutorial/installation)
+- [Microsoft Electron + WinApp CLI](https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/guides/electron-setup)
+- [Microsoft Electron MSIX](https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/guides/electron-packaging)
+- [Microsoft Store Win32 分发](https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-distribute-your-win32-app-through-microsoft-store)
+- [Playwright Locators](https://playwright.dev/docs/locators)

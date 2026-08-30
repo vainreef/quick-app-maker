@@ -1,145 +1,123 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$Destination = '',
     [string]$Branch = 'main'
 )
 
-$repoUrl = 'https://gitee.com/freevian/quick-app-maker.git'
-$gitVersion = '2.47.1.windows.1'
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+
+$workspaceRoot = (Get-Location).Path
+if ([string]::IsNullOrWhiteSpace($Destination)) {
+    $Destination = Join-Path $workspaceRoot 'quick-app-maker'
+}
+if (Test-Path -LiteralPath (Join-Path $workspaceRoot '.git')) {
+    $Destination = $workspaceRoot
+}
+
+$nodeVersion = '24.20.0'
+$nodeFile = "node-v$nodeVersion-win-x64.zip"
+$nodeUrl = "https://registry.npmmirror.com/-/binary/node/v$nodeVersion/$nodeFile"
+$nodeSha256 = '6cac9ffbca8f6a47091e4b5c772e0606049c3871cb67d900c0cedde630e545ba'
+$cacheRoot = Join-Path $workspaceRoot '.cache\bootstrap'
+$nodeRoot = Join-Path $workspaceRoot 'node'
+$nodeExe = Join-Path $nodeRoot 'node.exe'
+$nodeArchive = Join-Path $cacheRoot $nodeFile
+$gitRoot = Join-Path $workspaceRoot 'git'
+$gitExe = Join-Path $gitRoot 'cmd\git.exe'
+$gitFile = 'MinGit-2.47.1-64-bit.zip'
 $gitUrl = 'https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/MinGit-2.47.1-64-bit.zip'
+$gitSha256 = '50b04b55425b5c465d076cdb184f63a0cd0f86f6ec8bb4d5860114a713d2c29a'
+$gitArchive = Join-Path $cacheRoot $gitFile
 
-$current = (Get-Location).Path
-$workspaceRoot = if (Test-Path -LiteralPath (Join-Path $current '.git')) { Split-Path -Parent $current } else { $current }
-if (-not $workspaceRoot) { $workspaceRoot = $current }
+New-Item -ItemType Directory -Force -Path $cacheRoot | Out-Null
 
-$minGitDir = Join-Path $workspaceRoot 'git'
-$minGitExe = Join-Path $minGitDir 'cmd\git.exe'
-$bootstrapCache = Join-Path $workspaceRoot '.cache\bootstrap'
-$gitArchive = Join-Path $bootstrapCache 'MinGit-2.47.1-64-bit.zip'
-$gitLog = Join-Path $bootstrapCache 'git-clone.log'
-
-New-Item -ItemType Directory -Force -Path $bootstrapCache | Out-Null
-
-function Write-Step {
-    param([string]$Message)
+function Write-Step([string]$Message) {
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $Message"
 }
 
-function Find-SystemGit {
-    $command = Get-Command git.exe -ErrorAction SilentlyContinue
-    if ($command) { return $command.Source }
-
-    $candidates = @(
-        'C:\Program Files\Git\cmd\git.exe',
-        (Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd\git.exe')
-    )
-    foreach ($candidate in $candidates) {
-        if (Test-Path -LiteralPath $candidate) { return $candidate }
+function Download-Verified([string]$Url, [string]$OutputPath, [string]$ExpectedSha256) {
+    $part = "$OutputPath.part"
+    if ((Test-Path -LiteralPath $OutputPath) -and $ExpectedSha256) {
+        $existing = (Get-FileHash -LiteralPath $OutputPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($existing -eq $ExpectedSha256.ToLowerInvariant()) { return }
+        Remove-Item -LiteralPath $OutputPath -Force
     }
-    return $null
-}
-
-if ([string]::IsNullOrWhiteSpace($Destination)) {
-    if (Test-Path -LiteralPath (Join-Path $current '.git')) {
-        $Destination = $current
-    }
-    else {
-        $Destination = Join-Path $workspaceRoot 'quick-app-maker'
-    }
-}
-
-$git = $null
-if (Test-Path -LiteralPath $minGitExe) {
-    $git = (Resolve-Path -LiteralPath $minGitExe).Path
-    Write-Step "Workspace MinGit ready: $git"
-}
-else {
-    Write-Step "MinGit $gitVersion (portable, zero-UAC) missing; downloading from npmmirror"
-    if (-not (Test-Path -LiteralPath $gitArchive)) {
+    if (-not (Test-Path -LiteralPath $OutputPath)) {
+        Write-Step "Downloading $([IO.Path]::GetFileName($OutputPath)) from the China mirror"
         $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
         if ($curl) {
-            $previousErrorPreference = $ErrorActionPreference
-            $ErrorActionPreference = 'Continue'
-            & $curl.Source --silent --show-error -L --fail --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 1800 -o $gitArchive $gitUrl
-            $curlExitCode = $LASTEXITCODE
-            $ErrorActionPreference = $previousErrorPreference
-            if ($curlExitCode -ne 0) {
-                Write-Step "MinGit download via curl failed (exit $curlExitCode), falling back to Invoke-WebRequest"
-                Invoke-WebRequest -UseBasicParsing -Uri $gitUrl -OutFile $gitArchive
-            }
+            & $curl.Source --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 1800 -o $part $Url
+            if ($LASTEXITCODE -ne 0) { throw "Download failed: $Url (exit $LASTEXITCODE)" }
+        } else {
+            Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $part
         }
-        else {
-            Invoke-WebRequest -UseBasicParsing -Uri $gitUrl -OutFile $gitArchive
+        if (-not (Test-Path -LiteralPath $part)) { throw "Download produced no file: $part" }
+        if ($ExpectedSha256) {
+            $actual = (Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $ExpectedSha256.ToLowerInvariant()) { throw "SHA-256 mismatch for ${OutputPath}: ${actual}" }
         }
-    }
-
-    if (Test-Path -LiteralPath $gitArchive) {
-        Write-Step "Extracting MinGit (portable, zero-UAC) to $minGitDir"
-        New-Item -ItemType Directory -Force -Path $minGitDir | Out-Null
-        Expand-Archive -LiteralPath $gitArchive -DestinationPath $minGitDir -Force
-        if (Test-Path -LiteralPath $minGitExe) {
-            $git = (Resolve-Path -LiteralPath $minGitExe).Path
-        }
-    }
-
-    if (-not $git) {
-        Write-Step "Workspace MinGit extraction incomplete; checking system Git as fallback"
-        $git = Find-SystemGit
+        Move-Item -LiteralPath $part -Destination $OutputPath -Force
     }
 }
 
-if (-not $git -or -not (Test-Path -LiteralPath $git)) { throw 'Git executable was not found after bootstrap' }
+$nodeReady = $false
+if (Test-Path -LiteralPath $nodeExe) {
+    $nodeReady = (& $nodeExe --version 2>$null).Trim() -eq "v$nodeVersion"
+}
+if (-not $nodeReady) {
+    Download-Verified $nodeUrl $nodeArchive $nodeSha256
+    $staging = Join-Path $cacheRoot 'node-extract'
+    if (Test-Path -LiteralPath $staging) { Get-ChildItem -LiteralPath $staging -Force | Remove-Item -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $staging | Out-Null
+    Expand-Archive -LiteralPath $nodeArchive -DestinationPath $staging -Force
+    $inner = Get-ChildItem -LiteralPath $staging -Directory | Select-Object -First 1
+    if (-not $inner) { throw 'Node archive has no top-level directory.' }
+    if (Test-Path -LiteralPath $nodeRoot) { Get-ChildItem -LiteralPath $nodeRoot -Force | Remove-Item -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $nodeRoot | Out-Null
+    Get-ChildItem -LiteralPath $inner.FullName -Force | Move-Item -Destination $nodeRoot -Force
+}
+if (-not (Test-Path -LiteralPath $nodeExe)) { throw "Portable Node was not found at $nodeExe" }
 
-$gitCmdDir = Split-Path -Parent $git
-if ($env:PATH -notlike "*$gitCmdDir*") {
-    $env:PATH = "$gitCmdDir;$env:PATH"
+$git = Get-Command git.exe -ErrorAction SilentlyContinue
+if ($git) {
+    $gitPath = $git.Source
+} elseif (Test-Path -LiteralPath $gitExe) {
+    $gitPath = (Resolve-Path -LiteralPath $gitExe).Path
+} else {
+    Download-Verified $gitUrl $gitArchive $gitSha256
+    $staging = Join-Path $cacheRoot 'git-extract'
+    if (Test-Path -LiteralPath $staging) { Get-ChildItem -LiteralPath $staging -Force | Remove-Item -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $staging | Out-Null
+    Expand-Archive -LiteralPath $gitArchive -DestinationPath $staging -Force
+    $inner = Get-ChildItem -LiteralPath $staging -Directory | Select-Object -First 1
+    New-Item -ItemType Directory -Force -Path $gitRoot | Out-Null
+    Get-ChildItem -LiteralPath $inner.FullName -Force | Move-Item -Destination $gitRoot -Force
+    if (-not (Test-Path -LiteralPath $gitExe)) { throw "Portable Git was not found at $gitExe" }
+    $gitPath = (Resolve-Path -LiteralPath $gitExe).Path
 }
 
-if (Test-Path -LiteralPath (Join-Path $Destination '.git')) {
-    Write-Step "Repository already exists: $Destination"
-    $pullArgs = "-C `"$Destination`" pull --ff-only origin `"$Branch`""
-    $pull = Start-Process -FilePath $git `
-        -ArgumentList $pullArgs `
-        -RedirectStandardOutput $gitLog `
-        -RedirectStandardError "$gitLog.err" `
-        -PassThru -Wait
-    if ($pull.ExitCode -ne 0) {
-        throw "Gitee pull exit code $($pull.ExitCode). See $gitLog.err"
-    }
-}
-else {
+if (-not (Test-Path -LiteralPath (Join-Path $Destination '.git'))) {
     if (Test-Path -LiteralPath $Destination) {
-        $contents = @(Get-ChildItem -LiteralPath $Destination -Force -ErrorAction SilentlyContinue)
-        if ($contents.Count -gt 0) {
-            throw "Destination exists and is not empty: $Destination"
-        }
+        $items = @(Get-ChildItem -LiteralPath $Destination -Force)
+        if ($items.Count -gt 0) { throw "Destination exists and is not empty: $Destination" }
     }
-    Write-Step "Cloning Gitee repository to $Destination"
-    $cloneArgs = "clone --branch `"$Branch`" `"$repoUrl`" `"$Destination`""
-    $clone = Start-Process -FilePath $git `
-        -ArgumentList $cloneArgs `
-        -RedirectStandardOutput $gitLog `
-        -RedirectStandardError "$gitLog.err" `
-        -PassThru -Wait
-    if ($clone.ExitCode -ne 0) {
-        throw "Gitee clone exit code $($clone.ExitCode). See $gitLog.err"
-    }
+    Write-Step "Cloning quick-app-maker into $Destination"
+    & $gitPath clone --branch $Branch 'https://gitee.com/freevian/quick-app-maker.git' $Destination
+    if ($LASTEXITCODE -ne 0) { throw "Git clone failed with exit code $LASTEXITCODE" }
+} elseif ($Destination -ne $workspaceRoot) {
+    Write-Step "Updating quick-app-maker from Gitee"
+    & $gitPath -C $Destination pull --ff-only origin $Branch
+    if ($LASTEXITCODE -ne 0) { throw "Git pull failed with exit code $LASTEXITCODE" }
 }
 
-$head = (& $git -C $Destination rev-parse --short HEAD | Out-String).Trim()
-$workspaceRoot = Split-Path -Parent $Destination
-Write-Step "Repository ready: $head"
-Write-Step "Git executable: $git"
-Write-Step "Workspace root: $workspaceRoot"
-Write-Step "NOTE: 所有 App 项目、.cache/ 工具缓存与临时文件均放置于当前工作目录。"
-
-$installerScript = Join-Path $Destination 'bootstrap\install.ps1'
-if (-not (Test-Path -LiteralPath $installerScript)) {
-    throw "Repository installer is missing: $installerScript"
-}
-
-Write-Step 'Starting repository toolchain installer'
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installerScript -RepoRoot $Destination -GitPath $git
-if ($LASTEXITCODE -ne 0) {
-    throw "Repository toolchain installer exit code $LASTEXITCODE"
-}
+$env:PATH = "$nodeRoot;$env:PATH"
+$env:npm_config_userconfig = Join-Path $workspaceRoot '.cache\npmrc'
+Write-Step "Running Node bootstrap: $Destination"
+& $nodeExe (Join-Path $Destination 'bin\qam.mjs') bootstrap --workspace-root $workspaceRoot
+if ($LASTEXITCODE -ne 0) { throw "Node bootstrap failed with exit code $LASTEXITCODE" }
+Write-Host ''
+Write-Host 'BOOTSTRAP_READY'
+Write-Host "NODE_PATH: $nodeExe"
+Write-Host "WORKSPACE_ROOT: $workspaceRoot"
+Write-Host 'NEXT_ACTION: read skills/vainreef-fast-publish/SKILL.md and start discovery'

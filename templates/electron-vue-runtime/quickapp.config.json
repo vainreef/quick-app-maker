@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 2,
+  "name": "__APP_NAME__",
+  "slug": "__SLUG__",
+  "framework": "electron-vue-runtime",
+  "bundler": "none"
+}

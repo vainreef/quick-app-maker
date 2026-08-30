@@ -1,0 +1,32 @@
+{
+  "name": "quick-app-maker",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Node.js and Electron app generator with Microsoft Store workflow automation",
+  "type": "module",
+  "bin": {
+    "qam": "bin/qam.mjs"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "node bin/qam.mjs check",
+    "test": "node --test",
+    "doctor": "node bin/qam.mjs doctor"
+  },
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "dependencies": {
+    "playwright-core": "1.62.1"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.0.0",
+    "vue": "3.5.42"
+  },
+  "optionalDependencies": {
+    "@microsoft/winappcli": "0.6.2"
+  }
+}

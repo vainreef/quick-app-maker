@@ -1,0 +1,26 @@
+{
+  "name": "__SLUG__",
+  "productName": "__APP_NAME__",
+  "version": "0.1.0",
+  "description": "__APP_NAME__",
+  "author": "Quick App Maker",
+  "main": "src/main/main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "node tools/dev.cjs",
+    "test": "node --test",
+    "package:layout": "node tools/package-layout.cjs",
+    "package:store": "node tools/package-store.cjs"
+  },
+  "dependencies": {
+    "vue": "3.5.42"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.0.0"
+  },
+  "optionalDependencies": {
+    "@microsoft/winappcli": "0.6.2"
+  }
+}

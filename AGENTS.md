@@ -1,23 +1,65 @@
-# quick-app-maker Agent Contract
+# Quick App Maker V2 Agent Contract
 
-## Partner Center publishing
+## 目标
 
-Before touching Microsoft Partner Center automation, read:
+主线是 Node.js / Electron。所有新 App、CLI、测试和 Store 自动化都从 `bin/qam.mjs` 进入。旧的 C#、.NET、WinUI、PowerShell CDP 驱动已从 V2 删除。
 
-1. `docs/partner-center/Agent-运行契约.md`
-2. `docs/partner-center/Edge-Store-可靠性重构.md`
-3. `skills/vainreef-fast-publish/SKILL.md`
+## 工具链
 
-The only supported implementation is `toolchain/edge-store-cli/`. The ignored `apps/Project/edge-store-cli-fast/` tree is a prior diagnostic copy; never select its historical DLL or `_tmp-diag` scripts from `process.md` as the implementation. The local copy is synchronized for compatibility, but source changes belong in `toolchain/edge-store-cli/`.
+- Node.js 24 LTS portable：`WORKSPACE_ROOT/node/`；
+- npm：随 Node 提供，使用工作区 npmrc 和 `.cache/npm`；
+- Electron：固定版本，二进制使用 China mirror 和工作区 cache；
+- Store：Playwright + `playwright-core` 连接独立 Edge；
+- MSIX：Electron production layout 后调用本地 `@microsoft/winappcli`。
 
-## Required completion semantics
+唯一保留的 PowerShell 是 bootstrap 下载桥和 Windows 默认桌面启动桥；业务状态、页面定位、编排、验证全部用 Node。
 
-- Identify `PageKind` before waiting for a control.
-- Treat `0 form differences`, a successful click, same-DOM values, and `EXIT=0` as intermediate evidence.
-- After Apply, cold-load and recompute the complete phase diff.
-- Verify the corresponding submission-overview module is `Complete` before writing checkpoint `Converged` or reporting `PRODUCT_VERIFIED`.
-- A read-only run that finds differences returns exit code 4 and does not write completion.
-- Never upload a package when a same-name row is Processing, Error, or duplicated; only one `Validated` row is upload success.
-- Use `inspect` or `status` for current-page status; `run -Phase all` is an explicit six-phase operation, not a status probe.
-- For brand new product submissions, execute `Invoke-EdgeStore.ps1 -Action reserve -AppName "<AppName>" -Manifest <manifest>` to automate name reservation and Identity extraction. Never dump manual Partner Center console steps onto the user or prompt interactive choice dialogs.
-- Workspace boundary: All files, downloads, caches (.cache/), and scripts MUST strictly reside in the current working directory. Never download, write, or access files in $env:TEMP, %LOCALAPPDATA%, C:\Users\..., or /tmp.
+## 工作区边界
+
+下载、缓存、日志、测试 profile、截图、DOM 和 checkpoint 必须写入当前工作区。禁止把工具工件写到系统临时目录、用户全局 npm 目录或工作区之外。启动系统 Edge 时只读取可执行文件位置，不读取用户日常 profile；生产 App 的系统 `userData` 由 App 自己使用，Agent 通过 UI 验证，不直接读取。
+
+## Store 完成语义
+
+控制器必须执行：
+
+```text
+PageKind → 完整 Observe → Diff → Apply
+→ 当前 URL 冷导航 → 完整 Observe + Diff=0
+→ Overview 模块显式 Complete → Converged
+```
+
+退出码：
+
+| 码 | 含义 |
+| ---: | --- |
+| 0 | 阶段或总检已验证 |
+| 1 | 执行错误或验证失败 |
+| 2 | 配置、参数或 manifest 错误 |
+| 3 | Node、Edge 或 Playwright 会话不可用 |
+| 4 | 只读计划发现差异 |
+| 5 | 页面 schema/selector 漂移 |
+| 6 | 时间预算耗尽 |
+
+`Converged` 证据必须同时包含 `pageKind`、`coldDiff`、`overviewStatus`、`overviewUrl`、证据文件 ID。Unknown、Processing、Error、重复包和缺少模块状态均保持未完成。
+
+## 浏览器规则
+
+1. 任何控件操作前先识别 `PageKind`。
+2. 首选 `getByRole`、`getByLabel`、`getByText` 和 `getByTestId`。
+3. Playwright Locator 默认穿透 open Shadow DOM；禁止保存会失效的节点索引。
+4. 等待使用 Locator assertion、`waitForURL`、`waitForFunction` 或有截止时间的轮询；业务代码禁止固定 sleep。
+5. 上传使用 `setInputFiles`；特殊 closed shadow 才进入集中 CDP fallback。
+6. 会话使用工作区独立 profile，不接管用户日常 Edge。
+7. CLI 不实现最终认证提交点击。
+
+## 运行要求
+
+- 同一 App 同时只允许一个 dev/package/store writer；
+- 每次命令生成 run id 和结构化证据；
+- checkpoint 原子写入并校验 manifest hash、productId、submissionId；
+- 页面错误保存 screenshot、ARIA snapshot、DOM 摘要、console/network 诊断；
+- 日常 App 开发零显式编译；MSIX 仅在发布阶段封装一次。
+
+## 交付
+
+首版先邀请用户打开体验并收集修改意见；用户明确提出发布后，才进入 `reserve → package → preflight → store`。

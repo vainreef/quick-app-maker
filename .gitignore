@@ -1,45 +1,18 @@
-# macOS / editor
-.DS_Store
-.vscode/
-.idea/
-*.swp
-*.swo
-__pycache__/
-*.pyc
-
-
-# .NET / Windows build output
-**/bin/
-**/obj/
-**/TestResults/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
-# Generated packaging scratch space
-artifacts/
-publish/
-packages/
-
-# Local secrets and signing material
-.env
-.env.*
-!.env.example
+.cache/
+node/
+node_modules/
+out/
+dist/
+*.log
+*.tmp
+*.part
+*.msix
+*.msixbundle
+*.msixupload
 *.pfx
 *.p12
-*.pem
-*.key
-
-# Local tool and bootstrap caches (strictly within workspace)
-.cache/
-.bootstrap-entry.ps1
-smoke-app/
-.test-scratch*
-.nuget/
-
-# Edge Store CLI runtime state (isolated profile, logs, checkpoints)
-toolchain/edge-store-cli/state/
-
-# User app workspace: local only, never push to repository
-apps/
+devcert.*
+coverage/
+playwright-report/
+test-results/
+.DS_Store
