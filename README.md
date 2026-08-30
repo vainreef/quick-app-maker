@@ -16,6 +16,7 @@ bootstrap → 需求访谈 → create → dev → test → 用户试用
 在一个全新的 Windows 工作目录执行：
 
 ```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
 $entry = Join-Path (Get-Location).Path '.qam-entry.ps1'
 Invoke-WebRequest -UseBasicParsing `
   -Uri 'https://gitee.com/freevian/quick-app-maker/raw/main/bootstrap/entry.ps1' `
