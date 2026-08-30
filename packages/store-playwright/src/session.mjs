@@ -56,7 +56,15 @@ export class EdgeSession {
     if (!this.context) throw new Error('Edge has no browser context');
     const pages = this.context.pages(); this.page = pages.find(item => item.url().includes('partner.microsoft.com')) || pages[0];
     if (!this.page) this.page = await this.context.newPage();
+    this.attachDiagnostics(this.page);
     return { browser: this.browser, context: this.context, page: this.page, session: this.session };
+  }
+  attachDiagnostics(page) {
+    if (this.diagnosticPage === page) return;
+    this.diagnosticPage = page;
+    page.on('console', message => this.logger?.event('BROWSER_CONSOLE', { level: message.type(), text: redact(message.text()) }));
+    page.on('pageerror', error => this.logger?.event('BROWSER_PAGE_ERROR', { message: redact(error.message), stack: redact(error.stack || '') }));
+    page.on('requestfailed', request => this.logger?.event('BROWSER_REQUEST_FAILED', { url: redact(request.url()), error: redact(request.failure()?.errorText || '') }));
   }
   async close() {
     try { await this.browser?.close(); } catch {}
@@ -82,4 +90,8 @@ function resolveEdgePath(value) {
     for (const root of [process.env.ProgramFiles, process.env['ProgramFiles(x86)']]) { if (root) { const candidate = path.join(root, 'Microsoft', 'Edge', 'Application', 'msedge.exe'); if (fs.existsSync(candidate)) return candidate; } }
   }
   return 'msedge.exe';
+}
+
+function redact(value) {
+  return String(value ?? '').replace(/(authorization|token|cookie|secret|password)(\s*[:=]\s*)[^\s,;]+/gi, '$1$2[REDACTED]');
 }

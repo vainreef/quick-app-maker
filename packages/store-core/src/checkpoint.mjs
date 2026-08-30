@@ -11,8 +11,8 @@ const transitions = new Map([
   ['Failed', new Set(['Observed', 'Applying', 'Failed'])]
 ]);
 
-export function createCheckpoint({ productId = '', manifestHash = '' } = {}) {
-  return { schemaVersion: 2, productId, manifestHash, submissionId: '', phaseStatuses: Object.fromEntries(PHASES.map(name => [name, 'Unknown'])), convergedPhases: [], evidence: {}, updatedAt: new Date().toISOString() };
+export function createCheckpoint({ productId = '', manifestHash = '', submissionId = '' } = {}) {
+  return { schemaVersion: 2, productId, manifestHash, submissionId, phaseStatuses: Object.fromEntries(PHASES.map(name => [name, 'Unknown'])), convergedPhases: [], evidence: {}, updatedAt: new Date().toISOString() };
 }
 
 export function loadCheckpoint(stateDir, identity = {}) {
@@ -20,8 +20,9 @@ export function loadCheckpoint(stateDir, identity = {}) {
   const value = readJson(filePath, null);
   if (!value) return createCheckpoint(identity);
   if (value.schemaVersion !== 2) return createCheckpoint(identity);
-  if (identity.productId && value.productId && identity.productId !== value.productId) return createCheckpoint(identity);
-  if (identity.manifestHash && value.manifestHash && identity.manifestHash !== value.manifestHash) return createCheckpoint(identity);
+  if (identity.productId && value.productId !== identity.productId) return createCheckpoint(identity);
+  if (identity.manifestHash && value.manifestHash !== identity.manifestHash) return createCheckpoint(identity);
+  if (identity.submissionId && value.submissionId !== identity.submissionId) return createCheckpoint(identity);
   return value;
 }
 

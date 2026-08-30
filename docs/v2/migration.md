@@ -6,7 +6,7 @@
 | --- | --- |
 | WinUI/XAML 工程 | Electron/Vue Runtime |
 | dotnet build | 源码直接运行 |
-| PowerShell launcher | `node bin/qam.mjs` |
+| Launcher | `bootstrap/qam.cmd`（固定调用工作区便携 Node） |
 | C# CDP client | Playwright Locator |
 | 固定 Task.Delay | Locator assertion / bounded poll |
 | 手写 checkpoint | schema 校验 + 原子写 |

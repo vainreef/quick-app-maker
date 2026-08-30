@@ -6,7 +6,23 @@ export class Deadline {
   assert(label = 'operation') { if (this.remaining() <= 0) { const error = new Error(`time budget exhausted: ${label}`); error.code = 'DEADLINE'; throw error; } }
 }
 
-export async function reconcilePhase({ phase, adapter, desired, checkpoint, evidence, logger, apply = false, deadline = new Deadline() }) {
+export async function reconcilePhase(args) {
+  const { phase, adapter, checkpoint, evidence } = args;
+  try {
+    return await reconcilePhaseCore(args);
+  } catch (error) {
+    let evidenceIds = [];
+    try { evidenceIds = await adapter.captureErrorEvidence?.(evidence, error) ?? []; } catch (captureError) { error.diagnosticError = captureError.message; }
+    try {
+      const current = checkpoint.phaseStatuses[phase] ?? 'Unknown';
+      if (current !== 'Failed') mark(checkpoint, phase, 'Failed', { error: error.message, evidenceIds, diagnosticError: error.diagnosticError ?? '' });
+    } catch (markError) { error.checkpointError = markError.message; }
+    if (evidenceIds.length) error.evidenceIds = evidenceIds;
+    throw error;
+  }
+}
+
+async function reconcilePhaseCore({ phase, adapter, desired, checkpoint, evidence, logger, apply = false, deadline = new Deadline() }) {
   deadline.assert(`${phase}:start`);
   const page = await adapter.ensurePage();
   if (!adapter.acceptedPageKinds.includes(page.kind)) throw Object.assign(new Error(`unexpected PageKind for ${phase}: ${page.kind}`), { code: 'SCHEMA_DRIFT' });

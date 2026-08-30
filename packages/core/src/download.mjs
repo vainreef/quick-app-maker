@@ -11,6 +11,10 @@ export async function sha256(filePath) {
   return hash.digest('hex');
 }
 
+export function sha256Sync(filePath) {
+  return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+}
+
 export async function downloadVerified({ workspace, url, outputPath, expectedSha256 = '', retries = 1, logger = null }) {
   const target = assertWithin(workspace, outputPath, 'download output');
   fs.mkdirSync(path.dirname(target), { recursive: true });

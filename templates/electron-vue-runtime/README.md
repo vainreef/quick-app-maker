@@ -6,12 +6,13 @@
 
 ## 命令
 
+从包含 `node/` 与 `quick-app-maker/` 的工作区根目录执行：
+
 ```powershell
-npm start
-npm run dev
-npm test
-npm run package:layout
-npm run package:store
+.\quick-app-maker\bootstrap\qam.cmd dev .\__SLUG__
+.\quick-app-maker\bootstrap\qam.cmd test .\__SLUG__
+.\quick-app-maker\bootstrap\qam.cmd package .\__SLUG__ --profile store
+.\quick-app-maker\bootstrap\qam.cmd store preflight --app .\__SLUG__
 ```
 
 ## 需求和商店素材

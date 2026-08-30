@@ -41,7 +41,7 @@ export async function waitForPageKind(page, accepted, { timeoutMs = 90_000, oper
 export async function waitUntil(predicate, { timeoutMs = 30_000, intervalMs = 250, label = 'condition' } = {}) {
   const end = Date.now() + timeoutMs; let lastError;
   while (Date.now() < end) {
-    try { if (await predicate()) return true; } catch (error) { lastError = error; }
+    try { if (await predicate()) return true; } catch (error) { if (error?.retryable === false || ['CONFIG', 'ERROR', 'SCHEMA_DRIFT', 'SESSION', 'DEADLINE'].includes(error?.code)) throw error; lastError = error; }
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
   throw new Error(`${label} timed out${lastError ? `: ${lastError.message}` : ''}`);

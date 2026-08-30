@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appRoot, assertWithin, ensureWorkspace, loadToolchain, configureNpmEnvironment, Logger, run, commandExists, writeAtomic, readJson } from '@quick-app/core';
+import { appRoot, assertWithin, ensureWorkspace, loadToolchain, configureNpmEnvironment, Logger, runNpm, runNodeScript, resolvePortableNode, sha256Sync, withWorkspaceLock, writeAtomic, readJson } from '@quick-app/core';
 import { createElectronApp } from '@quick-app/generator-electron';
 import { EXIT, PHASES, normalizePhase, loadDesired, saveDesired, validateDesired, importListingMarkdown, runId, loadCheckpoint, saveCheckpoint, EvidenceStore, Deadline, reconcilePhase } from '@quick-app/store-core';
 import { runPreflight } from '@quick-app/store-preflight';
@@ -17,7 +17,7 @@ try {
   const code = await dispatch(command, args);
   process.exitCode = code ?? 0;
 } catch (error) {
-  const code = error.code === 'DEADLINE' ? EXIT.DEADLINE : error.code === 'SCHEMA_DRIFT' ? EXIT.SCHEMA_DRIFT : error.code === 'SESSION' ? EXIT.SESSION : error.code === 'CONFIG' ? EXIT.CONFIG : error.code === 'DIFF' ? EXIT.DIFF : EXIT.ERROR;
+  const code = error.code === 'DEADLINE' ? EXIT.DEADLINE : error.code === 'SCHEMA_DRIFT' ? EXIT.SCHEMA_DRIFT : error.code === 'SESSION' || error.code === 'TOOLCHAIN' ? EXIT.SESSION : error.code === 'CONFIG' ? EXIT.CONFIG : error.code === 'DIFF' ? EXIT.DIFF : EXIT.ERROR;
   if (args.json) process.stdout.write(JSON.stringify({ ok: false, code, error: error.message, result: error.result ?? undefined }, null, 2) + '\n');
   else process.stderr.write(`[ERROR ${code}] ${error.message}\n`);
   process.exitCode = code;
@@ -28,6 +28,7 @@ async function dispatch(name, options) {
   if (name === 'doctor') return doctor();
   if (name === 'bootstrap') return bootstrap(options);
   if (name === 'check') return check();
+  if (name === 'self-test') return selfTest();
   if (name === 'create') return create(options);
   if (name === 'dev') return appCommand('dev', options);
   if (name === 'test') return appCommand('test', options);
@@ -37,63 +38,89 @@ async function dispatch(name, options) {
 }
 
 function help() {
-  console.log(`Quick App Maker V2\n\nCommands:\n  doctor\n  bootstrap\n  create --name NAME --slug SLUG\n  dev APP\n  test APP\n  package APP --profile store\n  store launch|reserve|preflight|discover|inspect|plan|apply|run|verify|status|stop --app APP\n  check\n`);
+  console.log(`Quick App Maker V2\n\nCommands:\n  doctor\n  bootstrap\n  self-test\n  create --name NAME --slug SLUG\n  dev APP\n  test APP\n  package APP --profile store\n  store launch|reserve|preflight|discover|inspect|plan|apply|run|verify|status|stop --app APP\n  check\n`);
   return 0;
 }
 
 async function doctor() {
-  const lock = loadToolchain(ROOT); const node = process.versions.node; const major = Number(node.split('.')[0]);
-  const report = { node, required: lock.node.version, npm: await npmVersion(), workspace, registry: lock.npm.registry, electron: lock.electron.version, playwright: lock.playwright.version, winapp: lock.winapp.version, platform: process.platform, ok: major === 24 };
+  const lock = loadToolchain(ROOT); const node = process.versions.node; const major = Number(node.split('.')[0]); const nodePath = resolvePortableNode(workspace); const workspaceNode = isWorkspaceNode(workspace, nodePath); const npm = await npmVersion(workspace); const nodeOk = process.platform === 'win32' ? node === lock.node.version : major === 24; const report = { node, required: lock.node.version, npm, nodePath, workspaceNode, workspace, registry: lock.npm.registry, electron: lock.electron.version, playwright: lock.playwright.version, winapp: lock.winapp.version, platform: process.platform, ok: nodeOk && Boolean(npm) && (process.platform !== 'win32' || workspaceNode) };
   console.log(JSON.stringify(report, null, 2));
   return report.ok ? 0 : 1;
 }
 
 async function bootstrap(options) {
-  const lock = loadToolchain(ROOT); const env = configureNpmEnvironment(workspace, lock); const logger = new Logger({ runId: runId('bootstrap'), root: path.join(workspace, '.cache/qam/bootstrap') });
-  for (const dir of ['.cache/npm', '.cache/electron', '.cache/qam/runs']) fs.mkdirSync(path.join(workspace, dir), { recursive: true });
-  const dependenciesReady = fs.existsSync(path.join(ROOT, 'node_modules', 'electron')) && fs.existsSync(path.join(ROOT, 'node_modules', 'playwright-core')) && (process.platform !== 'win32' || fs.existsSync(path.join(ROOT, 'node_modules', '@microsoft', 'winappcli')));
-  if (fs.existsSync(path.join(ROOT, 'package-lock.json')) && !dependenciesReady) {
-    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'; logger.info('npm-ci'); await run(npm, ['ci', '--ignore-scripts', '--prefer-offline'], { cwd: ROOT, env, logger, timeoutMs: 900_000 });
-  }
-  await installElectron(ROOT, env, logger);
-  logger.pass('bootstrap ready', { node: process.execPath, workspace });
-  console.log(`BOOTSTRAP_READY\nNODE_PATH: ${process.execPath}\nWORKSPACE_ROOT: ${workspace}`);
-  return 0;
+  return withWorkspaceLock(workspace, 'bootstrap', async () => {
+    const lock = loadToolchain(ROOT); const env = configureNpmEnvironment(workspace, lock); const bootstrapRunId = runId('bootstrap'); const logger = new Logger({ runId: bootstrapRunId, root: path.join(workspace, '.cache/qam/runs', bootstrapRunId) });
+    for (const dir of ['.cache/npm', '.cache/electron', '.cache/qam/runs']) fs.mkdirSync(path.join(workspace, dir), { recursive: true });
+    const dependenciesReady = packageDependenciesReady(ROOT);
+    if (fs.existsSync(path.join(ROOT, 'package-lock.json')) && !dependenciesReady) {
+      logger.info('npm-ci', { cwd: ROOT }); await runNpm(['ci', '--ignore-scripts', '--prefer-offline'], { cwd: ROOT, workspace, env, logger, timeoutMs: 900_000 });
+    }
+    await installElectron(ROOT, env, logger, workspace);
+    const missing = dependencyStatus(ROOT).missing;
+    if (missing.length) throw Object.assign(new Error(`bootstrap incomplete; missing: ${missing.join(', ')}`), { code: 'TOOLCHAIN' });
+    writeAtomic(workspace, path.join(logger.root, 'bootstrap-result.json'), { ok: true, node: process.execPath, workspace, dependencies: dependencyStatus(ROOT) });
+    logger.pass('bootstrap ready', { node: process.execPath, workspace });
+    console.log(`BOOTSTRAP_READY\nNODE_PATH: ${process.execPath}\nWORKSPACE_ROOT: ${workspace}`);
+    return 0;
+  });
+}
+
+async function selfTest() {
+  return withWorkspaceLock(workspace, 'self-test', async () => { const env = configureNpmEnvironment(workspace); const testRunId = runId('self-test'); const logger = new Logger({ runId: testRunId, root: path.join(workspace, '.cache/qam/runs', testRunId) }); const result = await runNpm(['test'], { cwd: ROOT, workspace, env, logger, timeoutMs: 900_000 }); return result.code; });
 }
 
 async function create(options) {
   const name = options.name ?? options._[0]; if (!name) throw Object.assign(new Error('create requires --name'), { code: 'CONFIG' }); const slug = options.slug;
-  const root = createElectronApp({ workspace, name, slug });
-  const env = configureNpmEnvironment(workspace); const logger = new Logger({ runId: runId('create'), root: path.join(workspace, '.cache/qam/runs', runId('create')) });
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'; await run(npm, ['install', '--ignore-scripts', '--prefer-offline'], { cwd: root, env, logger, timeoutMs: 900_000 }); await installElectron(root, env, logger);
-  console.log(`APP_CREATED: ${root}`); return 0;
+  return withWorkspaceLock(workspace, 'create', async () => {
+    const root = createElectronApp({ workspace, name, slug });
+    const env = configureNpmEnvironment(workspace); const createRunId = runId('create'); const logger = new Logger({ runId: createRunId, root: path.join(workspace, '.cache/qam/runs', createRunId) });
+    await runNpm(['install', '--ignore-scripts', '--prefer-offline'], { cwd: root, workspace, env, logger, timeoutMs: 900_000 }); await installElectron(root, env, logger, workspace); assertAppDependencies(root, false);
+    console.log(`APP_CREATED: ${root}`); return 0;
+  });
 }
 
-async function installElectron(cwd, env, logger) {
+async function installElectron(cwd, env, logger, workspaceRoot) {
   const ready = process.platform === 'win32' ? path.join(cwd, 'node_modules', 'electron', 'dist', 'electron.exe') : path.join(cwd, 'node_modules', 'electron', 'dist', 'Electron.app', 'Contents', 'MacOS', 'electron');
   if (fs.existsSync(ready)) return;
-  const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'; const bin = path.join(cwd, 'node_modules', '.bin', process.platform === 'win32' ? 'install-electron.cmd' : 'install-electron');
-  if (fs.existsSync(bin)) await run(npx, ['--no-install', 'install-electron', '--no'], { cwd, env, logger, timeoutMs: 900_000 });
+  const installer = path.join(cwd, 'node_modules', 'electron', 'install.js');
+  if (!fs.existsSync(installer)) throw Object.assign(new Error(`Electron installer not found: ${installer}`), { code: 'TOOLCHAIN' });
+  await runNodeScript(installer, [], { cwd, workspace: workspaceRoot, env, logger, timeoutMs: 900_000 });
+  if (!fs.existsSync(ready)) throw Object.assign(new Error(`Electron runtime was not installed at ${ready}`), { code: 'TOOLCHAIN' });
 }
 
 async function appCommand(action, options) {
   const root = appRoot(workspace, options.app ?? options._[0] ?? '.'); if (!fs.existsSync(path.join(root, 'package.json'))) throw Object.assign(new Error(`app package.json not found: ${root}`), { code: 'CONFIG' });
-  const env = configureNpmEnvironment(workspace); const logger = new Logger({ runId: runId(action), root: path.join(workspace, '.cache/qam/runs', runId(action)) }); const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const appDepsReady = fs.existsSync(path.join(root, 'node_modules', 'electron')) && fs.existsSync(path.join(root, 'node_modules', 'vue'));
-  if (!appDepsReady) await run(npm, ['install', '--ignore-scripts', '--prefer-offline'], { cwd: root, env, logger, timeoutMs: 900_000 });
-  await installElectron(root, env, logger);
-  if (action === 'package:store') { if (options.profile && options.profile !== 'store') throw Object.assign(new Error('only --profile store is supported'), { code: 'CONFIG' }); const desired = loadDesired(root); if (!desired.productId || desired.productId === 'PENDING' || !desired.package?.identityName || !desired.package?.publisher) throw Object.assign(new Error('reserve the Store name and identity before creating the Store package'), { code: 'CONFIG' }); }
-  const script = action === 'package:store' ? 'package:store' : action; const result = await run(npm, ['run', script], { cwd: root, env, logger, timeoutMs: action === 'package:store' ? 1_200_000 : 0 }); return result.code;
+  const lockName = `app-${path.relative(workspace, root)}`;
+  return withWorkspaceLock(workspace, lockName, async () => {
+    const env = configureNpmEnvironment(workspace); const actionRunId = runId(action); const logger = new Logger({ runId: actionRunId, root: path.join(workspace, '.cache/qam/runs', actionRunId) }); const needsWinApp = action === 'package:store';
+    const appDepsReady = appDependencyStatus(root, needsWinApp).packagesReady;
+    if (!appDepsReady) await runNpm(['install', '--ignore-scripts', '--prefer-offline'], { cwd: root, workspace, env, logger, timeoutMs: 900_000 });
+    await installElectron(root, env, logger, workspace); assertAppDependencies(root, needsWinApp);
+    if (action === 'package:store') { if (options.profile && options.profile !== 'store') throw Object.assign(new Error('only --profile store is supported'), { code: 'CONFIG' }); const desired = loadDesired(root); if (!desired.productId || desired.productId === 'PENDING' || !desired.package?.identityName || !desired.package?.publisher) throw Object.assign(new Error('reserve the Store name and identity before creating the Store package'), { code: 'CONFIG' }); }
+    const script = action === 'package:store' ? 'package:store' : action; const result = await runNpm(['run', script], { cwd: root, workspace, env, logger, timeoutMs: action === 'package:store' ? 1_200_000 : 0 }); return result.code;
+  });
 }
 
 async function store(options) {
-  const sub = options._[0] ?? 'help'; const root = appRoot(workspace, options.app ?? options._[1] ?? '.'); const desired = loadDesired(root); resolveDesiredPaths(root, desired); if (desired.listingMarkdown && fs.existsSync(desired.listingMarkdown)) importListingMarkdown(desired, desired.listingMarkdown); const stateDir = path.join(root, '.cache', 'store'); fs.mkdirSync(stateDir, { recursive: true }); const checkpoint = loadCheckpoint(stateDir, { productId: desired.productId }); const logger = new Logger({ runId: runId(`store-${sub}`), root: path.join(workspace, '.cache/qam/runs', runId(`store-${sub}`)) });
+  const sub = options._[0] ?? 'help';
+  if (sub !== 'status') {
+    const root = appRoot(workspace, options.app ?? options._[1] ?? '.');
+    return withWorkspaceLock(workspace, `app-${path.relative(workspace, root)}`, () => storeUnlocked(options));
+  }
+  return storeUnlocked(options);
+}
+
+async function storeUnlocked(options) {
+  const sub = options._[0] ?? 'help'; const root = appRoot(workspace, options.app ?? options._[1] ?? '.'); const desired = loadDesired(root); resolveDesiredPaths(root, desired); if (desired.listingMarkdown && fs.existsSync(desired.listingMarkdown)) importListingMarkdown(desired, desired.listingMarkdown); const stateDir = path.join(root, '.cache', 'store'); fs.mkdirSync(stateDir, { recursive: true }); const storeRunId = runId(`store-${sub}`); const manifestFile = desired.package?.manifestPath && fs.existsSync(desired.package.manifestPath) ? desired.package.manifestPath : ''; const manifestHash = manifestFile ? sha256Sync(manifestFile) : ''; const checkpoint = loadCheckpoint(stateDir, { productId: desired.productId, submissionId: desired.submissionId, manifestHash }); checkpoint.manifestHash = manifestHash || checkpoint.manifestHash; const logger = new Logger({ runId: storeRunId, root: path.join(workspace, '.cache/qam/runs', storeRunId) });
   if (sub === 'preflight') { const result = runPreflight({ workspace, appRoot: root, desired, outputPath: path.join(logger.root, 'preflight-result.json') }); console.log(JSON.stringify(result, null, 2)); return 0; }
   if (sub === 'status') { console.log(JSON.stringify({ checkpoint, session: readJson(path.join(stateDir, 'session.json'), null) }, null, 2)); return 0; }
   const session = new EdgeSession({ workspace, stateDir, baseUrl: appsOverviewUrl(desired.site.baseUrl), logger });
   if (sub === 'launch') { const result = await session.connect(); await waitForSignedIn(result.page); console.log(JSON.stringify({ ok: true, session: result.session, page: await capturePage(result.page) }, null, 2)); await result.browser.close(); return 0; }
   if (sub === 'stop') { if (fs.existsSync(session.statePath())) { session.session = readJson(session.statePath(), null); await session.close(); } else console.log('No active QAM Edge session.'); return 0; }
-  const connected = await session.connect(); const { page } = connected;
+  let connected = null;
+  try {
+    connected = await session.connect(); const { page } = connected;
   if (sub === 'reserve') { const name = options.name ?? desired.productName; if (!name) throw Object.assign(new Error('store reserve requires --name'), { code: 'CONFIG' }); await waitForSignedIn(page); const result = await reserveProduct({ page, appRoot: root, desired, name, logger }); desired.productId = result.productId; checkpoint.productId = result.productId; saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
   await waitForSignedIn(page);
   if (sub === 'discover') { const result = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = result.submissionId; checkpoint.routes = result.routes; saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
@@ -101,7 +128,10 @@ async function store(options) {
   if (sub === 'verify') { const result = await verifyAll(page, desired, checkpoint, logger); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return result.ok ? 0 : EXIT.DIFF; }
   if (sub === 'plan' || sub === 'apply') { const phase = normalizePhase(options.phase); if (phase === 'age-ratings' && options.confirmAgeRatings) { desired.ageRatings.confirmed = true; saveDesired(root, desired); } const validationErrors = validateDesired(desired, { strict: sub === 'apply', checkAge: phase === 'age-ratings' }); if (validationErrors.length) throw Object.assign(new Error(validationErrors.join('; ')), { code: 'CONFIG' }); if (!checkpoint.submissionId) { const discovery = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = discovery.submissionId; checkpoint.routes = discovery.routes; saveCheckpoint(workspace, stateDir, checkpoint); } const driver = new StoreDriver({ page, desired, checkpoint, logger }); const adapters = phaseAdapters(driver); const runRoot = path.join(workspace, '.cache/qam/runs', logger.runId); const evidence = new EvidenceStore(workspace, runRoot); let result; try { result = await reconcilePhase({ phase, adapter: adapters[phase], desired, checkpoint, evidence, logger, apply: sub === 'apply', deadline: new Deadline(Number(options.deadline ?? 3_600_000)) }); } finally { saveCheckpoint(workspace, stateDir, checkpoint); } console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return result.exitCode; }
   if (sub === 'run') { const apply = Boolean(options.apply); if (apply && options.confirmAgeRatings) { desired.ageRatings.confirmed = true; saveDesired(root, desired); } const validationErrors = validateDesired(desired, { strict: apply }); if (validationErrors.length) throw Object.assign(new Error(validationErrors.join('; ')), { code: 'CONFIG' }); if (!checkpoint.submissionId) { const discovery = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = discovery.submissionId; checkpoint.routes = discovery.routes; saveCheckpoint(workspace, stateDir, checkpoint); } let exit = 0; for (const phase of PHASES) { const driver = new StoreDriver({ page, desired, checkpoint, logger }); const adapters = phaseAdapters(driver); try { const result = await reconcilePhase({ phase, adapter: adapters[phase], desired, checkpoint, evidence: new EvidenceStore(workspace, path.join(logger.root, 'evidence')), logger, apply, deadline: new Deadline(Number(options.deadline ?? 3_600_000)) }); if (result.exitCode !== 0) { exit = result.exitCode; if (!apply) break; } } finally { saveCheckpoint(workspace, stateDir, checkpoint); } } await connected.browser.close(); return exit; }
-  throw Object.assign(new Error(`unknown store command: ${sub}`), { code: 'CONFIG' });
+    throw Object.assign(new Error(`unknown store command: ${sub}`), { code: 'CONFIG' });
+  } finally {
+    try { if (connected?.browser) await connected.browser.close(); else if (session.session) await session.close(); } catch {}
+  }
 }
 
 function resolveDesiredPaths(root, desired) {
@@ -119,12 +149,40 @@ async function verifyAll(page, desired, checkpoint, logger) { const url = `${des
 
 async function check() {
   const stale = []; const roots = ['toolchain', 'bootstrap/workers', 'skills/vainreef-fast-publish/references/toolchain/v1']; for (const item of roots) if (fs.existsSync(path.join(ROOT, item))) stale.push(item);
-  const required = ['bin/qam.mjs', 'qam-toolchain.lock.json', 'packages/core/src/index.mjs', 'packages/store-core/src/index.mjs', 'packages/store-playwright/src/index.mjs', 'packages/store-preflight/src/index.mjs', 'templates/electron-vue-runtime/package.json', 'skills/vainreef-fast-publish/SKILL.md']; const missing = required.filter(item => !fs.existsSync(path.join(ROOT, item)));
+  const required = ['bin/qam.mjs', 'qam-toolchain.lock.json', 'bootstrap/entry.ps1', 'bootstrap/qam.cmd', 'packages/core/src/index.mjs', 'packages/core/src/process.mjs', 'packages/core/src/lock.mjs', 'packages/store-core/src/index.mjs', 'packages/store-playwright/src/index.mjs', 'packages/store-preflight/src/index.mjs', 'templates/electron-vue-runtime/package.json', 'templates/electron-vue-runtime/tools/package-store.cjs', 'skills/vainreef-fast-publish/SKILL.md']; const missing = required.filter(item => !fs.existsSync(path.join(ROOT, item)));
   const legacyFiles = []; for (const file of walk(ROOT)) if (!file.includes(`${path.sep}node_modules${path.sep}`) && /\.(cs|csproj|sln)$/i.test(file)) legacyFiles.push(path.relative(ROOT, file));
   const lockText = fs.existsSync(path.join(ROOT, 'package-lock.json')) ? fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8') : '';
-  const errors = [...stale.map(x => `stale tree exists: ${x}`), ...missing.map(x => `missing: ${x}`), ...legacyFiles.map(x => `legacy source exists: ${x}`)]; if (/git\+|ssh:\/\/git|github\.com\/electron\/node-gyp/i.test(lockText)) errors.push('package-lock contains a non-mirror git dependency'); const result = { ok: errors.length === 0, errors, checkedAt: new Date().toISOString() }; console.log(JSON.stringify(result, null, 2)); return result.ok ? 0 : 1;
+  const bootstrapText = fs.existsSync(path.join(ROOT, 'bootstrap/entry.ps1')) ? fs.readFileSync(path.join(ROOT, 'bootstrap/entry.ps1'), 'utf8') : ''; const processText = fs.existsSync(path.join(ROOT, 'packages/core/src/process.mjs')) ? fs.readFileSync(path.join(ROOT, 'packages/core/src/process.mjs'), 'utf8') : ''; const qamText = fs.readFileSync(path.join(ROOT, 'bin/qam.mjs'), 'utf8'); const storeScript = fs.existsSync(path.join(ROOT, 'templates/electron-vue-runtime/tools/package-store.cjs')) ? fs.readFileSync(path.join(ROOT, 'templates/electron-vue-runtime/tools/package-store.cjs'), 'utf8') : ''; const manifest = readJson(path.join(ROOT, 'package.json'), {}); const toolchain = readJson(path.join(ROOT, 'qam-toolchain.lock.json'), {}); const versionChecks = [['playwright-core', manifest.dependencies?.['playwright-core'], toolchain.playwright?.version], ['electron', manifest.devDependencies?.electron, toolchain.electron?.version], ['@electron/packager', manifest.devDependencies?.['@electron/packager'], toolchain.packager?.version], ['vue', manifest.devDependencies?.vue, toolchain.ui?.version], ['@microsoft/winappcli', manifest.optionalDependencies?.['@microsoft/winappcli'], toolchain.winapp?.version]]; const errors = [...stale.map(x => `stale tree exists: ${x}`), ...missing.map(x => `missing: ${x}`), ...legacyFiles.map(x => `legacy source exists: ${x}`)]; for (const [name, actual, expected] of versionChecks) if (!expected || actual !== expected) errors.push(`toolchain version mismatch: ${name}=${actual ?? ''}, lock=${expected ?? ''}`); if (/git\+|ssh:\/\/git|github\.com\/electron\/node-gyp/i.test(lockText)) errors.push('package-lock contains a non-mirror git dependency'); if (/Get-Command\s+git(?:\.exe)?|\$gitPath\s*=\s*\$git\.Source/i.test(bootstrapText)) errors.push('bootstrap selects system Git'); if (!/cmd\\git\.exe/.test(bootstrapText)) errors.push('bootstrap does not validate portable Git'); if (!/npm-cli\.js/.test(bootstrapText) || !/--prefix\s+\$Destination\s+ci/.test(bootstrapText)) errors.push('bootstrap does not install dependencies before starting qam'); if (!/runNpm|resolveBundledNpmCli/.test(processText)) errors.push('process runner lacks bundled npm execution'); if (/npx\.cmd|npm\.cmd/.test(qamText) || /npx\.cmd|npm\.cmd|--no-install/.test(storeScript)) errors.push('project directly invokes a command shim'); const result = { ok: errors.length === 0, errors, checkedAt: new Date().toISOString() }; console.log(JSON.stringify(result, null, 2)); return result.ok ? 0 : 1;
 }
 
 function parseArgs(raw) { const result = { _: [] }; for (let i = 0; i < raw.length; i += 1) { const token = raw[i]; if (!token.startsWith('-')) { result._.push(token); continue; } const key = token.replace(/^-+/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase()); const next = raw[i + 1]; if (next && !next.startsWith('-')) { result[key] = next; i += 1; } else result[key] = true; } return result; }
-async function npmVersion() { const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'; try { return (await run(npm, ['--version'], { cwd: ROOT, allowFailure: true })).stdout.trim(); } catch { return ''; } }
+async function npmVersion(workspaceRoot) { try { return (await runNpm(['--version'], { cwd: ROOT, workspace: workspaceRoot, allowFailure: true })).stdout.trim(); } catch { return ''; } }
+function packageDependenciesReady(root) { return dependencyStatus(root).packagesReady; }
+function dependencyStatus(root) {
+  const lock = loadToolchain(ROOT);
+  const packages = {
+    electron: packageVersionMatches(path.join(root, 'node_modules', 'electron', 'package.json'), lock.electron.version),
+    packager: packageVersionMatches(path.join(root, 'node_modules', '@electron', 'packager', 'package.json'), lock.packager.version),
+    playwrightCore: packageVersionMatches(path.join(root, 'node_modules', 'playwright-core', 'package.json'), lock.playwright.version),
+    vue: packageVersionMatches(path.join(root, 'node_modules', 'vue', 'package.json'), lock.ui.version),
+    workspaceCore: packageVersionMatches(path.join(root, 'node_modules', '@quick-app', 'core', 'package.json'), '2.0.0'),
+    workspaceGenerator: packageVersionMatches(path.join(root, 'node_modules', '@quick-app', 'generator-electron', 'package.json'), '2.0.0'),
+    workspaceStoreCore: packageVersionMatches(path.join(root, 'node_modules', '@quick-app', 'store-core', 'package.json'), '2.0.0'),
+    workspaceStorePlaywright: packageVersionMatches(path.join(root, 'node_modules', '@quick-app', 'store-playwright', 'package.json'), '2.0.0'),
+    workspaceStorePreflight: packageVersionMatches(path.join(root, 'node_modules', '@quick-app', 'store-preflight', 'package.json'), '2.0.0'),
+    winapp: process.platform !== 'win32' || packageVersionMatches(path.join(root, 'node_modules', '@microsoft', 'winappcli', 'package.json'), lock.winapp.version) && fs.existsSync(path.join(root, 'node_modules', '@microsoft', 'winappcli', 'bin', process.arch === 'arm64' ? 'win-arm64' : 'win-x64', 'winapp.exe'))
+  };
+  const packagesReady = Object.values(packages).every(Boolean);
+  const runtime = process.platform === 'win32' ? path.join(root, 'node_modules', 'electron', 'dist', 'electron.exe') : path.join(root, 'node_modules', 'electron', 'dist', 'Electron.app', 'Contents', 'MacOS', 'electron');
+  const missing = Object.entries(packages).filter(([, ok]) => !ok).map(([name]) => name); if (!fs.existsSync(runtime)) missing.push('electron-runtime');
+  return { packagesReady, ok: missing.length === 0, missing, runtime };
+}
+function appDependencyStatus(root, needsWinApp) {
+  const lock = loadToolchain(ROOT); const packages = { electron: packageVersionMatches(path.join(root, 'node_modules', 'electron', 'package.json'), lock.electron.version), packager: packageVersionMatches(path.join(root, 'node_modules', '@electron', 'packager', 'package.json'), lock.packager.version), vue: packageVersionMatches(path.join(root, 'node_modules', 'vue', 'package.json'), lock.ui.version) };
+  if (needsWinApp) packages.winapp = packageVersionMatches(path.join(root, 'node_modules', '@microsoft', 'winappcli', 'package.json'), lock.winapp.version) && fs.existsSync(path.join(root, 'node_modules', '@microsoft', 'winappcli', 'bin', process.arch === 'arm64' ? 'win-arm64' : 'win-x64', 'winapp.exe'));
+  return { packagesReady: Object.values(packages).every(Boolean), packages };
+}
+function assertAppDependencies(root, needsWinApp) { const status = appDependencyStatus(root, needsWinApp); if (!status.packagesReady) { const missing = Object.entries(status.packages).filter(([, ok]) => !ok).map(([name]) => name); throw Object.assign(new Error(`app dependencies missing: ${missing.join(', ')}`), { code: 'TOOLCHAIN' }); } }
+function packageVersionMatches(file, expected) { const value = readJson(file, null); return Boolean(value && value.version === expected); }
+function isWorkspaceNode(root, nodePath) { const expected = process.platform === 'win32' ? path.join(root, 'node', 'node.exe') : path.join(root, 'node', 'bin', 'node'); return path.resolve(nodePath) === path.resolve(expected); }
 function* walk(root) { for (const entry of fs.readdirSync(root, { withFileTypes: true })) { if (['.git', 'node_modules', '.cache'].includes(entry.name)) continue; const file = path.join(root, entry.name); if (entry.isDirectory()) yield* walk(file); else yield file; } }

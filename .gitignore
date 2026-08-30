@@ -1,4 +1,5 @@
 .cache/
+.qam-entry.ps1
 node/
 node_modules/
 out/

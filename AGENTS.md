@@ -9,11 +9,13 @@
 - **禁止依赖与检查系统全局环境**：Agent 事先**不需要也不得**检查用户系统是否安装了 Git 或 Node.js，严禁调用用户系统全局环境；
 - **全链路内置便携环境**：
   - Node.js 24 LTS portable：`WORKSPACE_ROOT/node/`；
-  - Git portable（若系统无可用）：`WORKSPACE_ROOT/git/`；
+  - Git portable（始终使用工作区版本）：`WORKSPACE_ROOT/git/`；
   - npm：随 Node 提供，使用工作区 npmrc 和 `.cache/npm`；
   - Electron：固定版本，二进制使用 China mirror 和工作区 cache；
   - Store：Playwright + `playwright-core` 连接独立 Edge；
   - MSIX：Electron production layout 后调用本地 `@microsoft/winappcli`。
+
+Windows 命令统一通过 `bootstrap/qam.cmd` 进入；该包装器固定解析工作区 `node/node.exe` 与其内置 npm CLI。业务代码不直接启动 `npm.cmd`、`npx.cmd`，也不依赖 PATH 中的 Node/npm。
 
 唯一保留的 PowerShell 是 bootstrap 下载桥和 Windows 默认桌面启动桥；业务状态、页面定位、编排、验证全部用 Node。
 
@@ -62,6 +64,7 @@ PageKind → 完整 Observe → Diff → Apply
 - checkpoint 原子写入并校验 manifest hash、productId、submissionId；
 - 页面错误保存 screenshot、ARIA snapshot、DOM 摘要、console/network 诊断；
 - 日常 App 开发零显式编译；MSIX 仅在发布阶段封装一次。
+- 首次 bootstrap 先用便携 npm 建立 workspace 依赖，再加载 `bin/qam.mjs`；Electron 运行时下载完成并验证文件存在后才报告就绪。
 
 ## 交付
 

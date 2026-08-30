@@ -71,31 +71,54 @@ if (-not $nodeReady) {
     if (Test-Path -LiteralPath $staging) { Get-ChildItem -LiteralPath $staging -Force | Remove-Item -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $staging | Out-Null
     Expand-Archive -LiteralPath $nodeArchive -DestinationPath $staging -Force
-    $inner = Get-ChildItem -LiteralPath $staging -Directory | Select-Object -First 1
-    if (-not $inner) { throw 'Node archive has no top-level directory.' }
+    $archiveRoot = $staging
+    if (-not (Test-Path -LiteralPath (Join-Path $archiveRoot 'node.exe'))) {
+        $inner = @(Get-ChildItem -LiteralPath $staging -Directory)
+        if ($inner.Count -eq 1 -and (Test-Path -LiteralPath (Join-Path $inner[0].FullName 'node.exe'))) {
+            $archiveRoot = $inner[0].FullName
+        }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $archiveRoot 'node.exe'))) { throw "Node archive has no node.exe: $nodeArchive" }
+    $installRoot = Join-Path $cacheRoot 'node-ready'
+    if (Test-Path -LiteralPath $installRoot) { Get-ChildItem -LiteralPath $installRoot -Force | Remove-Item -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+    Get-ChildItem -LiteralPath $archiveRoot -Force | Move-Item -Destination $installRoot -Force
+    if (-not (Test-Path -LiteralPath (Join-Path $installRoot 'node.exe'))) { throw "Node staging is incomplete: $installRoot" }
     if (Test-Path -LiteralPath $nodeRoot) { Get-ChildItem -LiteralPath $nodeRoot -Force | Remove-Item -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $nodeRoot | Out-Null
-    Get-ChildItem -LiteralPath $inner.FullName -Force | Move-Item -Destination $nodeRoot -Force
+    Move-Item -LiteralPath $installRoot -Destination $nodeRoot -Force
 }
 if (-not (Test-Path -LiteralPath $nodeExe)) { throw "Portable Node was not found at $nodeExe" }
 
-$git = Get-Command git.exe -ErrorAction SilentlyContinue
-if ($git) {
-    $gitPath = $git.Source
-} elseif (Test-Path -LiteralPath $gitExe) {
-    $gitPath = (Resolve-Path -LiteralPath $gitExe).Path
-} else {
+$gitReady = $false
+if (Test-Path -LiteralPath $gitExe) {
+    try { $gitReady = (& $gitExe --version 2>$null).Trim() -eq 'git version 2.47.1.windows.1' } catch { $gitReady = $false }
+}
+if (-not $gitReady) {
     Download-Verified $gitUrl $gitArchive $gitSha256
     $staging = Join-Path $cacheRoot 'git-extract'
     if (Test-Path -LiteralPath $staging) { Get-ChildItem -LiteralPath $staging -Force | Remove-Item -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $staging | Out-Null
     Expand-Archive -LiteralPath $gitArchive -DestinationPath $staging -Force
-    $inner = Get-ChildItem -LiteralPath $staging -Directory | Select-Object -First 1
-    New-Item -ItemType Directory -Force -Path $gitRoot | Out-Null
-    Get-ChildItem -LiteralPath $inner.FullName -Force | Move-Item -Destination $gitRoot -Force
-    if (-not (Test-Path -LiteralPath $gitExe)) { throw "Portable Git was not found at $gitExe" }
-    $gitPath = (Resolve-Path -LiteralPath $gitExe).Path
+    $archiveRoot = $staging
+    if (-not (Test-Path -LiteralPath (Join-Path $archiveRoot 'cmd\git.exe'))) {
+        $inner = @(Get-ChildItem -LiteralPath $staging -Directory)
+        if ($inner.Count -eq 1 -and (Test-Path -LiteralPath (Join-Path $inner[0].FullName 'cmd\git.exe'))) {
+            $archiveRoot = $inner[0].FullName
+        }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $archiveRoot 'cmd\git.exe'))) { throw "MinGit archive has no cmd\git.exe: $gitArchive" }
+    $installRoot = Join-Path $cacheRoot 'git-ready'
+    if (Test-Path -LiteralPath $installRoot) { Get-ChildItem -LiteralPath $installRoot -Force | Remove-Item -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+    Get-ChildItem -LiteralPath $archiveRoot -Force | Move-Item -Destination $installRoot -Force
+    if (-not (Test-Path -LiteralPath (Join-Path $installRoot 'cmd\git.exe'))) { throw "Git staging is incomplete: $installRoot" }
+    if (Test-Path -LiteralPath $gitRoot) { Get-ChildItem -LiteralPath $gitRoot -Force | Remove-Item -Recurse -Force }
+    Move-Item -LiteralPath $installRoot -Destination $gitRoot -Force
 }
+if (-not (Test-Path -LiteralPath $gitExe)) { throw "Portable Git was not found at $gitExe" }
+$gitVersion = (& $gitExe --version 2>$null).Trim()
+if ($gitVersion -ne 'git version 2.47.1.windows.1') { throw "Unexpected portable Git version at ${gitExe}: $gitVersion" }
+$gitPath = (Resolve-Path -LiteralPath $gitExe).Path
 
 if (-not (Test-Path -LiteralPath (Join-Path $Destination '.git'))) {
     if (Test-Path -LiteralPath $Destination) {
@@ -112,7 +135,38 @@ if (-not (Test-Path -LiteralPath (Join-Path $Destination '.git'))) {
 }
 
 $env:PATH = "$nodeRoot;$env:PATH"
-$env:npm_config_userconfig = Join-Path $workspaceRoot '.cache\npmrc'
+$npmCli = Join-Path $nodeRoot 'node_modules\npm\bin\npm-cli.js'
+$npmCache = Join-Path $workspaceRoot '.cache\npm'
+$npmrc = Join-Path $workspaceRoot '.cache\npmrc'
+if (-not (Test-Path -LiteralPath $npmCli)) { throw "Bundled npm CLI was not found at $npmCli" }
+New-Item -ItemType Directory -Force -Path $npmCache | Out-Null
+Set-Content -LiteralPath $npmrc -Encoding ascii -Value @(
+    'registry=https://registry.npmmirror.com',
+    'fund=false',
+    'audit=false',
+    'progress=false',
+    'prefer-offline=true'
+)
+$env:npm_config_registry = 'https://registry.npmmirror.com'
+$env:npm_config_cache = $npmCache
+$env:npm_config_userconfig = $npmrc
+$env:npm_config_fund = 'false'
+$env:npm_config_audit = 'false'
+$env:npm_config_progress = 'false'
+$env:npm_config_prefer_offline = 'true'
+$env:ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'
+$env:electron_config_cache = Join-Path $workspaceRoot '.cache\electron'
+$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '1'
+$env:QAM_WORKSPACE_ROOT = $workspaceRoot
+$env:QAM_REQUIRE_PORTABLE = '1'
+$dependencyMarker = Join-Path $Destination 'node_modules\.package-lock.json'
+$workspaceCore = Join-Path $Destination 'node_modules\@quick-app\core\package.json'
+if (-not (Test-Path -LiteralPath $dependencyMarker) -or -not (Test-Path -LiteralPath $workspaceCore)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Destination 'package-lock.json'))) { throw "package-lock.json was not found at $Destination" }
+    Write-Step "Installing quick-app-maker dependencies with bundled npm"
+    & $nodeExe $npmCli --prefix $Destination ci --ignore-scripts --prefer-offline
+    if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE" }
+}
 Write-Step "Running Node bootstrap: $Destination"
 & $nodeExe (Join-Path $Destination 'bin\qam.mjs') bootstrap --workspace-root $workspaceRoot
 if ($LASTEXITCODE -ne 0) { throw "Node bootstrap failed with exit code $LASTEXITCODE" }

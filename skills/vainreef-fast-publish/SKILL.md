@@ -10,7 +10,7 @@ description: 用 Node.js、Electron 和 Playwright 在 Windows 工作区内快�
 - **绝对使用工作区环境，禁止检查系统环境**：事先**无需检查**用户是否安装 Node.js/Git，**严禁使用**用户系统全局环境，所有操作统一使用 bootstrap 在工作区内准备的便携 Node/Git 沙箱，直接按流程执行；
 - 默认技术栈：Node.js 24 LTS、Electron 44、JavaScript、Vue Runtime；
 - 默认模板 `electron-vue-runtime` 不使用 bundler，不使用 TypeScript emit；
-- 所有命令从 `node bin/qam.mjs` 进入；
+- 所有命令通过 `bootstrap/qam.cmd` 进入；该包装器固定使用工作区便携 Node。
 - 下载、cache、日志、测试 profile 和证据都位于当前工作区；
 - 首版先交付试用，用户明确提出发布后才进入 Store；
 - 商店自动化到 `verify` 结束，最终认证提交由用户审核并点击。
@@ -31,10 +31,10 @@ description: 用 Node.js、Electron 和 Playwright 在 Windows 工作区内快�
 ## 开发流程
 
 ```powershell
-node .\bin\qam.mjs bootstrap
-node .\bin\qam.mjs create --name "应用名称" --slug app-slug
-node .\bin\qam.mjs dev .\app-slug
-node .\bin\qam.mjs test .\app-slug
+.\bootstrap\qam.cmd bootstrap
+.\bootstrap\qam.cmd create --name "应用名称" --slug app-slug
+.\bootstrap\qam.cmd dev .\app-slug
+.\bootstrap\qam.cmd test .\app-slug
 ```
 
 `dev` 直接运行源码。renderer 的 JS/HTML/CSS 变化刷新窗口；main/preload 变化重启进程。日常修改不执行 build、不生成 MSIX。
@@ -53,24 +53,24 @@ node .\bin\qam.mjs test .\app-slug
 用户表达“发布到商店”后按顺序执行：
 
 ```powershell
-node .\bin\qam.mjs store launch --app .\app-slug
-node .\bin\qam.mjs store reserve --app .\app-slug --name "应用名称"
-node .\bin\qam.mjs package .\app-slug --profile store
-node .\bin\qam.mjs store preflight --app .\app-slug
-node .\bin\qam.mjs store discover --app .\app-slug
-node .\bin\qam.mjs store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000
+.\bootstrap\qam.cmd store launch --app .\app-slug
+.\bootstrap\qam.cmd store reserve --app .\app-slug --name "应用名称"
+.\bootstrap\qam.cmd package .\app-slug --profile store
+.\bootstrap\qam.cmd store preflight --app .\app-slug
+.\bootstrap\qam.cmd store discover --app .\app-slug
+.\bootstrap\qam.cmd store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000
 ```
 
 需要逐阶段审查时，用下面的命令替代 `store run`：
 
 ```powershell
-node .\bin\qam.mjs store apply --app .\app-slug --phase availability
-node .\bin\qam.mjs store apply --app .\app-slug --phase properties
-node .\bin\qam.mjs store apply --app .\app-slug --phase age-ratings --confirm-age-ratings
-node .\bin\qam.mjs store apply --app .\app-slug --phase packages
-node .\bin\qam.mjs store apply --app .\app-slug --phase listing
-node .\bin\qam.mjs store apply --app .\app-slug --phase options
-node .\bin\qam.mjs store verify --app .\app-slug
+.\bootstrap\qam.cmd store apply --app .\app-slug --phase availability
+.\bootstrap\qam.cmd store apply --app .\app-slug --phase properties
+.\bootstrap\qam.cmd store apply --app .\app-slug --phase age-ratings --confirm-age-ratings
+.\bootstrap\qam.cmd store apply --app .\app-slug --phase packages
+.\bootstrap\qam.cmd store apply --app .\app-slug --phase listing
+.\bootstrap\qam.cmd store apply --app .\app-slug --phase options
+.\bootstrap\qam.cmd store verify --app .\app-slug
 ```
 
 `--confirm-age-ratings` 表示用户已检查问卷；缺失时年龄分级阶段停在配置检查。

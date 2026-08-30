@@ -22,16 +22,15 @@
 在一个全新的 Windows 工作区目录（如 `C:\Workspace\Project`）中，打开 PowerShell 运行以下指令：
 
 ```powershell
-# 1. 允许当前用户运行 PowerShell 脚本
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
-
-# 2. 下载并执行一键引导脚本（全自动安装 Node 24、Git 并克隆 quick-app-maker）
+# 下载并执行一键引导脚本（下载便携 Node、便携 Git 并克隆 quick-app-maker）
 $entry = Join-Path (Get-Location).Path '.qam-entry.ps1'
 Invoke-WebRequest -UseBasicParsing `
   -Uri 'https://gitee.com/freevian/quick-app-maker/raw/main/bootstrap/entry.ps1' `
   -OutFile $entry
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $entry
 ```
+
+> 首启脚本在仓库克隆前从 Gitee raw 下载。发布更新时，必须让 raw 版本与仓库中的 `bootstrap/entry.ps1` 保持同一版本。
 
 ### 执行后自动生成的目录结构
 
@@ -97,16 +96,16 @@ Project/
 
 ```powershell
 # 1. 验证工具链与环境健康状态
-node .\quick-app-maker\bin\qam.mjs doctor
+.\quick-app-maker\bootstrap\qam.cmd doctor
 
 # 2. 创建新应用（例如：倒计时时钟应用）
-node .\quick-app-maker\bin\qam.mjs create --name "倒计时时钟" --slug countdown-app
+.\quick-app-maker\bootstrap\qam.cmd create --name "倒计时时钟" --slug countdown-app
 
 # 3. 启动开发模式（监视 HTML/JS/CSS 自动刷新窗口，修改 main/preload 自动重启进程）
-node .\quick-app-maker\bin\qam.mjs dev .\countdown-app
+.\quick-app-maker\bootstrap\qam.cmd dev .\countdown-app
 
 # 4. 运行单元与冒烟自动化测试
-node .\quick-app-maker\bin\qam.mjs test .\countdown-app
+.\quick-app-maker\bootstrap\qam.cmd test .\countdown-app
 ```
 
 开发完成后，先邀请用户直接在电脑上打开体验，收集反馈并持续迭代。
@@ -119,25 +118,25 @@ node .\quick-app-maker\bin\qam.mjs test .\countdown-app
 
 ```powershell
 # 1. 启动独立隔离的 Edge 浏览器，引导用户登录 Partner Center（不接管用户日常浏览器）
-node .\quick-app-maker\bin\qam.mjs store launch --app .\countdown-app
+.\quick-app-maker\bootstrap\qam.cmd store launch --app .\countdown-app
 
 # 2. 自动化保留应用名称，并自动回填应用 Identity 信息到 appxmanifest
-node .\quick-app-maker\bin\qam.mjs store reserve --app .\countdown-app --name "倒计时时钟"
+.\quick-app-maker\bootstrap\qam.cmd store reserve --app .\countdown-app --name "倒计时时钟"
 
 # 3. 生产封装生成符合 Store 规范的 MSIX 程序包
-node .\quick-app-maker\bin\qam.mjs package .\countdown-app --profile store
+.\quick-app-maker\bootstrap\qam.cmd package .\countdown-app --profile store
 
 # 4. 离线静态预检（严格校验 MSIX 格式、manifest 字段、图标资产尺寸与文案）
-node .\quick-app-maker\bin\qam.mjs store preflight --app .\countdown-app
+.\quick-app-maker\bootstrap\qam.cmd store preflight --app .\countdown-app
 
 # 5. 发现或创建本次提交的草稿会话
-node .\quick-app-maker\bin\qam.mjs store discover --app .\countdown-app
+.\quick-app-maker\bootstrap\qam.cmd store discover --app .\countdown-app
 
 # 6. 一键自动化填写 Store 六大阶段（定价与可用性、属性、年龄分级、程序包、Store 一览与提交选项）
-node .\quick-app-maker\bin\qam.mjs store run --app .\countdown-app --apply --confirm-age-ratings --deadline 3600000
+.\quick-app-maker\bootstrap\qam.cmd store run --app .\countdown-app --apply --confirm-age-ratings --deadline 3600000
 
 # 7. 冷加载总体验证（确认六个模块冷加载后状态均为 Complete 绿标）
-node .\quick-app-maker\bin\qam.mjs store verify --app .\countdown-app
+.\quick-app-maker\bootstrap\qam.cmd store verify --app .\countdown-app
 ```
 
 > [!IMPORTANT]
@@ -152,18 +151,18 @@ node .\quick-app-maker\bin\qam.mjs store verify --app .\countdown-app
 
 ```powershell
 # 逐模块审查与填报
-node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase availability
-node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase properties
-node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase age-ratings --confirm-age-ratings
-node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase packages
-node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase listing
-node .\quick-app-maker\bin\qam.mjs store apply --app .\my-app --phase options
+.\quick-app-maker\bootstrap\qam.cmd store apply --app .\my-app --phase availability
+.\quick-app-maker\bootstrap\qam.cmd store apply --app .\my-app --phase properties
+.\quick-app-maker\bootstrap\qam.cmd store apply --app .\my-app --phase age-ratings --confirm-age-ratings
+.\quick-app-maker\bootstrap\qam.cmd store apply --app .\my-app --phase packages
+.\quick-app-maker\bootstrap\qam.cmd store apply --app .\my-app --phase listing
+.\quick-app-maker\bootstrap\qam.cmd store apply --app .\my-app --phase options
 
 # 查看当前检查点与会话状态
-node .\quick-app-maker\bin\qam.mjs store status --app .\my-app
+.\quick-app-maker\bootstrap\qam.cmd store status --app .\my-app
 
 # 停止当前 Edge 会话
-node .\quick-app-maker\bin\qam.mjs store stop --app .\my-app
+.\quick-app-maker\bootstrap\qam.cmd store stop --app .\my-app
 ```
 
 ---
@@ -174,6 +173,6 @@ node .\quick-app-maker\bin\qam.mjs store stop --app .\my-app
 - **原子下载与缓存保护**：所有下载先写 `.part` 临时文件，哈希校验一致后原子重命名；
 - **全套自动化测试**：
   ```powershell
-  node .\quick-app-maker\bin\qam.mjs check
-  node --test
+  .\quick-app-maker\bootstrap\qam.cmd check
+  .\quick-app-maker\bootstrap\qam.cmd self-test
   ```

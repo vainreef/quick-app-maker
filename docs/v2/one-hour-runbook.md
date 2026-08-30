@@ -2,7 +2,7 @@
 
 | 时间 | 动作 | 结果 |
 | --- | --- | --- |
-| 0–10 分钟 | bootstrap/doctor/npm cache | Node 和依赖就绪 |
+| 0–10 分钟 | entry → portable npm ci → bootstrap/doctor/cache | Node、依赖和 Electron 运行时就绪 |
 | 10–30 分钟 | discovery/create/dev | MVP 可试用 |
 | 30–40 分钟 | test + 用户确认 | 验收通过 |
 | 40–48 分钟 | reserve/package/preflight | Store 包就绪 |
