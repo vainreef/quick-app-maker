@@ -7,6 +7,7 @@ description: 用 Node.js、Electron 和 Playwright 在 Windows 工作区内快�
 
 ## 核心规则
 
+- **绝对使用工作区环境，禁止检查系统环境**：事先**无需检查**用户是否安装 Node.js/Git，**严禁使用**用户系统全局环境，所有操作统一使用 bootstrap 在工作区内准备的便携 Node/Git 沙箱，直接按流程执行；
 - 默认技术栈：Node.js 24 LTS、Electron 44、JavaScript、Vue Runtime；
 - 默认模板 `electron-vue-runtime` 不使用 bundler，不使用 TypeScript emit；
 - 所有命令从 `node bin/qam.mjs` 进入；

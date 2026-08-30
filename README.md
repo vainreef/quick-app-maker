@@ -13,6 +13,12 @@ bootstrap → 需求访谈 → create → dev → test → 用户试用
 
 ## 一条命令入场
 
+> [!IMPORTANT]
+> **统一使用内置独立环境，禁止检查与使用系统全局环境**：
+> 1. 执行前**不需要检查**用户机器是否预装了 Node.js 或 Git，严禁让用户手动去系统安装任何依赖；
+> 2. **严禁调用用户系统全局的 Node.js/Git/npm**，所有操作必须统一使用 bootstrap 部署在当前工作区内的独立便携环境（`WORKSPACE_ROOT/node/`、`WORKSPACE_ROOT/git/`）；
+> 3. Agent 与开发者直接按照文档流程执行入场脚本，环境准备与沙箱配置全部由脚本自动完成。
+
 在一个全新的 Windows 工作目录执行：
 
 ```powershell
