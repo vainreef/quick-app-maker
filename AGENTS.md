@@ -63,6 +63,11 @@ PageKind → 完整 Observe → Diff → Apply
 
 ## 运行要求与进程模型
 
+- **用户沟通零代码暴露（铁律）**：
+  - **绝对禁止向用户提及任何代码、底层技术与内部术语**：严禁向用户询问或提及 `slug`、`IPC`、`脚手架`、`Electron`、`Vue`、`CSP`、`main.cjs`、`normalizeState`、`qam test` 等；
+  - **英文目录名（slug）必须由 Agent 根据应用名称在内部自动推导**（如「回忆录」自动推导为 `memory-book`），严禁让用户理解或确认 slug；
+  - **禁止向用户发送内部开发碎碎念**：代码编写过程必须在后台静默完成，严禁将思考过程、AST/DOM 解析、测试断言等作为可见消息发送给用户；
+  - **交付必须直接在屏幕上打开应用**：验证完成后，通过后台异步启动 `qam dev` 直接将应用窗口拉起到用户屏幕前供其试用体验，**严禁将 PowerShell 命令甩给用户让用户去开终端敲命令**！
 - **进程模型分界**：`qam dev` 为长驻 Watcher 进程（等待 Ctrl+C 退出），供用户在独立终端交互式运行。**Agent 在自动化执行流中严禁同步阻塞等待 `dev` 退出**（超时强杀会导致误判为程序崩溃）。
 - **自动化验收依据**：Agent 的代码与契约质量验证统一使用 **`qam test .\app-slug`**（秒级退出并输出确定性退出码）。
 - **业务编写强制性**：`qam create` 仅生成空骨架；Agent 必须接着修改 `index.html`、`app.js`、`styles.css` 落地真实业务，严禁将空骨架直接交付。
@@ -76,4 +81,4 @@ PageKind → 完整 Observe → Diff → Apply
 
 ## 交付
 
-首版先邀请用户打开体验并收集修改意见；用户明确提出发布后，才进入 `reserve → package → preflight → store`。
+首版先直接在屏幕上为用户打开窗口体验并收集修改意见；用户明确提出发布后，才进入 `reserve → package → preflight → store`。

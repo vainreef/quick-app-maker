@@ -215,6 +215,7 @@ Project/
 | **误区 3：脱离 `qam.cmd` 直调 `electron.exe`** | 绕过沙箱环境，引发权限报错和环境漂移 | 永远使用 `.\quick-app-maker\bootstrap\qam.cmd` 作为唯一执行入口 |
 | **误区 4：使用 localStorage 替代 Electron IPC** | 无法做到桌面应用可靠文件持久化，破坏安全沙箱数据契约 | 必须使用 `window.qam.saveState` 与 `window.qam.loadState` 并在主进程校验 |
 | **误区 5：移除 CSP 中的 unsafe-eval 声明** | Vue 3 在浏览器端无法动态编译 HTML 模板，导致 `v-cloak` 锁死全黑屏 | `index.html` 的 CSP 必须保留 `script-src 'self' 'unsafe-eval'` |
+| **误区 6：向用户暴露代码与技术黑话** | 逼迫非技术用户理解底层实现，交付体验极差 | 严禁提 slug/IPC/Vue/函数名等；后台直接打开应用窗口供体验 |
 
 ---
 

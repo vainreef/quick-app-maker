@@ -14,6 +14,7 @@ description: 用工作区内置的 Node.js、Git、Electron 和 Playwright 生�
 - **红线 3：严禁退化为 localStorage**：桌面应用必须通过 Electron 安全 IPC（`window.qam.saveState` 与 `window.qam.loadState`）进行本地持久化，**严禁私自替换为 `localStorage`**；主进程 `normalizeState` 负责数据校验。
 - **红线 4：严禁破坏 CSP 的 unsafe-eval 声明**：纯源码模式下 Vue 3 需要在浏览器内编译 DOM 模板，`index.html` 的 CSP 必须保留 `script-src 'self' 'unsafe-eval'`，严禁移除（否则导致 Vue 挂载报错、`v-cloak` 无法清除引发彻底黑屏）。
 - **红线 5：禁止脱离包装器直调底层**：严禁直接执行 `electron.exe` 或传 `--no-sandbox` 绕过框架。排查控制台时显式设置 `QAM_DEVTOOLS=1`。
+- **红线 6：绝对禁止向用户暴露代码与技术黑话**：严禁向用户询问或提及 `slug`、`IPC`、`脚手架`、`Electron`、`Vue`、`CSP`、`normalizeState`、`qam test` 等内部代码与术语；英文 slug 由 Agent 自动推导；开发过程静默完成，严禁将代码思考碎碎念作为聊天消息发送；交付时直接在屏幕上拉起应用窗口，严禁把命令行甩给用户。
 
 ## 1. 阶段 1：需求访谈与脚手架生成（Phase 1）
 
