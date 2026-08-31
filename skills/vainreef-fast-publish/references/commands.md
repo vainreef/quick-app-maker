@@ -1,42 +1,41 @@
 # V2 命令速查
 
-从工作区根目录先解析引擎目录；已进入 `quick-app-maker/` 时 `$qamRoot` 为 `.`：
-
+工作区执行入口前缀解析：
 ```powershell
-# 1. 环境准备与健康检查
-& "$qamRoot\bootstrap\qam.cmd" doctor
-& "$qamRoot\bootstrap\qam.cmd" bootstrap
-& "$qamRoot\bootstrap\qam.cmd" self-test
-
-# 2. 生成应用脚手架
-& "$qamRoot\bootstrap\qam.cmd" create --name "名称" --slug slug
-
-# 3. 自动化测试验收（编写完 HTML/JS/CSS 业务代码后必跑，秒级退出）
-& "$qamRoot\bootstrap\qam.cmd" test .\slug
-
-# 4. 启动开发热重载（长驻服务，由用户在独立终端交互式运行体验）
-& "$qamRoot\bootstrap\qam.cmd" dev .\slug
+$qamRoot = if (Test-Path .\quick-app-maker\bootstrap\qam.cmd) { '.\quick-app-maker' } else { '.' }
 ```
 
-Store 仅在用户明确提出发布后执行：
-
+## 1. 环境准备与诊断
 ```powershell
-& "$qamRoot\bootstrap\qam.cmd" store launch --app .\slug
-& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\slug --name "名称"
-& "$qamRoot\bootstrap\qam.cmd" package .\slug --profile store
-& "$qamRoot\bootstrap\qam.cmd" store preflight --app .\slug
-& "$qamRoot\bootstrap\qam.cmd" store discover --app .\slug
-& "$qamRoot\bootstrap\qam.cmd" store run --app .\slug --apply --confirm-age-ratings --deadline 3600000
-& "$qamRoot\bootstrap\qam.cmd" store verify --app .\slug
+& "$qamRoot\bootstrap\qam.cmd" doctor     # 诊断便携 Node 24、Git、npm、Electron 镜像与沙箱健康度
+& "$qamRoot\bootstrap\qam.cmd" bootstrap  # 初始化工作区依赖与 Electron 运行时
+& "$qamRoot\bootstrap\qam.cmd" self-test   # 运行引擎 34 项全量契约测试
 ```
 
-阶段调试：
-
+## 2. 应用开发与质量验收
 ```powershell
-& "$qamRoot\bootstrap\qam.cmd" store plan --app .\slug --phase availability
-& "$qamRoot\bootstrap\qam.cmd" store apply --app .\slug --phase availability
-& "$qamRoot\bootstrap\qam.cmd" store status --app .\slug
-& "$qamRoot\bootstrap\qam.cmd" store stop --app .\slug
+& "$qamRoot\bootstrap\qam.cmd" create --name "应用名称" --slug app-slug  # 创建应用骨架
+& "$qamRoot\bootstrap\qam.cmd" test .\app-slug                           # 自动化质量验收（秒级退出，提供确凿证据）
+& "$qamRoot\bootstrap\qam.cmd" dev .\app-slug                            # 启动开发热重载（长驻 Watcher，供用户体验）
 ```
 
-`store plan` 为只读动作，发现差异返回 4；`store apply` 才执行写入。最终认证按钮由用户点击。进程存在只证明启动，不证明窗口已渲染；运行报告必须附动态操作或页面证据。
+## 3. Microsoft Store 自动化发布（用户确认后触发）
+```powershell
+& "$qamRoot\bootstrap\qam.cmd" store launch --app .\app-slug             # 启动隔离 Edge 会话引导登录
+& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称" # 保留名称并回填 Identity
+& "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store        # 生产封装生成 Store MSIX 包
+& "$qamRoot\bootstrap\qam.cmd" store preflight --app .\app-slug          # 离线静态预检（校验 manifest/素材/文案）
+& "$qamRoot\bootstrap\qam.cmd" store discover --app .\app-slug           # 发现或创建本次提交草稿
+& "$qamRoot\bootstrap\qam.cmd" store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000 # 自动化填写六大阶段
+& "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug            # 冷加载总体验证（确认 6 模块均为 Complete 绿标）
+```
+
+## 4. 阶段断点与排错
+```powershell
+& "$qamRoot\bootstrap\qam.cmd" store plan --app .\app-slug --phase availability   # 只读检查差异（有差异退出码 4）
+& "$qamRoot\bootstrap\qam.cmd" store apply --app .\app-slug --phase availability  # 单独执行指定阶段填报
+& "$qamRoot\bootstrap\qam.cmd" store status --app .\app-slug                      # 查看当前检查点与会话状态
+& "$qamRoot\bootstrap\qam.cmd" store stop --app .\app-slug                        # 停止当前 Edge 会话
+```
+
+> **重要边界**：`store verify` 通过后，CLI 不会自动点击最终的“提交进行认证”按钮，由用户在浏览器中亲自复核并点击提交。

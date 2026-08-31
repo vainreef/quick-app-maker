@@ -216,12 +216,15 @@ Project/
 | **误区 4：使用 localStorage 替代 Electron IPC** | 无法做到桌面应用可靠文件持久化，破坏安全沙箱数据契约 | 必须使用 `window.qam.saveState` 与 `window.qam.loadState` 并在主进程校验 |
 | **误区 5：移除 CSP 中的 unsafe-eval 声明** | Vue 3 在浏览器端无法动态编译 HTML 模板，导致 `v-cloak` 锁死全黑屏 | `index.html` 的 CSP 必须保留 `script-src 'self' 'unsafe-eval'` |
 
-- **国内网络全量镜像**：Node 便携包与 npm 使用 npmmirror，Electron 二进制使用 China mirror，锁文件 `qam-toolchain.lock.json` 固化版本与 SHA-256；
-- **原子下载与缓存保护**：所有下载先写 `.part` 临时文件，哈希校验一致后原子重命名；
-- **全套自动化测试**：
+---
+
+## 底层环境保障与交付标准
+
+- **全量国内网络镜像**：Node 便携包与 npm 使用 npmmirror，Electron 二进制使用 China mirror，锁文件 `qam-toolchain.lock.json` 固化版本与 SHA-256；
+- **原子下载与沙箱保护**：所有下载先写 `.part` 临时文件，哈希校验通过后原子重命名，严禁污染宿主全局环境；
+- **全套引擎自检测试**：
   ```powershell
   .\quick-app-maker\bootstrap\qam.cmd check
   .\quick-app-maker\bootstrap\qam.cmd self-test
   ```
-
-进程列表只证明命令启动；交付前还要完成真实窗口的输入、保存、关闭重开、错误和庆祝路径，并把截图/控制台或自动化证据写入 `build/run-report.md`。开发模式默认不打开 DevTools，需要排查时再显式设置 `QAM_DEVTOOLS=1`。
+- **交付验收标准**：进程列表仅证明命令启动；正式交付前必须完成真实窗口的输入、保存、错误与重启恢复路径。开发模式默认关闭 DevTools，需排查控制台时显式设置 `$env:QAM_DEVTOOLS='1'`。

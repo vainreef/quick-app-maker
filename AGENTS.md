@@ -70,14 +70,9 @@ PageKind → 完整 Observe → Diff → Apply
 - **CSP 策略与 Vue 运行时**：纯源码模式下 `index.html` 的 CSP 必须包含 `script-src 'self' 'unsafe-eval'`，严禁移除 `'unsafe-eval'`（否则 Vue 3 无法在浏览器端动态编译模板，会导致 `[v-cloak]` 无法卸载引发彻底黑屏）。
 - **禁止应试拼凑代码**：测试报错时必须排查真实的架构、数据流与逻辑根因，**严禁为了迎合静态断言而在源码中机械拼接死字符串**。
 - **严禁直调底层**：严禁脱离 `bootstrap/qam.cmd` 直接调用底层 `electron.exe` 或使用 `--no-sandbox` 破坏沙箱隔离。
-- 同一 App 同时只允许一个 dev/package/store writer；
-- 每次命令生成 run id 和结构化证据；
-- checkpoint 原子写入并校验 manifest hash、productId、submissionId；
-- 页面错误保存 screenshot、ARIA snapshot、DOM 摘要、console/network 诊断；
-- 进程清理只针对当前 run 的 PID/lock，不按名称批量结束 Electron 或 Node；
-- 日常 App 开发零显式编译；MSIX 仅在发布阶段封装一次。
-- 首次 bootstrap 先用便携 npm 建立 workspace 依赖，再加载 `bin/qam.mjs`；Electron 运行时下载完成并验证文件存在后才报告就绪。
-- 源码正则或进程列表只算静态/启动证据；交付前必须完成真实窗口的输入、持久化、错误和关闭路径，并在 run-report 中保留证据。
+- **并发与锁控制**：同一 App 同时只允许一个 dev/package/store writer；进程清理只针对当前 run 的 PID/lock，严禁按名称批量强杀系统 Electron 或 Node。
+- **结构化证据**：每次执行生成 run id 和结构化日志；checkpoint 原子写入并严格校验 manifest hash、productId 与 submissionId。
+- **真实窗口交付**：源码正则或进程列表只算静态/启动证据；交付前必须完成真实窗口的输入、持久化、错误和关闭路径验证。
 
 ## 交付
 
