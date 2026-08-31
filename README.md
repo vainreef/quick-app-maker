@@ -158,11 +158,12 @@ Project/
 > [!NOTE]
 > - **开发者账号**：微软账号与个人开发者认证免费，无需高昂费用；若未认证，`store launch` 启动 Edge 后在网页中指引用户完成个人认证；
 > - **代码签名**：MSIX 包由微软商店云端统一自动完成签名，**完全不需要开发者购买或提供第三方代码签名证书**；
-> - **时序规范**：必须先 `store launch` 与 `store reserve`（获取 ProductId 与 Identity），再执行 `package`。
+> - **人机协同流程**：`store launch`（秒级拉起 Edge） $\rightarrow$ 提示用户在窗口登录，用户在聊天框回复「我登录好了」 $\rightarrow$ 一键全自动填报 6 大表 $\rightarrow$ 人工点击最终提交。
 
 ```powershell
-# 1. 启动独立隔离的 Edge 浏览器，引导用户登录 Partner Center（不接管用户日常浏览器）
+# 1. 启动独立隔离的 Edge 浏览器，引导用户登录 Partner Center（秒级返回）
 .\quick-app-maker\bootstrap\qam.cmd store launch --app .\countdown-app
+# -> 用户在 Edge 中完成登录后，在聊天框回复「我登录好了」
 
 # 2. 自动化保留应用名称，并自动回填应用 Identity 信息到 appxmanifest
 .\quick-app-maker\bootstrap\qam.cmd store reserve --app .\countdown-app --name "倒计时时钟"

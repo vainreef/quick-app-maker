@@ -117,7 +117,7 @@ async function storeUnlocked(options) {
   if (sub === 'preflight') { const result = runPreflight({ workspace, appRoot: root, desired, outputPath: path.join(logger.root, 'preflight-result.json') }); console.log(JSON.stringify(result, null, 2)); return 0; }
   if (sub === 'status') { console.log(JSON.stringify({ checkpoint, session: readJson(path.join(stateDir, 'session.json'), null) }, null, 2)); return 0; }
   const session = new EdgeSession({ workspace, stateDir, baseUrl: appsOverviewUrl(desired.site.baseUrl), logger });
-  if (sub === 'launch') { const result = await session.connect(); await waitForSignedIn(result.page); console.log(JSON.stringify({ ok: true, session: result.session, page: await capturePage(result.page) }, null, 2)); await result.browser.close(); return 0; }
+  if (sub === 'launch') { const sessionInfo = await session.ensure(); console.log(JSON.stringify({ ok: true, launched: true, session: sessionInfo, message: 'Edge launched. Please sign in to Microsoft Partner Center, then reply when ready.' }, null, 2)); return 0; }
   if (sub === 'stop') { if (fs.existsSync(session.statePath())) { session.session = readJson(session.statePath(), null); await session.close(); } else console.log('No active QAM Edge session.'); return 0; }
   let connected = null;
   try {

@@ -21,13 +21,15 @@ $qamRoot = if (Test-Path .\quick-app-maker\bootstrap\qam.cmd) { '.\quick-app-mak
 
 ## 3. Microsoft Store 自动化发布（用户确认后触发）
 ```powershell
-& "$qamRoot\bootstrap\qam.cmd" store launch --app .\app-slug             # 启动隔离 Edge 会话引导登录
-& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称" # 保留名称并回填 Identity
-& "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store        # 生产封装生成 Store MSIX 包
-& "$qamRoot\bootstrap\qam.cmd" store preflight --app .\app-slug          # 离线静态预检（校验 manifest/素材/文案）
-& "$qamRoot\bootstrap\qam.cmd" store discover --app .\app-slug           # 发现或创建本次提交草稿
-& "$qamRoot\bootstrap\qam.cmd" store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000 # 自动化填写六大阶段
-& "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug            # 冷加载总体验证（确认 6 模块均为 Complete 绿标）
+& "$qamRoot\bootstrap\qam.cmd" store launch --app .\app-slug             # 1. 启动隔离 Edge（秒级返回），Agent 提示用户登录
+# -> 用户在 Edge 中完成登录/2FA 后，在聊天框回复「我登录好了」
+& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称" # 2. 保留名称并回填 Identity
+& "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store        # 3. 生产封装生成 Store MSIX 包
+& "$qamRoot\bootstrap\qam.cmd" store preflight --app .\app-slug          # 4. 离线静态预检（校验 manifest/素材/文案）
+& "$qamRoot\bootstrap\qam.cmd" store discover --app .\app-slug           # 5. 发现或创建本次提交草稿
+& "$qamRoot\bootstrap\qam.cmd" store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000 # 6. 自动化填写六大阶段
+& "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug            # 7. 冷加载总体验证（确认 6 模块均为 Complete 绿标）
+# -> Agent 提示用户在浏览器中最后核对并点击「提交进行认证」
 ```
 
 ## 4. 阶段断点与排错

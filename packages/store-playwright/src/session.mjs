@@ -44,10 +44,9 @@ export class EdgeSession {
     const args = [`--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1', '--remote-allow-origins=http://localhost,http://127.0.0.1', '--no-first-run', '--no-default-browser-check', '--start-maximized', this.baseUrl];
     let childPid = 0;
     if (process.platform === 'win32' && process.env.QAM_DEFAULT_DESKTOP !== '0') {
-      const pidFile = path.join(this.stateDir, `edge-${runId}.pid`); const bridge = resolveBridge(this.workspace); const taskName = `QAM-Edge-${runId}`;
-      execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', bridge, '-TaskName', taskName, '-EdgePath', this.edgePath, '-Port', String(port), '-Profile', profile, '-Url', this.baseUrl, '-PidFile', pidFile], { stdio: 'inherit' });
+      const pidFile = path.join(this.stateDir, `edge-${runId}.pid`); const bridge = resolveBridge(this.workspace);
+      execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', bridge, '-EdgePath', this.edgePath, '-Port', String(port), '-Profile', profile, '-Url', this.baseUrl, '-PidFile', pidFile], { stdio: 'inherit' });
       await waitForFile(pidFile, 15_000); childPid = Number(fs.readFileSync(pidFile, 'utf8').trim());
-      try { execFileSync('schtasks.exe', ['/Delete', '/TN', taskName, '/F'], { stdio: 'ignore' }); } catch {}
     } else {
       const child = spawn(this.edgePath, args, { detached: true, stdio: 'ignore', windowsHide: false }); child.unref(); childPid = child.pid ?? 0;
     }

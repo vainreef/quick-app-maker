@@ -79,6 +79,15 @@ PageKind → 完整 Observe → Diff → Apply
 - **结构化证据**：每次执行生成 run id 和结构化日志；checkpoint 原子写入并严格校验 manifest hash、productId 与 submissionId。
 - **真实窗口交付**：源码正则或进程列表只算静态/启动证据；交付前必须完成真实窗口的输入、持久化、错误和关闭路径验证。
 
-## 交付
+## 交付与发布协同
 
-首版先直接在屏幕上为用户打开窗口体验并收集修改意见；用户明确提出发布后，才进入 `reserve → package → preflight → store`。
+1. **首版试用交付**：业务开发与测试通过后，通过后台异步启动 `qam dev` 直接在用户屏幕上打开应用窗口体验，收集用户修改意见；
+2. **微软商店发布协同（铁律）**：
+   - 用户明确提出发布后，Agent 先执行 `qam store launch --app .\app-slug`（秒级拉起独立 Edge 浏览器）；
+   - Agent **必须向用户发送登录指引消息并等待回复**：
+     > “我已在屏幕上为您打开了 Edge 浏览器，请在弹出的窗口中登录您的微软账号（支持免费个人开发者账号）。**登录完成后，请在聊天框回复我说『我登录好了』，我接着为您全自动填表与上架！**”
+   - Agent 结束当前发言，从容等待用户回复；
+   - 用户在聊天框回复“我登录好了”后，Agent 接力执行全套自动化流水线：
+     `store reserve` $\rightarrow$ `package --profile store` $\rightarrow$ `store preflight` $\rightarrow$ `store discover` $\rightarrow$ `store run --apply --confirm-age-ratings` $\rightarrow$ `store verify`；
+   - 验证通过后，提示用户在浏览器中做最后的人工核对并点击「提交进行认证」。
+
