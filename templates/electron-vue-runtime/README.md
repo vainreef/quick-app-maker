@@ -13,10 +13,10 @@
 从包含 `node/` 与 `quick-app-maker/` 的工作区根目录执行：
 
 ```powershell
-.\quick-app-maker\bootstrap\qam.cmd dev .\__SLUG__
-.\quick-app-maker\bootstrap\qam.cmd test .\__SLUG__
-.\quick-app-maker\bootstrap\qam.cmd package .\__SLUG__ --profile store
-.\quick-app-maker\bootstrap\qam.cmd store preflight --app .\__SLUG__
+.\quick-app-maker\bootstrap\qam.cmd test .\__SLUG__                          # 自动化测试验收（秒级退出）
+.\quick-app-maker\bootstrap\qam.cmd dev .\__SLUG__                           # 启动开发热重载（长驻服务）
+.\quick-app-maker\bootstrap\qam.cmd package .\__SLUG__ --profile store       # 生产封装生成 Store MSIX 包
+.\quick-app-maker\bootstrap\qam.cmd store preflight --app .\__SLUG__         # 离线静态预检
 ```
 
 ## 需求和商店素材
