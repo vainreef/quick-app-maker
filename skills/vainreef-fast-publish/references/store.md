@@ -1,23 +1,37 @@
-# Partner Center V2
+# Partner Center V2 自动化发布手册
 
-## 阶段
+## 0. 账号与证书常识（避免误导用户）
 
-- reserve：名称、ProductId、Package Identity；
-- preflight：MSIX、manifest、语言、资产、文案；
-- launch/discover：独立 Edge profile、登录、SubmissionId 和实时路由；
-- availability/properties/age-ratings/packages/listing/options：每次一个阶段；
-- verify：冷导航 Overview，六项均为 Complete。
+- **开发者账号**：微软账号与个人开发者认证免费，无需高昂费用；若用户未注册或未认证，运行 `store launch` 自动拉起 Edge 浏览器，指引用户在网页中完成注册或个人认证；
+- **代码签名**：上架微软商店的 MSIX 包由**微软商店官方在云端自动完成安全签名**（Store Signing），**完全不需要开发者购买或提供第三方代码签名证书**，严禁向用户询问证书问题！
 
-## 页面操作
+## 1. 自动化流水线标准时序（严禁跳步或颠倒时序）
 
-使用 Playwright Locator、ARIA 角色、Label 和文本。控件动作后重新 Observe。页面变化后重新定位，不保存 node index。Shadow DOM 使用 open root 自动穿透，closed root 进入集中 CDP fallback。
+```powershell
+# 1. 启动独立 Edge 引导用户登录/注册 Partner Center
+& "$qamRoot\bootstrap\qam.cmd" store launch --app .\app-slug
 
-## 完成链
+# 2. 自动化保留应用名称，自动回填 ProductId 与 Identity 到 manifest
+& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称"
 
-`PageKind → Observe → Diff → Apply → 冷加载 → Diff=0 → Overview Complete → Converged`
+# 3. 生产封装 MSIX（必须在 reserve 之后执行）
+& "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store
 
-`store run` 的 deadline 是整轮总预算，不能在每个 phase 重新计时。未知、Processing、Error、重复包和缺少证据都保持未完成。
+# 4. 离线静态预检（校验 MSIX、manifest、素材尺寸与文案）
+& "$qamRoot\bootstrap\qam.cmd" store preflight --app .\app-slug
 
-## 资料
+# 5. 发现当前提交草稿路由
+& "$qamRoot\bootstrap\qam.cmd" store discover --app .\app-slug
 
-产品文案、截图和 Identity 在用户确认前不得视作已完成；占位文字只能作为模板。最终认证提交由用户亲自复核并点击。
+# 6. 一键自动化填写六大阶段（定价、属性、年龄分级问卷、程序包上传、商店文案与选项）
+& "$qamRoot\bootstrap\qam.cmd" store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000
+
+# 7. 冷加载总检验证（确认 6 个模块均为 Complete 绿标）
+& "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug
+```
+
+## 2. 页面自动化操作与收敛判定
+
+- **Playwright 定位器**：首选 `getByRole`、`getByLabel`、`getByText`，默认穿透 open Shadow DOM；
+- **收敛判定链**：`PageKind → Observe → Diff → Apply → 冷加载 → Diff=0 → Overview Complete → Converged`；
+- **人工终审边界**：`store verify` 全绿标后，CLI 不会自动点击最终的“提交进行认证”按钮，留给用户在浏览器中复核并点击。

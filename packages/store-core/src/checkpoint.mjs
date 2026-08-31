@@ -50,4 +50,7 @@ export function markConverged(checkpoint, phase, evidence) {
   return checkpoint;
 }
 
-export function runId(prefix = 'run') { return `${prefix}-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${crypto.randomBytes(3).toString('hex')}`; }
+export function runId(prefix = 'run') {
+  const clean = String(prefix).replace(/[^a-zA-Z0-9_-]/g, '-');
+  return `${clean}-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${crypto.randomBytes(3).toString('hex')}`;
+}

@@ -65,15 +65,33 @@ $qamRoot = if (Test-Path .\quick-app-maker\bootstrap\qam.cmd) { '.\quick-app-mak
 
 ## 4. 阶段 4：Microsoft Store 自动化发布（Phase 4）
 
-**只有用户明确提出发布时才进入**：
+**只有用户明确提出发布时才进入**。
+
+> [!NOTE]
+> - **账号与认证免费**：微软个人开发者账号注册与认证是免费的。若用户未注册/未认证，执行 `store launch` 自动拉起 Edge 浏览器指引用户完成注册认证；
+> - **云端自动签名**：MSIX 包由微软商店官方云端自动完成安全签名，**完全不需要开发者提供代码签名证书**，严禁向用户询问证书问题；
+> - **严格遵守时序**：必须先 `store launch` 与 `store reserve`（获取 ProductId 与 Identity），再执行 `package`。
 
 ```powershell
+# 1. 启动独立 Edge 引导用户登录/注册 Partner Center
 & "$qamRoot\bootstrap\qam.cmd" store launch --app .\app-slug
+
+# 2. 保留应用名称并自动回填 ProductId 与 Identity 到 manifest
 & "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称"
+
+# 3. 生产封装生成 Store MSIX（必须在 reserve 之后执行）
 & "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store
+
+# 4. 离线静态预检（校验 manifest、素材尺寸与文案）
 & "$qamRoot\bootstrap\qam.cmd" store preflight --app .\app-slug
+
+# 5. 发现或创建本次提交草稿
 & "$qamRoot\bootstrap\qam.cmd" store discover --app .\app-slug
+
+# 6. 一键自动化填写六大阶段（定价、属性、年龄分级问卷、程序包上传、商店文案与选项）
 & "$qamRoot\bootstrap\qam.cmd" store run --app .\app-slug --apply --confirm-age-ratings --deadline 3600000
+
+# 7. 冷加载总检验证（确认六个模块均为 Complete 绿标）
 & "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug
 ```
 

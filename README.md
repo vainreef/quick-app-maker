@@ -153,7 +153,12 @@ Project/
 
 ## 第 4 步：Microsoft Store 自动化发布（用户明确提出发布后触发）
 
-当用户明确提出要上架发布时，触发完整的 Store 自动化流水线：
+当用户明确提出要上架发布时，触发完整的 Store 自动化流水线。
+
+> [!NOTE]
+> - **开发者账号**：微软账号与个人开发者认证免费，无需高昂费用；若未认证，`store launch` 启动 Edge 后在网页中指引用户完成个人认证；
+> - **代码签名**：MSIX 包由微软商店云端统一自动完成签名，**完全不需要开发者购买或提供第三方代码签名证书**；
+> - **时序规范**：必须先 `store launch` 与 `store reserve`（获取 ProductId 与 Identity），再执行 `package`。
 
 ```powershell
 # 1. 启动独立隔离的 Edge 浏览器，引导用户登录 Partner Center（不接管用户日常浏览器）

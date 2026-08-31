@@ -1,11 +1,24 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
+import { fileURLToPath } from 'node:url';
 import { spawn, execFileSync } from 'node:child_process';
 import { assertWithin, writeAtomic } from '@quick-app/core';
 
 export async function freePort() {
   return await new Promise((resolve, reject) => { const server = net.createServer(); server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(() => resolve(port)); }); server.on('error', reject); });
+}
+
+function resolveBridge(workspace) {
+  const candidates = [
+    path.resolve(workspace, 'bootstrap', 'launch-default-desktop.ps1'),
+    path.resolve(workspace, 'quick-app-maker', 'bootstrap', 'launch-default-desktop.ps1'),
+    fileURLToPath(new URL('../../../bootstrap/launch-default-desktop.ps1', import.meta.url))
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return candidates[0];
 }
 
 export class EdgeSession {
@@ -31,7 +44,7 @@ export class EdgeSession {
     const args = [`--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1', '--remote-allow-origins=http://localhost,http://127.0.0.1', '--no-first-run', '--no-default-browser-check', '--start-maximized', this.baseUrl];
     let childPid = 0;
     if (process.platform === 'win32' && process.env.QAM_DEFAULT_DESKTOP !== '0') {
-      const pidFile = path.join(this.stateDir, `edge-${runId}.pid`); const bridge = path.resolve(this.workspace, 'bootstrap', 'launch-default-desktop.ps1'); const taskName = `QAM-Edge-${runId}`;
+      const pidFile = path.join(this.stateDir, `edge-${runId}.pid`); const bridge = resolveBridge(this.workspace); const taskName = `QAM-Edge-${runId}`;
       execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', bridge, '-TaskName', taskName, '-EdgePath', this.edgePath, '-Port', String(port), '-Profile', profile, '-Url', this.baseUrl, '-PidFile', pidFile], { stdio: 'inherit' });
       await waitForFile(pidFile, 15_000); childPid = Number(fs.readFileSync(pidFile, 'utf8').trim());
       try { execFileSync('schtasks.exe', ['/Delete', '/TN', taskName, '/F'], { stdio: 'ignore' }); } catch {}
