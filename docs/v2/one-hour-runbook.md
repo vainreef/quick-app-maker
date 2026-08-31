@@ -3,8 +3,8 @@
 | 时间 | 动作 | 通过条件 |
 | --- | --- | --- |
 | 0–10 分钟 | entry → portable npm ci → bootstrap/doctor/self-test | 工作区 Node、便携 Git、依赖和 Electron 运行时就绪 |
-| 10–30 分钟 | discovery/create/dev | 源码可启动，真实窗口核心闭环可操作 |
-| 30–40 分钟 | test + 动态验收 + 用户确认 | 输入、日期、持久化、错误和庆祝路径都有证据 |
+| 10–30 分钟 | discovery → create → 业务编码 (HTML/JS/CSS) → test | 业务功能完整实现，自动化测试秒级通过 |
+| 30–40 分钟 | dev 用户试用 + 动态验收 + 用户确认 | 真实窗口输入、持久化、错误和关闭路径都有证据 |
 | 40–48 分钟 | reserve/package/preflight | 用户确认发布，包和资料不是占位内容 |
 | 48–60 分钟 | 六阶段 apply + verify | 每阶段 cold Diff=0，Overview 模块全 Complete |
 

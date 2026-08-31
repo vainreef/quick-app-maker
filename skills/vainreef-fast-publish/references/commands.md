@@ -3,12 +3,18 @@
 从工作区根目录先解析引擎目录；已进入 `quick-app-maker/` 时 `$qamRoot` 为 `.`：
 
 ```powershell
-$qamRoot = if (Test-Path .\quick-app-maker\bootstrap\qam.cmd) { '.\quick-app-maker' } else { '.' }
+# 1. 环境准备与健康检查
 & "$qamRoot\bootstrap\qam.cmd" doctor
 & "$qamRoot\bootstrap\qam.cmd" bootstrap
 & "$qamRoot\bootstrap\qam.cmd" self-test
+
+# 2. 生成应用脚手架
 & "$qamRoot\bootstrap\qam.cmd" create --name "名称" --slug slug
+
+# 3. 自动化测试验收（编写完 HTML/JS/CSS 业务代码后必跑，秒级退出）
 & "$qamRoot\bootstrap\qam.cmd" test .\slug
+
+# 4. 启动开发热重载（长驻服务，由用户在独立终端交互式运行体验）
 & "$qamRoot\bootstrap\qam.cmd" dev .\slug
 ```
 

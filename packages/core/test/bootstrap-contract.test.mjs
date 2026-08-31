@@ -48,6 +48,6 @@ test('development wrapper leaves DevTools opt-in', () => {
 
 test('store run shares one deadline across all phases', () => {
   const text = fs.readFileSync(path.join(root, 'bin', 'qam.mjs'), 'utf8');
-  assert.match(text, /const deadline = new Deadline\([^)]*\); for \(const phase of PHASES\)/);
-  assert.match(text, /apply, deadline \}\)/);
+  assert.match(text, /const deadline = new Deadline\([^;]+\);\s*for\s*\(const phase of PHASES\)/);
+  assert.match(text, /apply,\s*deadline\s*\}\)/);
 });

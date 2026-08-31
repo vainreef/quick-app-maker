@@ -89,12 +89,19 @@ Project/
 
 ---
 
-## 第 2 步：自然语言开发应用（零显式编译、纯源码直接运行）
+## 第 2 步：应用开发完整流水线（先建骨架 → 编写业务 → 自动化测试）
 
-> [!NOTE]
-> 默认技术栈使用 **Node.js 24 LTS + Electron 44 + JavaScript + Vue 3 浏览器原生运行时**。日常开发直接运行源码，无需 Webpack/Vite 编译打包，保存即刷新。
+> [!IMPORTANT]
+> **开发流程严格遵守标准时序**：`qam create` 仅生成基础脚手架骨架，**必须接着编写 HTML/JS/CSS 业务代码**，再通过 `qam test` 验证，最后通过 `qam dev` 供用户打开体验。
 
-### 开发指令清单
+```text
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│ 1. 创建骨架  │ ──► │ 2. 编写业务  │ ──► │ 3. 运行测试  │ ──► │ 4. 试用体验  │
+│ (qam create) │     │ (HTML/JS/CSS)│     │  (qam test)  │     │  (qam dev)   │
+└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
+```
+
+### 2.1 校验环境并创建应用脚手架
 
 ```powershell
 # 1. 验证工具链与环境健康状态
@@ -102,21 +109,49 @@ Project/
 .\quick-app-maker\bootstrap\qam.cmd bootstrap
 .\quick-app-maker\bootstrap\qam.cmd self-test
 
-# 2. 创建新应用（例如：倒计时时钟应用）
+# 2. 创建新应用脚手架（例如：倒计时时钟应用）
 .\quick-app-maker\bootstrap\qam.cmd create --name "倒计时时钟" --slug countdown-app
 
-# 3. 启动开发模式（监视 HTML/JS/CSS 自动刷新窗口，修改 main/preload 自动重启进程）
-.\quick-app-maker\bootstrap\qam.cmd dev .\countdown-app
-
-# 4. 运行单元与冒烟自动化测试
+# 3. 验证脚手架基础契约
 .\quick-app-maker\bootstrap\qam.cmd test .\countdown-app
 ```
 
-开发完成后，先邀请用户直接在电脑上打开体验，收集反馈并持续迭代。
+### 2.2 编写核心业务代码（核心开发环节）
+
+在生成的应用目录（如 `countdown-app/`）中实现具体业务需求，**日常开发零显式编译，保存即生效**：
+
+1. **界面结构**（`src/renderer/index.html`）：构建应用的 HTML 页面结构、交互组件与容器；
+2. **业务逻辑**（`src/renderer/app.js`）：编写 Vue 3 原生响应式状态管理、核心算法与数据流；
+3. **视觉样式**（`src/renderer/styles.css`）：编写深色主题、排版与动效；
+4. **数据契约**（`src/main/main.cjs`）：若需要特定的持久化数据结构，按需扩展主进程的 IPC 校验。
+
+### 2.3 运行自动化测试与冒烟验收
+
+```powershell
+# 运行单元与冒烟自动化测试（秒级退出，提供确凿质量证据）
+.\quick-app-maker\bootstrap\qam.cmd test .\countdown-app
+```
 
 ---
 
-## 第 3 步：Microsoft Store 自动化发布（用户明确提出发布后触发）
+## 第 3 步：用户试用体验与开发热重载（`qam dev`）
+
+当业务代码编写并测试通过后，启动开发模式供用户体验：
+
+```powershell
+# 启动开发模式（监视 HTML/JS/CSS 自动刷新窗口，修改 main/preload 自动重启进程）
+.\quick-app-maker\bootstrap\qam.cmd dev .\countdown-app
+```
+
+> [!WARNING]
+> **进程边界与 Agent 运行须知**：
+> - `qam dev` 是**交互式长驻 Watcher 进程**，窗口打开后会持续挂起监听，按 `Ctrl+C` 退出；
+> - **AI Agent 严禁在同步阻塞终端中无限期等待 `dev` 退出**（否则会导致超时强杀并误判为崩溃）；
+> - Agent 在自动化流程中应使用 `qam test` 取得质量证据，并通过文字指引用户在独立终端运行 `dev` 或使用后台守护任务启动。
+
+---
+
+## 第 4 步：Microsoft Store 自动化发布（用户明确提出发布后触发）
 
 当用户明确提出要上架发布时，触发完整的 Store 自动化流水线：
 
@@ -171,7 +206,13 @@ Project/
 
 ---
 
-## 质量与网络保障
+## 质量保障与常见误区清单（Anti-Patterns）
+
+| 常见误区 | 产生后果 | 正确规范 |
+| :--- | :--- | :--- |
+| **误区 1：创建脚手架后不写业务代码** | 交付的 App 仍为脚手架空便签，用户打开没有任何实际功能 | `qam create` 后必须立即编写 `index.html`、`app.js`、`styles.css` 落地业务 |
+| **误区 2：在自动化会话中同步等待 `dev`** | `dev` 为长驻服务，工具超时（60s）后强杀进程，导致误判崩溃 | Agent 质量验证统一使用 `qam test`；`dev` 留给用户在独立终端启动 |
+| **误区 3：脱离 `qam.cmd` 直调 `electron.exe`** | 绕过沙箱环境，引发权限报错和环境漂移 | 永远使用 `.\quick-app-maker\bootstrap\qam.cmd` 作为唯一执行入口 |
 
 - **国内网络全量镜像**：Node 便携包与 npm 使用 npmmirror，Electron 二进制使用 China mirror，锁文件 `qam-toolchain.lock.json` 固化版本与 SHA-256；
 - **原子下载与缓存保护**：所有下载先写 `.part` 临时文件，哈希校验一致后原子重命名；

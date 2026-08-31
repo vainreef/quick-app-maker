@@ -61,8 +61,12 @@ PageKind → 完整 Observe → Diff → Apply
 
 8. 开发模式默认关闭 DevTools；排查时显式设置 `QAM_DEVTOOLS=1`。
 
-## 运行要求
+## 运行要求与进程模型
 
+- **进程模型分界**：`qam dev` 为长驻 Watcher 进程（等待 Ctrl+C 退出），供用户在独立终端交互式运行。**Agent 在自动化执行流中严禁同步阻塞等待 `dev` 退出**（超时强杀会导致误判为程序崩溃）。
+- **自动化验收依据**：Agent 的代码与契约质量验证统一使用 **`qam test .\app-slug`**（秒级退出并输出确定性退出码）。
+- **业务编写强制性**：`qam create` 仅生成空骨架；Agent 必须接着修改 `index.html`、`app.js`、`styles.css` 落地真实业务，严禁将空骨架直接交付。
+- **严禁直调底层**：严禁脱离 `bootstrap/qam.cmd` 直接调用底层 `electron.exe` 或使用 `--no-sandbox` 破坏沙箱隔离。
 - 同一 App 同时只允许一个 dev/package/store writer；
 - 每次命令生成 run id 和结构化证据；
 - checkpoint 原子写入并校验 manifest hash、productId、submissionId；
