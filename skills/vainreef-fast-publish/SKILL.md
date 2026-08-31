@@ -11,7 +11,9 @@ description: 用工作区内置的 Node.js、Git、Electron 和 Playwright 生�
 - **统一命令入口**：首次入场只运行下载桥 `entry.ps1`；之后所有项目、测试和 Store 命令统一走 `bootstrap/qam.cmd`。
 - **红线 1：长驻进程禁止同步阻塞等待**：`qam dev` 是热重载长驻 Watcher 进程（按 Ctrl+C 退出）。**AI Agent 在自动化流程中严禁前台同步阻塞等待 `dev` 退出**（否则触发超时强杀并引发崩溃误判）。Agent 自检必须使用秒级退出的 **`qam test .\app-slug`**，并提示用户在独立终端启动 `dev`。
 - **红线 2：脚手架创建后必须编写业务代码**：`qam create` 仅生成通用骨架模板。Agent 必须紧接着修改 `src/renderer/index.html`、`app.js`、`styles.css` 实现具体业务功能，严禁跳过业务编写。
-- **红线 3：禁止脱离包装器直调底层**：严禁直接执行 `electron.exe` 或传 `--no-sandbox` 绕过框架。排查控制台时显式设置 `QAM_DEVTOOLS=1`。
+- **红线 3：严禁退化为 localStorage**：桌面应用必须通过 Electron 安全 IPC（`window.qam.saveState` 与 `window.qam.loadState`）进行本地持久化，**严禁私自替换为 `localStorage`**；主进程 `normalizeState` 负责数据校验。
+- **红线 4：严禁破坏 CSP 的 unsafe-eval 声明**：纯源码模式下 Vue 3 需要在浏览器内编译 DOM 模板，`index.html` 的 CSP 必须保留 `script-src 'self' 'unsafe-eval'`，严禁移除（否则导致 Vue 挂载报错、`v-cloak` 无法清除引发彻底黑屏）。
+- **红线 5：禁止脱离包装器直调底层**：严禁直接执行 `electron.exe` 或传 `--no-sandbox` 绕过框架。排查控制台时显式设置 `QAM_DEVTOOLS=1`。
 
 ## 1. 阶段 1：需求访谈与脚手架生成（Phase 1）
 

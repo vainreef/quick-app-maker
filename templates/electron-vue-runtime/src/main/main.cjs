@@ -28,17 +28,25 @@ function saveState(value) {
 }
 
 function normalizeState(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.items)) throw new TypeError('state.items must be an array');
-  if (value.items.length > MAX_ITEMS) throw new RangeError(`state.items exceeds ${MAX_ITEMS} records`);
-  const items = value.items.map((item, index) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new TypeError(`state.items[${index}] must be an object`);
-    const id = typeof item.id === 'string' ? item.id.trim() : '';
-    const text = typeof item.text === 'string' ? item.text.trim() : '';
-    if (!id || id.length > 128 || !text || text.length > 10_000) throw new TypeError(`state.items[${index}] is invalid`);
-    return { id, text, ...(typeof item.createdAt === 'string' && item.createdAt ? { createdAt: item.createdAt } : {}) };
-  });
-  if (new Set(items.map(item => item.id)).size !== items.length) throw new TypeError('state.items contains duplicate ids');
-  return { version: 1, items };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('state must be an object');
+  if (Array.isArray(value.items)) {
+    if (value.items.length > MAX_ITEMS) throw new RangeError(`state.items exceeds ${MAX_ITEMS} records`);
+    const items = value.items.map((item, index) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) throw new TypeError(`state.items[${index}] must be an object`);
+      const id = typeof item.id === 'string' ? item.id.trim() : (item.id != null ? String(item.id).trim() : '');
+      const text = typeof item.text === 'string' ? item.text.trim() : (typeof item.title === 'string' ? item.title.trim() : '');
+      if (!id || id.length > 128) throw new TypeError(`state.items[${index}] is invalid: missing id`);
+      return {
+        ...item,
+        id,
+        text: text || item.text || item.title || '',
+        ...(typeof item.createdAt === 'string' && item.createdAt ? { createdAt: item.createdAt } : { createdAt: new Date().toISOString() })
+      };
+    });
+    if (new Set(items.map(item => item.id)).size !== items.length) throw new TypeError('state.items contains duplicate ids');
+    return { version: value.version ?? 1, ...value, items };
+  }
+  return { version: value.version ?? 1, ...value, items: [] };
 }
 
 function registerProtocol() {

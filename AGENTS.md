@@ -66,6 +66,9 @@ PageKind → 完整 Observe → Diff → Apply
 - **进程模型分界**：`qam dev` 为长驻 Watcher 进程（等待 Ctrl+C 退出），供用户在独立终端交互式运行。**Agent 在自动化执行流中严禁同步阻塞等待 `dev` 退出**（超时强杀会导致误判为程序崩溃）。
 - **自动化验收依据**：Agent 的代码与契约质量验证统一使用 **`qam test .\app-slug`**（秒级退出并输出确定性退出码）。
 - **业务编写强制性**：`qam create` 仅生成空骨架；Agent 必须接着修改 `index.html`、`app.js`、`styles.css` 落地真实业务，严禁将空骨架直接交付。
+- **数据持久化契约**：必须且仅能使用 `window.qam.saveState()` 与 `window.qam.loadState()` 进行本地持久化，**严禁退化为 `localStorage`**；如需扩展数据模型，必须保证 `src/renderer/app.js` 与 `src/main/main.cjs` 的字段与类型定义严格对齐。
+- **CSP 策略与 Vue 运行时**：纯源码模式下 `index.html` 的 CSP 必须包含 `script-src 'self' 'unsafe-eval'`，严禁移除 `'unsafe-eval'`（否则 Vue 3 无法在浏览器端动态编译模板，会导致 `[v-cloak]` 无法卸载引发彻底黑屏）。
+- **禁止应试拼凑代码**：测试报错时必须排查真实的架构、数据流与逻辑根因，**严禁为了迎合静态断言而在源码中机械拼接死字符串**。
 - **严禁直调底层**：严禁脱离 `bootstrap/qam.cmd` 直接调用底层 `electron.exe` 或使用 `--no-sandbox` 破坏沙箱隔离。
 - 同一 App 同时只允许一个 dev/package/store writer；
 - 每次命令生成 run id 和结构化证据；

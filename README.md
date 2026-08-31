@@ -213,6 +213,8 @@ Project/
 | **误区 1：创建脚手架后不写业务代码** | 交付的 App 仍为脚手架空便签，用户打开没有任何实际功能 | `qam create` 后必须立即编写 `index.html`、`app.js`、`styles.css` 落地业务 |
 | **误区 2：在自动化会话中同步等待 `dev`** | `dev` 为长驻服务，工具超时（60s）后强杀进程，导致误判崩溃 | Agent 质量验证统一使用 `qam test`；`dev` 留给用户在独立终端启动 |
 | **误区 3：脱离 `qam.cmd` 直调 `electron.exe`** | 绕过沙箱环境，引发权限报错和环境漂移 | 永远使用 `.\quick-app-maker\bootstrap\qam.cmd` 作为唯一执行入口 |
+| **误区 4：使用 localStorage 替代 Electron IPC** | 无法做到桌面应用可靠文件持久化，破坏安全沙箱数据契约 | 必须使用 `window.qam.saveState` 与 `window.qam.loadState` 并在主进程校验 |
+| **误区 5：移除 CSP 中的 unsafe-eval 声明** | Vue 3 在浏览器端无法动态编译 HTML 模板，导致 `v-cloak` 锁死全黑屏 | `index.html` 的 CSP 必须保留 `script-src 'self' 'unsafe-eval'` |
 
 - **国内网络全量镜像**：Node 便携包与 npm 使用 npmmirror，Electron 二进制使用 China mirror，锁文件 `qam-toolchain.lock.json` 固化版本与 SHA-256；
 - **原子下载与缓存保护**：所有下载先写 `.part` 临时文件，哈希校验一致后原子重命名；

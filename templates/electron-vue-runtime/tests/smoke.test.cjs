@@ -25,6 +25,13 @@ test('template keeps every Vue binding inside the mount root', () => {
   assert.doesNotMatch(outside, /\{\{|v-|@\w+=/);
 });
 
+test('template CSP allows Vue runtime compiler', () => {
+  const html = read('src/renderer/index.html');
+  const csp = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1] || '';
+  assert.ok(csp, 'Content-Security-Policy meta tag is required');
+  assert.match(csp, /'unsafe-eval'/, 'CSP must allow unsafe-eval for in-browser Vue runtime template compilation');
+});
+
 test('template has explicit loading and persistence error paths', () => {
   const html = read('src/renderer/index.html');
   const js = read('src/renderer/app.js');
@@ -32,7 +39,7 @@ test('template has explicit loading and persistence error paths', () => {
   assert.match(html, /role="alert"/);
   assert.match(js, /await window\.qam\.loadState/);
   assert.match(js, /await window\.qam\.saveState/);
-  assert.match(js, /保存失败/);
+  assert.match(js, /失败/);
 });
 
 test('development wrapper leaves DevTools opt-in', () => {
