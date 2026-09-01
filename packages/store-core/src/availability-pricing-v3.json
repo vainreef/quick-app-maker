@@ -1,0 +1,36 @@
+{
+  "section": "定价 (Pricing V3)",
+  "sectionTitleId": "availabilityPricingHeader",
+  "toggleButton": {
+    "hideId": "pricingHideBtn",
+    "text": "隐藏选项"
+  },
+  "marketGroups": {
+    "defaultGroup": {
+      "name": "Default",
+      "marketCount": "240 个市场",
+      "currencySelector": {
+        "container": ".price-config he-select",
+        "tag": "he-select"
+      },
+      "priceTierSelector": {
+        "container": "price-tier-selection[pricetierkey=\"Retail\"] he-select",
+        "tag": "he-select",
+        "options": "he-option"
+      }
+    }
+  },
+  "commandActions": [
+    { "text": "创建新市场组", "type": "command" },
+    { "text": "查看每个市场的价格", "type": "command" },
+    { "text": "计划价格更改", "type": "command" }
+  ],
+  "platformOptimizationDialog": {
+    "container": "price-table he-dialog",
+    "radioGroup": "he-radio-group[name=\"platform\"]",
+    "options": [
+      { "value": "Xbox", "label": "控制台" },
+      { "value": "PC", "label": "电脑" }
+    ]
+  }
+}

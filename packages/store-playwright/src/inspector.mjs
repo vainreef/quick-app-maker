@@ -6,21 +6,33 @@ export async function capturePage(page) {
     const has = selector => document.querySelector(selector) !== null;
     const signals = {
       signIn: /login\.microsoftonline|login\.live\.com|signin|oauth/i.test(url),
-      loading: text.length < 80 && !has('main input,main textarea,main button,main a'),
+      loading: text.length < 80 && !has('main input,main textarea,main button,main a,main [role="button"],h1'),
       availability: /availability|pricingandavailability/i.test(url) || has('input[name="marketSelection"],#saveButtonPricing'),
       properties: /properties/i.test(url) || has('select[name="CategorySelect"],input[name="privacyPolicySelection"]'),
       ageQuestionnaire: /ageratings(?!\/summary)/i.test(url) || has('input[name="inputMode"],input[name^="question#"]'),
       ageSummary: /ageratings\/summary/i.test(url) || has('age-rating-summary,.rating-summary-table'),
-      packages: /packages/i.test(url) && has('input[type="file"],tr'),
+      packages: /packages/i.test(url) && has('input[type="file"],tr,.description,.fileuploader'),
       listingGrid: /managelanguages/i.test(url) || has('submission-listing-summary,he-data-grid'),
-      listingForm: /languageid=/i.test(url) || has('textarea[name="description"],#description'),
+      listingForm: (/listings\?|languageid=/i.test(url) && has('textarea,input')) || has('textarea[name="description"],#description'),
       options: /options/i.test(url) && has('textarea,input[type="radio"]'),
-      overview: /\/overview(?:[/?#]|$)/i.test(url) || has('a[href*="/submissions/"]'),
+      overview: /\/submissions\/[^/?#]+\/overview/i.test(url) || /\/products\/[^/?#]+(?:\/overview|\/identity)?/i.test(url) || (/\/overview(?:[/?#]|$)/i.test(url) && has('a[href*="/submissions/"]')),
       certification: /in certification|正在认证/i.test(text),
       fatal: /something went wrong|出现问题|error-page/i.test(text)
     };
     let kind = 'Unknown';
-    if (signals.signIn) kind = 'SignIn'; else if (signals.fatal) kind = 'ErrorPage'; else if (signals.loading) kind = 'LoadingShell'; else if (signals.certification) kind = 'CertificationStatus'; else if (signals.ageSummary) kind = 'AgeRatingsSummary'; else if (signals.ageQuestionnaire) kind = 'AgeRatingsQuestionnaire'; else if (signals.listingForm && !signals.listingGrid) kind = 'ListingForm'; else if (signals.listingGrid) kind = 'ListingLanguageGrid'; else if (signals.availability) kind = 'AvailabilityForm'; else if (signals.properties) kind = 'PropertiesForm'; else if (signals.packages) kind = 'PackagesForm'; else if (signals.options) kind = 'OptionsForm'; else if (/\/submissions\/[^/?#]+\/overview/i.test(url)) kind = 'SubmissionOverview'; else if (/\/products\/[^/?#]+\/overview|\/apps-and-games\/overview/i.test(url)) kind = 'ProductOverview';
+    if (signals.signIn) kind = 'SignIn';
+    else if (signals.fatal) kind = 'ErrorPage';
+    else if (signals.loading) kind = 'LoadingShell';
+    else if (signals.certification) kind = 'CertificationStatus';
+    else if (signals.listingForm) kind = 'ListingForm';
+    else if (signals.listingGrid) kind = 'ListingLanguageGrid';
+    else if (signals.availability) kind = 'AvailabilityForm';
+    else if (signals.properties) kind = 'PropertiesForm';
+    else if (signals.ageSummary) kind = 'AgeRatingsSummary';
+    else if (signals.ageQuestionnaire) kind = 'AgeRatingsQuestionnaire';
+    else if (signals.packages) kind = 'PackagesForm';
+    else if (signals.options) kind = 'OptionsForm';
+    else if (signals.overview) kind = 'SubmissionOverview';
     return { kind, ready: !['Unknown', 'LoadingShell'].includes(kind), url, title: document.title || '', textPreview: text.slice(0, 1800), signals, buttons: [...document.querySelectorAll('button,[role="button"]')].map(x => (x.innerText || x.getAttribute('aria-label') || '').trim()).filter(Boolean).slice(0, 40), errors: [...document.querySelectorAll('[role="alert"],.alert-error,.alert-danger')].map(x => (x.innerText || '').trim()).filter(Boolean).slice(0, 20) };
   });
   if (!PAGE_KINDS.includes(data.kind)) data.kind = 'Unknown';

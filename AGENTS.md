@@ -4,9 +4,9 @@
 
 主线是 Node.js / Electron。所有新 App、CLI、测试和 Store 自动化都从 `bin/qam.mjs` 进入。旧的 C#、.NET、WinUI、PowerShell CDP 驱动已从 V2 删除。
 
-## 工具链
+## 工具链与便携沙箱
 
-- **禁止依赖与检查系统全局环境**：Agent 事先**不需要也不得**检查用户系统是否安装了 Git 或 Node.js，严禁调用用户系统全局环境；
+- **禁止依赖与检查系统全局环境**：Agent 事先不需要也不得检查用户系统是否安装了 Git 或 Node.js，严禁调用用户系统全局环境；
 - **全链路内置便携环境**：
   - Node.js 24 LTS portable：`WORKSPACE_ROOT/node/`；
   - Git portable（始终使用工作区版本）：`WORKSPACE_ROOT/git/`；
@@ -17,10 +17,6 @@
 
 Windows 命令统一通过 `bootstrap/qam.cmd` 进入；该包装器固定解析工作区 `node/node.exe` 与其内置 npm CLI。业务代码不直接启动 `npm.cmd`、`npx.cmd`，也不依赖 PATH 中的 Node/npm。
 
-`qam-toolchain.lock.json` 从引擎目录加载：命令调用 `configureNpmEnvironment` 时必须传入引擎 lock，空工作区不需要手工复制一份到根目录。Edge 与 PowerShell 视为 Windows 内置能力；下载桥不探测系统 Git、Node 或 curl。
-
-唯一保留的 PowerShell 是 bootstrap 下载桥和 Windows 默认桌面启动桥；业务状态、页面定位、编排、验证全部用 Node。
-
 ## 工作区边界
 
 下载、缓存、日志、测试 profile、截图、DOM 和 checkpoint 必须写入当前工作区。禁止把工具工件写到系统临时目录、用户全局 npm 目录或工作区之外。启动系统 Edge 时只读取可执行文件位置，不读取用户日常 profile；生产 App 的系统 `userData` 由 App 自己使用，Agent 通过 UI 验证，不直接读取。
@@ -30,36 +26,32 @@ Windows 命令统一通过 `bootstrap/qam.cmd` 进入；该包装器固定解析
 控制器必须执行：
 
 ```text
-PageKind → 完整 Observe → Diff → Apply
-→ 当前 URL 冷导航 → 完整 Observe + Diff=0
-→ Overview 模块显式 Complete → Converged
+PageKind → 完整 Observe → Diff → Apply (直接填表并保存成功) → Converged
 ```
 
 退出码：
+- `0`: 阶段或总检已验证
+- `1`: 执行错误或验证失败
+- `2`: 配置、参数或 manifest 错误
+- `3`: Node、Edge 或 Playwright 会话不可用
+- `4`: 只读计划发现差异
+- `5`: 页面 schema/selector 漂移
+- `6`: 时间预算耗尽
 
-| 码 | 含义 |
-| ---: | --- |
-| 0 | 阶段或总检已验证 |
-| 1 | 执行错误或验证失败 |
-| 2 | 配置、参数或 manifest 错误 |
-| 3 | Node、Edge 或 Playwright 会话不可用 |
-| 4 | 只读计划发现差异 |
-| 5 | 页面 schema/selector 漂移 |
-| 6 | 时间预算耗尽 |
+## 浏览器与表单铁律
 
-`Converged` 证据必须同时包含 `pageKind`、`coldDiff`、`overviewStatus`、`overviewUrl`、证据文件 ID。Unknown、Processing、Error、重复包和缺少模块状态均保持未完成。
-
-## 浏览器规则
-
-1. 任何控件操作前先识别 `PageKind`。
-2. 首选 `getByRole`、`getByLabel`、`getByText` 和 `getByTestId`。
-3. Playwright Locator 默认穿透 open Shadow DOM；禁止保存会失效的节点索引。
-4. 等待使用 Locator assertion、`waitForURL`、`waitForFunction` 或有截止时间的轮询；业务代码禁止固定 sleep。
-5. 上传使用 `setInputFiles`；特殊 closed shadow 才进入集中 CDP fallback。
-6. 会话使用工作区独立 profile，不接管用户日常 Edge。
-7. CLI 不实现最终认证提交点击。
-
-8. 开发模式默认关闭 DevTools；排查时显式设置 `QAM_DEVTOOLS=1`。
+1. **PageKind 准确识别**：任何控件操作前先识别 `PageKind`，具体表单（ListingForm/Grid/Form）优先级必须高于 Overview，严禁在未进入表单时误判为 Overview；
+2. **选择器穿透与定位**：首选 `getByRole`、`getByLabel`、`getByText` 和 `getByTestId`；Playwright Locator 默认穿透 open Shadow DOM；
+3. **Web Components 支持**：`<he-select>` 需通过内部 input 键入回车或 DOM 点击 `<he-option>` 触发；`<he-button>` 必须支持复合定位；
+4. **可见性过滤（`:visible` 铁律）**：错误与警告断言必须严格过滤 `:visible` 伪类，严禁误读隐藏在 DOM 中的未激活错误模板节点；
+5. **MSIX 打包 EBUSY 防御**：生产打包必须显式忽略 `.cache`、`build`、`out` 等运行时目录，防止复制被 Edge 独占锁定的 profile 引发 EBUSY；
+6. **大包 CDP 注入**：50MB+ 大安装包上传必须使用 CDP 会话 `DOM.setFileInputFiles` 注入，规避 websocket 50MB 传输上限；
+7. **受限功能声明**：「提交选项」页面若包含 `runFullTrust` 受限功能，必须显式等待异步审核区块并填入本地离线隐私合规声明，消除 `<textarea class="has-error">` 校验拦截；
+8. **属性页隐私策略**：「属性」页面必须提供纯本地隐私策略声明文本（`#privacyPolicyText`），防止全信任桌面权限被微软后台拦截；
+9. **完全就绪 DOM 调试**：发生报错时，必须显式等待所有 progressbar 和 loading 遮罩彻底卸载，抓取真实、完整的全量 DOM 结构与 ARIA 树进行深度分析；
+10. **单阶段精准生效（最小操作集）**：严禁在已有模块完成时盲目跑全量 6 阶段轮询（`store run`），优先针对未完成模块执行 `store apply --phase <phase>`，最后通过 `store verify` 一次性总验；
+11. **严格串行执行与 CDP 独占防死锁**：严禁并发派发多个 Edge / Playwright / Store 相关的命令或后台 Task；所有 CDP 操作必须单任务串行执行，前序任务彻底退出后方可执行下一个；
+12. **全交互显式日志记录**：所有与浏览器发生的交互（导航 goto、元素读取、输入 fill、选择 choose、保存 save、冷导航刷新 coldVerify、总览校验 overviewVerify）必须全部打印清晰明确的 `[BROWSER_ACTION]` 日志，严禁静默黑盒操作。
 
 ## 运行要求与进程模型
 
@@ -76,18 +68,36 @@ PageKind → 完整 Observe → Diff → Apply
 - **禁止应试拼凑代码**：测试报错时必须排查真实的架构、数据流与逻辑根因，**严禁为了迎合静态断言而在源码中机械拼接死字符串**。
 - **严禁直调底层**：严禁脱离 `bootstrap/qam.cmd` 直接调用底层 `electron.exe` 或使用 `--no-sandbox` 破坏沙箱隔离。
 - **并发与锁控制**：同一 App 同时只允许一个 dev/package/store writer；进程清理只针对当前 run 的 PID/lock，严禁按名称批量强杀系统 Electron 或 Node。
-- **结构化证据**：每次执行生成 run id 和结构化日志；checkpoint 原子写入并严格校验 manifest hash、productId 与 submissionId。
-- **真实窗口交付**：源码正则或进程列表只算静态/启动证据；交付前必须完成真实窗口的输入、持久化、错误和关闭路径验证。
 
-## 交付与发布协同
+## 交付与发布协同（五步标准流水线）
 
 1. **首版试用交付**：业务开发与测试通过后，通过后台异步启动 `qam dev` 直接在用户屏幕上打开应用窗口体验，收集用户修改意见；
-2. **微软商店发布协同（铁律）**：
-   - 用户明确提出发布后，Agent 先执行 `qam store launch --app .\app-slug`（秒级拉起独立 Edge 浏览器）；
-   - Agent **必须向用户发送登录指引消息并等待回复**：
-     > “我已在屏幕上为您打开了 Edge 浏览器，请在弹出的窗口中登录您的微软账号（支持免费个人开发者账号）。**登录完成后，请在聊天框回复我说『我登录好了』，我接着为您全自动填表与上架！**”
-   - Agent 结束当前发言，从容等待用户回复；
-   - 用户在聊天框回复“我登录好了”后，Agent 接力执行全套自动化流水线：
-     `store reserve` $\rightarrow$ `package --profile store` $\rightarrow$ `store preflight` $\rightarrow$ `store discover` $\rightarrow$ `store run --apply --confirm-age-ratings` $\rightarrow$ `store verify`；
-   - 验证通过后，提示用户在浏览器中做最后的人工核对并点击「提交进行认证」。
-
+2. **微软商店发布协同（五步标准流水线）**：
+   - **第 1 步（登录与保留名称协同）**：
+     - 用户明确提出发布后，Agent 先执行 `qam store launch --app .\app-slug`（秒级拉起独立 Edge 浏览器）；
+     - Agent **必须向用户发送登录与应用命名指引消息并等待回复**：
+       - 引导用户在弹出的 Edge 窗口中登录微软账号；
+       - 提示用户登录后点击「新产品」$\rightarrow$「MSIX 或 PWA 应用」，**由用户亲自输入应用名称并点击「保留产品名称」**；
+       - **向用户提供建议产品名称与备选名**；
+       - **说明若名称已被占用的解决办法**（如增加特色修饰词、副标题、开发者标识等）；
+       - 明确告知用户：**保留成功后，请在聊天框回复我说『我保留好了』或『下一步』！**
+     - Agent 结束当前发言，从容等待用户回复；
+   - **第 2 步（材料全面盘点与来源协同，铁律）**：
+     - Agent **必须向用户全面列出 Microsoft Store 上架所需的全部材料清单与规格**（文案类 4 项、图像资产类 5 项、合规声明类 3 项）；
+     - Agent **必须主动询问用户材料来源意向**：
+       - 方案 A（由 Agent 全自动生成与设计）：Agent 明确说明打算如何生成（真机渲染截取真实 1366x768 界面、主题设计 Logo、撰写文案）；
+       - 方案 B（由用户亲自提供）：用户自行提供设计素材；
+       - 方案 C（混合模式）：文案/截图由 Agent 生成，特定 Logo 由用户提供；
+     - Agent 等待用户确认方案后，再开始执行真实素材生成与整理；
+   - **第 3 步（真机素材生成、交互弹窗与用户确认，铁律）**：
+     - 严禁使用脚手架纯色占位图；Agent 基于真实应用渲染捕获高清截图并设计图标；
+     - Agent 将素材统一整理在 `store-submission-assets` 文件夹，**所有文件名必须全部采用纯中文清晰命名，明确标注用途与分辨率规格；文字说明绝对禁止使用 md，一律采用 txt 格式**（如 `00_时光回忆录_完整文案与亮点特性说明.txt`、`01_微软商店详情页_主运行界面高清截图_1366x768.png` 等）；
+     - Agent **必须通过交互式任务指令拉起文件管理器，并通过 `OpenInputDesktop` 显式检测窗口句柄确保弹窗已置顶展示在用户屏幕前**；
+     - Agent **向用户逐一说明每个素材的作用与规格，提醒用户核对确认**；
+     - 明确告知用户：**素材核对无误后，请在聊天框回复我说『确认素材』或『继续』，我接着为您全自动填报并上传！**
+     - Agent 结束当前发言，从容等待用户确认；
+   - **第 4 步（精准生效与全自动流水线接力，铁律）**：
+     - 用户在聊天框回复“确认素材”或“继续”后，Agent 依据当前后台真实状态，**优先执行未完成模块的精准生效（`store apply --phase <phase>`），严禁对已有绿标的模块重复全量轮询**；
+     - 填报完成后，执行 `store verify` 进行一键总体验收。
+   - **第 5 步（人工最终审核与提交）**：
+     - 验证通过（6 大模块全绿标）后，提示用户在浏览器中做最后的人工核对并点击「提交进行认证」。

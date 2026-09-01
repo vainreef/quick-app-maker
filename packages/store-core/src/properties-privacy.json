@@ -1,0 +1,62 @@
+{
+  "section": "隐私策略声明*",
+  "question": "此产品是否访问、收集或传输个人信息(可用于识别个人身份的数据)?*",
+  "baseField": {
+    "name": "privacyPolicySelection",
+    "tag": "select",
+    "containerId": "subcategory-dropdown",
+    "required": true,
+    "validationErrorText": "此问题需要予以回复。",
+    "default": "NotSet",
+    "options": [
+      {
+        "value": "NotSet",
+        "label": "选择一个答案以查看相应的操作",
+        "l10nKey": "appsubmission_privacypolicy_default_option"
+      },
+      {
+        "value": "Yes",
+        "label": "是，我的产品使用个人信息",
+        "l10nKey": "appsubmission_privacypolicy_option1"
+      },
+      {
+        "value": "No",
+        "label": "否，我的产品不使用任何个人信息",
+        "l10nKey": "appsubmission_privacypolicy_option2"
+      }
+    ]
+  },
+  "dynamicFieldsWhenYes": {
+    "heading": "你需要为产品提供有效的隐私策略。",
+    "radiogroup": [
+      {
+        "id": "privacyPolicyURL",
+        "type": "radio",
+        "label": "提供隐私策略 URL",
+        "nestedInput": {
+          "type": "text",
+          "placeholder": "Enter Privacy Policy URL",
+          "ariaLabel": "应用隐私策略 URL",
+          "maxLength": 2048,
+          "validationErrorText": "此提交需提供隐私策略。"
+        }
+      },
+      {
+        "id": "privacyPolicyText",
+        "type": "radio",
+        "label": "提供隐私策略文本",
+        "tooltip": "下面提供的策略文本将用于发布产品的所有市场。",
+        "nestedTextarea": {
+          "tag": "textarea",
+          "ariaLabel": "提供隐私策略文本",
+          "rows": 10,
+          "cols": 120,
+          "maxLength": 500000,
+          "className": "form-control spacer-xs-bottom",
+          "label": "隐私策略文本*",
+          "validationErrorText": "隐私策略是必需的。"
+        }
+      }
+    ]
+  }
+}

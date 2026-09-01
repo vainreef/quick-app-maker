@@ -1,0 +1,77 @@
+{
+  "section": "可见",
+  "sectionTitleId": "visibilityHeader",
+  "toggleButton": {
+    "container": "[uitestid=\"ShowVisibilityLink\"] button",
+    "showText": "显示选项",
+    "hideText": "隐藏选项",
+    "showId": "visibilityShowBtn",
+    "hideId": "visibilityHideBtn"
+  },
+  "distributionOption": {
+    "tag": "select",
+    "id": "distributionOption",
+    "options": [
+      { "value": "string:Retail", "label": "零售分发", "default": true },
+      { "value": "string:LineOfBusiness", "label": "业务线(LOB)分发", "default": false }
+    ]
+  },
+  "audienceRadioGroup": {
+    "title": "受众",
+    "headerId": "availabilityAudienceHeader",
+    "options": [
+      {
+        "id": "radioDistribution_PublicAudience",
+        "value": "Public",
+        "label": "开放受众",
+        "default": true
+      },
+      {
+        "id": "radioDistribution_PrivateBetaAudience",
+        "value": "PrivateBeta",
+        "label": "特定受众",
+        "default": false
+      }
+    ]
+  },
+  "discoverabilityRadioGroup": {
+    "title": "可发现性",
+    "headerId": "availabilityDiscoverability",
+    "options": [
+      {
+        "id": "radioVisibility_Public",
+        "name": "discoverbility",
+        "value": "Public",
+        "label": "使此产品可用并在 Microsoft Store 中可发现。",
+        "default": true
+      },
+      {
+        "id": "radioVisibility_Hidden",
+        "name": "discoverbility",
+        "value": "false",
+        "label": "使此产品可用，但在 Microsoft Store 中不可发现，并且:",
+        "default": false,
+        "nestedOptions": [
+          {
+            "id": "radioDistribution_Hidden",
+            "name": "discoverbilityHidden",
+            "value": "Hidden",
+            "label": "仅限直接链接: 具有指向该产品列表的直接链接的所有客户都可以下载它，使用 Windows 8.x 的客户除外。"
+          },
+          {
+            "id": "radioDistribution_Beta",
+            "name": "discoverbilityHidden",
+            "value": "Beta",
+            "label": "仅限使用 Windows Phone 8.x 的个人..."
+          },
+          {
+            "id": "radioDistribution_StopSelling",
+            "name": "discoverbilityHidden",
+            "value": "NotSelling",
+            "label": "停止购买: 具有直接链接的任何客户均可查看产品的 Microsoft Store 一览..."
+          }
+        ]
+      }
+    ]
+  }
+}

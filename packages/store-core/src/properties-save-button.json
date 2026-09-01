@@ -1,0 +1,16 @@
+{
+  "section": "底部操作栏",
+  "saveButton": {
+    "tag": "button",
+    "type": "submit",
+    "name": "save_button",
+    "className": "btn btn-primary",
+    "spanL10nKey": "appsubmission_savebutton",
+    "text": "保存",
+    "primarySelector": "button[name=\"save_button\"]",
+    "fallbackSelectors": [
+      "button[type=\"submit\"].btn-primary",
+      ".btn-group button.btn-primary"
+    ]
+  }
+}

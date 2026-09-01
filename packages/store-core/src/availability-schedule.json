@@ -1,0 +1,35 @@
+{
+  "section": "计划",
+  "sectionTitleId": "availabilityDatesHeader",
+  "toggleButton": {
+    "showId": "scheduleShowBtn",
+    "hideId": "scheduleHideBtn",
+    "showText": "显示选项",
+    "hideText": "隐藏选项"
+  },
+  "baseSchedule": {
+    "title": "基准计划",
+    "release": {
+      "id": "releaseId",
+      "label": "发布",
+      "selector": "select[uitestid=\"AvailableSelector-0\"]",
+      "options": [
+        { "value": "string:asap", "label": "尽快", "default": true },
+        { "value": "string:custom", "label": "在" }
+      ]
+    },
+    "stopSelling": {
+      "id": "stopSellingId",
+      "label": "停止购置",
+      "selector": "select[uitestid=\"StopSellingSelector-0\"]",
+      "options": [
+        { "value": "string:auto-fill", "label": "永不", "default": true },
+        { "value": "string:custom", "label": "在" }
+      ]
+    }
+  },
+  "marketOverride": {
+    "buttonText": "针对特定市场进行自定义",
+    "modalId": "market-selector-dates"
+  }
+}

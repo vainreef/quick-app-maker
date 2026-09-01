@@ -1,0 +1,17 @@
+{
+  "section": "程序包 (Packages)",
+  "dropzone": {
+    "outerBlock": "div.block:has(.description)",
+    "description": "Drag your packages here (.msix, .msixbundle, .msixupload, .appx, .appxbundle, .appxupload, .xap) or browse your files.",
+    "fileInput": {
+      "selector": "input[type=\"file\"][name=\"fileuploader\"], input.fileuploader, input[type=\"file\"]",
+      "method": "CDP DOM.setFileInputFiles"
+    }
+  },
+  "buttons": {
+    "save": {
+      "selector": "input.btn-primary[value=\"Save\"], input.btn-primary[value*=\"保存\"], input[type=\"button\"][value=\"Save\"]",
+      "text": "Save"
+    }
+  }
+}

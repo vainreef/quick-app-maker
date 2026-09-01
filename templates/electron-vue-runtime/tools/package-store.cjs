@@ -21,7 +21,7 @@ function run(args) {
   if (result.status !== 0) throw new Error(`WinApp CLI exited with ${result.status ?? 1}`);
 }
 (async () => {
-  const layouts = await packager({ dir: root, out: outRoot, platform: 'win32', arch: 'x64', overwrite: true, asar: true, prune: true, executableName: pkg.name, ignore: [/^\/store($|\/)/, /^\/tests($|\/)/, /^\/tools\/package-store/, /\.log$/] });
+  const layouts = await packager({ dir: root, out: outRoot, platform: 'win32', arch: 'x64', overwrite: true, asar: true, prune: true, executableName: pkg.name, ignore: [/^\/\.cache($|\/)/, /^\/build($|\/)/, /^\/out($|\/)/, /^\/store($|\/)/, /^\/tests($|\/)/, /^\/tools($|\/)/, /\.log$/] });
   const layoutRoot = layouts[0];
   const assets = path.join(layoutRoot, 'Assets'); fs.mkdirSync(assets, { recursive: true });
   for (const file of fs.readdirSync(path.join(storeRoot, 'assets'))) fs.copyFileSync(path.join(storeRoot, 'assets', file), path.join(assets, file));

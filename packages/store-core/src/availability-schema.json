@@ -1,0 +1,100 @@
+{
+  "phase": "availability",
+  "url": "https://partner.microsoft.com/zh-cn/dashboard/products/{productId}/submissions/{submissionId}/availability",
+  "sections": [
+    {
+      "name": "市场",
+      "fields": {
+        "marketSelection": {
+          "type": "radio",
+          "name": "marketSelection",
+          "options": [
+            { "value": "true", "label": "全球所有市场", "default": true },
+            { "value": "false", "label": "限定特定市场", "default": false }
+          ]
+        },
+        "futureMarkets": {
+          "type": "checkbox",
+          "label": "让我的产品将来在任何市场中均可按基价并在公开上市日提供。",
+          "default": true
+        }
+      }
+    },
+    {
+      "name": "定价和免费试用",
+      "fields": {
+        "priceTier": {
+          "type": "he-select",
+          "container": "price-tier-selection he-select",
+          "label": "基础价格",
+          "default": "0",
+          "options": [
+            { "value": "0", "label": "免费" }
+          ]
+        },
+        "trialType": {
+          "type": "select",
+          "ariaLabel": "TrialType",
+          "label": "免费试用类型",
+          "default": "string:NoTrial",
+          "options": [
+            { "value": "string:NoTrial", "label": "无免费试用" },
+            { "value": "string:TimedAccess", "label": "时间限制" },
+            { "value": "string:Unlimited", "label": "无限制" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "可发现性与受众",
+      "fields": {
+        "audience": {
+          "type": "radio",
+          "id": "radioDistribution_PublicAudience",
+          "name": "audience",
+          "options": [
+            { "id": "radioDistribution_PublicAudience", "value": "Public", "label": "开放受众", "default": true },
+            { "id": "radioDistribution_PrivateBetaAudience", "value": "PrivateBeta", "label": "特定受众", "default": false }
+          ]
+        },
+        "visibility": {
+          "type": "radio",
+          "id": "radioVisibility_Public",
+          "name": "discoverbility",
+          "options": [
+            { "id": "radioVisibility_Public", "value": "Public", "label": "使此产品可用并在 Microsoft Store 中可发现。", "default": true },
+            { "id": "radioVisibility_Hidden", "value": "false", "label": "使此产品可用，但在 Microsoft Store 中不可发现", "default": false }
+          ]
+        }
+      }
+    },
+    {
+      "name": "组织许可",
+      "fields": {
+        "enterpriseOnline": {
+          "type": "checkbox",
+          "id": "enterpriseonline_checkbox",
+          "label": "通过 Microsoft Store 托管(联机)的许可和分发向组织提供产品",
+          "default": true
+        },
+        "enterpriseOffline": {
+          "type": "checkbox",
+          "id": "enterpriseoffline_checkbox",
+          "label": "允许组织使用组织托管(脱机)的许可和分配",
+          "default": false
+        }
+      }
+    },
+    {
+      "name": "保存按钮",
+      "fields": {
+        "saveButton": {
+          "type": "submit",
+          "id": "saveButtonPricing",
+          "value": "保存草稿",
+          "primarySelector": "#saveButtonPricing, input[type=\"submit\"][value*=\"保存\"]"
+        }
+      }
+    }
+  ]
+}

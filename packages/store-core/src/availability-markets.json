@@ -1,0 +1,60 @@
+{
+  "section": "市场",
+  "sectionTitleId": "salesMarketsHeader",
+  "radioGroup": {
+    "name": "marketSelection",
+    "options": [
+      {
+        "type": "radio",
+        "name": "marketSelection",
+        "value": "true",
+        "label": "全球所有市场",
+        "badge": "推荐",
+        "default": true,
+        "expandButton": {
+          "text": "显示选项",
+          "l10nKey": "AppSubmission_ShowOption"
+        }
+      },
+      {
+        "type": "radio",
+        "name": "marketSelection",
+        "value": "false",
+        "label": "限定特定市场",
+        "default": false
+      }
+    ]
+  },
+  "modalSelector": {
+    "containerId": "market-selector-salesMarket",
+    "title": "市场选择",
+    "searchInput": {
+      "uitestid": "marketSearchBox",
+      "ariaLabel": "MarketSearchBox"
+    },
+    "actions": {
+      "selectAll": {
+        "uitestid": "MarketSelectorSelectAllLink-salesMarket",
+        "label": "全选"
+      },
+      "unselectAll": {
+        "uitestid": "MarketSelectorUnSelectAllLink-salesMarket",
+        "label": "取消全选"
+      },
+      "confirm": {
+        "uitestid": "MarketSelectorOkButton-salesMarket",
+        "label": "确定"
+      },
+      "cancel": {
+        "uitestid": "MarketSelectorCancelButton-salesMarket",
+        "label": "取消"
+      }
+    }
+  },
+  "futureMarketsCheckbox": {
+    "type": "checkbox",
+    "label": "让我的产品将来在任何市场中均可按基价并在公开上市日提供。",
+    "id": "enableFutureMarkets",
+    "defaultChecked": true
+  }
+}

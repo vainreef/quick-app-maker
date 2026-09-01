@@ -1,0 +1,86 @@
+{
+  "section": "类别和子类别*",
+  "fields": {
+    "CategorySelect": {
+      "name": "CategorySelect",
+      "containerId": "category-dropdown",
+      "ariaLabel": "应用类别组合框",
+      "required": true,
+      "default": "NotSet",
+      "options": [
+        { "value": "NotSet", "label": "选取类别" },
+        { "value": "Security", "label": "安全性" },
+        { "value": "NavigationAndMaps", "label": "导航 + 地图" },
+        { "value": "MultimediaDesign", "label": "多媒体设计" },
+        { "value": "PersonalFinance", "label": "个人理财" },
+        { "value": "Personalization", "label": "个性化" },
+        { "value": "Shopping", "label": "购物" },
+        { "value": "KidsAndFamily", "label": "孩子 + 家庭" },
+        { "value": "HealthAndFitness", "label": "健康 + 健身" },
+        { "value": "Education", "label": "教育" },
+        { "value": "DeveloperTools", "label": "开发人员工具" },
+        { "value": "Travel", "label": "旅游" },
+        { "value": "Business", "label": "商务" },
+        { "value": "Social", "label": "社交" },
+        { "value": "Productivity", "label": "生产率" },
+        { "value": "Lifestyle", "label": "生活方式" },
+        { "value": "UtilitiesAndTools", "label": "实用工具 + 工具" },
+        { "value": "FoodAndDining", "label": "食品 + 餐饮" },
+        { "value": "BooksAndReference", "label": "书籍 + 参考" },
+        { "value": "Sports", "label": "体育" },
+        { "value": "NewsAndWeather", "label": "新闻 + 天气" },
+        { "value": "Medical", "label": "医疗" },
+        { "value": "Music", "label": "音乐" },
+        { "value": "Entertainment", "label": "娱乐" },
+        { "value": "PhotoAndVideo", "label": "照片 + 视频" },
+        { "value": "GovernmentAndPolitics", "label": "政策与时事" }
+      ]
+    },
+    "SubcategorySelect": {
+      "name": "SubcategorySelect",
+      "containerId": "subcategory-dropdown",
+      "ariaLabel": "应用子类别组合框",
+      "required": false,
+      "disabledByDefault": true,
+      "default": "NotSet",
+      "options": [
+        { "value": "NotSet", "label": "无" }
+      ]
+    },
+    "SecondaryCategorySelect": {
+      "name": "SecondaryCategorySelect",
+      "containerId": "secondary-category-dropdown",
+      "ariaLabel": "应用类别组合框",
+      "required": false,
+      "default": "NotSet",
+      "options": [
+        { "value": "NotSet", "label": "选取次要类别(可选)" },
+        { "value": "Security", "label": "安全性" },
+        { "value": "NavigationAndMaps", "label": "导航 + 地图" },
+        { "value": "MultimediaDesign", "label": "多媒体设计" },
+        { "value": "PersonalFinance", "label": "个人理财" },
+        { "value": "Personalization", "label": "个性化" },
+        { "value": "Shopping", "label": "购物" },
+        { "value": "KidsAndFamily", "label": "孩子 + 家庭" },
+        { "value": "HealthAndFitness", "label": "健康 + 健身" },
+        { "value": "Education", "label": "教育" },
+        { "value": "DeveloperTools", "label": "开发人员工具" },
+        { "value": "Travel", "label": "旅游" },
+        { "value": "Business", "label": "商务" },
+        { "value": "Social", "label": "社交" },
+        { "value": "Productivity", "label": "生产率" },
+        { "value": "Lifestyle", "label": "生活方式" },
+        { "value": "UtilitiesAndTools", "label": "实用工具 + 工具" },
+        { "value": "FoodAndDining", "label": "食品 + 餐饮" },
+        { "value": "BooksAndReference", "label": "书籍 + 参考" },
+        { "value": "Sports", "label": "体育" },
+        { "value": "NewsAndWeather", "label": "新闻 + 天气" },
+        { "value": "Medical", "label": "医疗" },
+        { "value": "Music", "label": "音乐" },
+        { "value": "Entertainment", "label": "娱乐" },
+        { "value": "PhotoAndVideo", "label": "照片 + 视频" },
+        { "value": "GovernmentAndPolitics", "label": "政策与时事" }
+      ]
+    }
+  }
+}

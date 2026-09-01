@@ -1,0 +1,49 @@
+{
+  "section": "产品声明",
+  "comment": "在下面选中任何适用的复选框。这可能会影响产品的显示方式，或者影响是否只向特定用户提供你的产品。",
+  "checkboxes": [
+    {
+      "id": "store-checkbox",
+      "name": "'store-checkbox'",
+      "label": "此产品允许用户购买，但不使用 Microsoft Store 商务系统。",
+      "defaultChecked": false
+    },
+    {
+      "id": "accessibility-checkbox",
+      "name": "'accessibility-checkbox'",
+      "label": "此产品已经过测试，符合辅助功能准则。",
+      "defaultChecked": false
+    },
+    {
+      "id": "storage-checkbox",
+      "name": "'storage-checkbox'",
+      "label": "客户可以将此产品安装到备用驱动器或可移动存储。",
+      "defaultChecked": true
+    },
+    {
+      "id": "backups-checkbox",
+      "name": "'backups-checkbox'",
+      "label": "Windows 可以将此产品的数据包括在 OneDrive 的自动备份中。",
+      "defaultChecked": true
+    },
+    {
+      "id": "windows-checkbox",
+      "name": "'windows-checkbox'",
+      "label": "Customers can use Windows 10/11 features to record and broadcast clips of this product.",
+      "warning": "只有“游戏”类别中的应用才支持广播和录制。",
+      "defaultChecked": true
+    },
+    {
+      "id": "penInk-checkbox",
+      "name": "'penInk-checkbox'",
+      "label": "本产品支持笔墨输入。",
+      "defaultChecked": false
+    },
+    {
+      "id": "usesGenAI-checkbox",
+      "name": "'usesGenAI-checkbox'",
+      "label": "本产品整合了生成式 AI 功能，利用人工智能创建新内容，包括文本、图像、音频、视频和代码。",
+      "defaultChecked": false
+    }
+  ]
+}

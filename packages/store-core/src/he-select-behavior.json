@@ -1,0 +1,21 @@
+{
+  "component": "he-select",
+  "behavior": "直接键入支持 (Combobox Direct Input)",
+  "description": "<he-select> 内部包含完整的 role='combobox' 输入框 (<input class='text-field__control'>)。不需要遍历海量选项，可以直接通过键入目标值并回车完成选择。",
+  "domStructure": {
+    "shadowInput": "input.text-field__control[role=\"combobox\"]",
+    "placeholder": "Select",
+    "indicatorButton": "button.text-field__button"
+  },
+  "automationPattern": {
+    "recommended": [
+      "1. 定位到 he-select 内部的 input: locator('he-select input, he-select .text-field__control')",
+      "2. 直接输入目标文本: await input.fill('0') 或 await input.fill('CNY')",
+      "3. 触发回车或失焦: await input.press('Enter')"
+    ],
+    "fallback": [
+      "1. 点击 he-select 展开下拉",
+      "2. 点击匹配的 he-option"
+    ]
+  }
+}

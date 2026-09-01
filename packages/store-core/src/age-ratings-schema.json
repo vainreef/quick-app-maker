@@ -1,0 +1,69 @@
+{
+  "section": "年龄分级 (Age Ratings)",
+  "pageTitle": "年龄分级",
+  "inputMode": {
+    "name": "inputMode",
+    "options": [
+      {
+        "value": "questionnaire",
+        "label": "我已准备好填写 International Age Rating Coalition (IARC)调查表。",
+        "default": true
+      },
+      {
+        "value": "import",
+        "label": "我已在其他地方填写了此应用的调查表，并具有 IARC 证书 ID 或全球分级 ID。"
+      }
+    ]
+  },
+  "primaryQuestion": {
+    "id": "1109",
+    "name": "question#1109",
+    "question": "以下哪个选项最准确地描述了你的应用? 请注意，在回答有关你应用的问题时，不得考虑广告内容。",
+    "options": [
+      {
+        "value": "1827",
+        "title": "游戏",
+        "description": "应用是游戏或博彩应用。"
+      },
+      {
+        "value": "2555",
+        "title": "社交或通信",
+        "description": "此应用的主要用途是结识新朋友或与人交流。示例包括，Facebook、Twitter、Skype 和 SMS。"
+      },
+      {
+        "value": "2558",
+        "title": "其他所有应用类型",
+        "description": "任何非游戏、社交网络应用或通信应用的应用。示例包括娱乐产品、消费商店、新闻应用、生活方式应用、流服务、实用工具、工具、表情符号集、健身应用、杂志和自定义。"
+      }
+    ]
+  },
+  "physicalMediaDistribution": {
+    "question": "此产品是否使用直接从分级委员会获得的分级，并且/或者将通过物理介质在任何区域分发?",
+    "options": [
+      { "id": "yesVal", "label": "是" },
+      { "id": "noVal", "label": "否", "default": true }
+    ]
+  },
+  "buttons": {
+    "previewRatings": {
+      "selector": "he-button[data-l10n-key=\"AppSubmission_AgeRating_PreviewRatingsButton\"], he-button:has-text(\"预览分级\")",
+      "text": "预览分级"
+    },
+    "continue": {
+      "selector": "he-button[data-l10n-key=\"AppSubmission_AgeRating_ContinueButton\"], he-button:has-text(\"继续\")",
+      "text": "继续"
+    },
+    "edit": {
+      "selector": "he-button[data-l10n-key=\"AppSubmission_AgeRating_EditButton\"], he-button:has-text(\"编辑\")",
+      "text": "编辑"
+    },
+    "saveDraft": {
+      "selector": "he-button[data-l10n-key=\"AppSubmission_AgeRating_SaveDraftButton\"], he-button:has-text(\"保存草稿\")",
+      "text": "保存草稿"
+    },
+    "cancel": {
+      "selector": "he-button[data-l10n-key=\"AppSubmission_AgeRating_CancelButton\"], he-button:has-text(\"取消\")",
+      "text": "取消"
+    }
+  }
+}

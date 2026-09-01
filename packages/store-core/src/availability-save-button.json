@@ -1,0 +1,19 @@
+{
+  "section": "底部操作栏",
+  "saveButton": {
+    "tag": "input",
+    "type": "submit",
+    "id": "saveButtonPricing",
+    "uitestid": "saveButtonPricing",
+    "className": "btn btn-primary",
+    "ngClick": "ctrl.Save()",
+    "value": "保存草稿",
+    "loadingIndicator": "progress-ring",
+    "primarySelector": "input#saveButtonPricing, [uitestid=\"saveButtonPricing\"]",
+    "fallbackSelectors": [
+      "#saveButtonPricing",
+      "input[type=\"submit\"][value*=\"保存\"]",
+      ".btn-group input.btn-primary"
+    ]
+  }
+}
