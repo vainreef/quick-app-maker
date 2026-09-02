@@ -17,7 +17,10 @@ export function slugify(value) {
 export function createElectronApp({ workspace, name, slug = slugify(name), profile = 'electron-vue-runtime' }) {
   if (profile !== 'electron-vue-runtime') throw new Error(`unknown generator profile: ${profile}`);
   const root = appRoot(workspace, slug);
-  if (fs.existsSync(root) && fs.readdirSync(root).length) throw new Error(`app directory is not empty: ${root}`);
+  const conflicting = fs.existsSync(root)
+    ? fs.readdirSync(root).filter(file => file !== 'README.md' && !file.startsWith('.'))
+    : [];
+  if (conflicting.length) throw new Error(`app directory contains conflicting files: ${conflicting.join(', ')}`);
   fs.mkdirSync(root, { recursive: true });
   copyTemplate(TEMPLATE, root, { app_name: name, name, slug });
   const desired = structuredClone(DEFAULT_DESIRED);
@@ -53,6 +56,7 @@ function copyTemplate(source, destination, replacements) {
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
     const from = path.join(source, entry.name); const to = path.join(destination, entry.name);
     if (entry.isDirectory()) { fs.mkdirSync(to, { recursive: true }); copyTemplate(from, to, replacements); continue; }
+    if (entry.name === 'README.md' && fs.existsSync(to)) continue;
     let data = fs.readFileSync(from);
     if (entry.name.endsWith('.json') || entry.name.endsWith('.cjs') || entry.name.endsWith('.md') || entry.name.endsWith('.js') || entry.name.endsWith('.html') || entry.name.endsWith('.xml') || entry.name.endsWith('.appxmanifest')) {
       let text = data.toString('utf8'); for (const [key, value] of Object.entries(replacements)) text = text.replaceAll(`__${key.toUpperCase()}__`, value); data = Buffer.from(text, 'utf8');

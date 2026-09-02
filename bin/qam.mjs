@@ -6,7 +6,7 @@ import { appRoot, assertWithin, ensureWorkspace, loadToolchain, configureNpmEnvi
 import { createElectronApp } from '@quick-app/generator-electron';
 import { EXIT, PHASES, normalizePhase, loadDesired, saveDesired, validateDesired, importListingMarkdown, runId, loadCheckpoint, saveCheckpoint, EvidenceStore, Deadline, reconcilePhase } from '@quick-app/store-core';
 import { runPreflight } from '@quick-app/store-preflight';
-import { BrowserSession, resolveBrowserType, StoreDriver, phaseAdapters, capturePage, waitForPageKind, waitUntil, observeOverview, reserveProduct } from '@quick-app/store-playwright';
+import { BrowserSession, resolveBrowserType, StoreDriver, phaseAdapters, capturePage, waitForPageKind, waitUntil, observeOverview, reserveProduct, verifyAppMount } from '@quick-app/store-playwright';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const TOOLCHAIN = loadToolchain(ROOT);
@@ -109,7 +109,22 @@ async function appCommand(action, options) {
     if (!appDepsReady) await runNpm(['install', '--ignore-scripts', '--prefer-offline'], { cwd: root, workspace, env, logger, timeoutMs: 900_000 });
     await installElectron(root, env, logger, workspace); assertAppDependencies(root, needsWinApp);
     if (action === 'package:store') { if (options.profile && options.profile !== 'store') throw Object.assign(new Error('only --profile store is supported'), { code: 'CONFIG' }); const desired = loadDesired(root); if (!desired.productId || desired.productId === 'PENDING' || !desired.package?.identityName || !desired.package?.publisher) throw Object.assign(new Error('reserve the Store name and identity before creating the Store package'), { code: 'CONFIG' }); }
-    const script = action === 'package:store' ? 'package:store' : action; const result = await runNpm(['run', script], { cwd: root, workspace, env, logger, timeoutMs: action === 'package:store' ? 1_200_000 : 0 }); return result.code;
+    const script = action === 'package:store' ? 'package:store' : action; const result = await runNpm(['run', script], { cwd: root, workspace, env, logger, timeoutMs: action === 'package:store' ? 1_200_000 : 0 });
+    if (result.code !== 0) return result.code;
+    if (action === 'test') {
+      try {
+        const verifyRes = await verifyAppMount(root, { logger });
+        if (verifyRes?.skipped) {
+          console.log(`[QAM_TEST] Headless UI mount verification skipped: ${verifyRes.reason}`);
+        } else {
+          console.log('[QAM_TEST] Headless UI mount verification passed: #app mounted cleanly without errors.');
+        }
+      } catch (mountError) {
+        console.error(`[QAM_TEST_ERROR] Headless UI mount verification failed:\n  ${mountError.message}`);
+        return 1;
+      }
+    }
+    return result.code;
   });
 }
 

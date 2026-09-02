@@ -1,5 +1,5 @@
 const { createApp, reactive, ref } = Vue;
-createApp({
+const app = createApp({
   setup() {
     const info = reactive({ name: '__APP_NAME__', version: 'loading' });
     const state = reactive({ version: 1, items: [] });
@@ -41,4 +41,25 @@ createApp({
     reload();
     return { info, state, draft, status, loading, saving, errorMessage, save, reload };
   }
-}).mount('#app');
+});
+
+app.config.errorHandler = (error, _instance, info) => {
+  console.error('Vue runtime error:', error, info);
+  const root = document.querySelector('#app');
+  if (root) root.removeAttribute('v-cloak');
+  let errBox = document.querySelector('#qam-render-error');
+  if (!errBox) {
+    errBox = document.createElement('div');
+    errBox.id = 'qam-render-error';
+    errBox.style.cssText = 'position:fixed;inset:0;padding:24px;background:#1a1412;color:#ff6b6b;font-family:monospace;z-index:99999;overflow:auto;line-height:1.6;box-sizing:border-box;';
+    document.body.prepend(errBox);
+  }
+  errBox.innerHTML = `<h3 style="margin:0 0 12px;color:#ff8787;">界面渲染异常（已解除黑屏隐藏）</h3><p style="color:#ddd;margin:0 0 8px;"><strong>错误原因：</strong>${error?.message ?? String(error)}</p><pre style="background:#2b1d1a;padding:12px;border-radius:6px;overflow:auto;color:#fcc;font-size:13px;white-space:pre-wrap;">${error?.stack || String(error)}</pre>`;
+};
+
+window.addEventListener('error', () => {
+  const root = document.querySelector('#app');
+  if (root && root.hasAttribute('v-cloak')) root.removeAttribute('v-cloak');
+});
+
+app.mount('#app');

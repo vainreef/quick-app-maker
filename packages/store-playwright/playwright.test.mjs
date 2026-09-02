@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { PHASES, normalizePhase } from '@quick-app/store-core';
 import { phaseAdapters } from './src/phases.mjs';
 import { waitUntil } from './src/inspector.mjs';
 import { resolveBrowserType, normalizeBrowserType, SUPPORTED_BROWSERS } from './src/browser-types.mjs';
 import { resolveBrowserPath, buildBrowserLaunchArgs } from './src/browser-launcher.mjs';
 import { BrowserSession, EdgeSession } from './src/browser-session.mjs';
+import { verifyAppMount } from './src/verifier.mjs';
 
 test('phase names normalize once', () => { assert.equal(normalizePhase('ageRatings'), 'age-ratings'); assert.deepEqual(PHASES.length, 6); });
 test('phase adapter registry exposes one uniform interface', () => { const driver = {}; const adapters = phaseAdapters(driver); for (const phase of PHASES) assert.ok(adapters[phase].acceptedPageKinds.length); });
@@ -40,4 +42,14 @@ test('browser session instantiates with resolved browser and supports edge alias
   const session = new BrowserSession({ workspace: process.cwd(), browserType: 'chrome' });
   assert.equal(session.browserType, 'chrome');
   assert.equal(EdgeSession, BrowserSession);
+});
+
+test('verifyAppMount verifies template index.html uncloaks and mounts cleanly', async () => {
+  const templateRoot = path.resolve(process.cwd(), 'templates', 'electron-vue-runtime');
+  const result = await verifyAppMount(templateRoot);
+  assert.equal(result.ok, true);
+  if (!result.skipped) {
+    assert.equal(result.check.cloaked, false);
+    assert.equal(result.check.exists, true);
+  }
 });

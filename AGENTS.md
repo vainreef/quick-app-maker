@@ -85,6 +85,12 @@ PageKind → Direct-Apply（完整填表）→ 保存收敛 → 记录检查点
 - **数据持久化契约**：必须且仅能使用 `window.qam.saveState()` 与 `window.qam.loadState()` 进行本地持久化，**严禁退化为 `localStorage`**；如需扩展数据模型，必须保证 `src/renderer/app.js` 与 `src/main/main.cjs` 的字段与类型定义严格对齐。
 - **CSP 策略与 Vue 运行时**：纯源码模式下 `index.html` 的 CSP 必须包含 `script-src 'self' 'unsafe-eval'`，严禁移除 `'unsafe-eval'`（否则 Vue 3 无法在浏览器端动态编译模板，会导致 `[v-cloak]` 无法卸载引发彻底黑屏）。
 - **禁止应试拼凑代码**：测试报错时必须排查真实的架构、数据流与逻辑根因，**严禁为了迎合静态断言而在源码中机械拼接死字符串**。
+- **故障响应与现场交付铁律（防自嗨与死循环）**：
+  - **严禁编写临时探针/自检脚本**：严禁在排查问题时擅自手写 `verify-render.cjs`、`probe.cjs` 等离题工具脚本试图自证清白，所有契约与无头挂载验证必须且仅能依靠 `qam test .\app-slug`；
+  - **无视觉权限时的行为准则**：若无截图权限或用户直接反馈“界面空白/什么也没有/报错”，**必须以用户的直观反馈为唯一事实**；
+  - **标准恢复流水线**：排查并修改源码后，必须严格遵循以下闭环：
+    `修改业务代码 → 执行 qam test 确认无头挂载通过 → 后台重新拉起 qam dev 恢复屏幕窗口 → 简明告知用户已修复并询问窗口效果`；
+  - **禁止丢下用户自言自语**：窗口一旦关闭或进程退出，第一优先级永远是重新把窗口呈现给用户，绝对严禁向用户输出“标准输出不回流”、“TaskOutput 异常”、“检查 __dirname”等底层调试碎碎念。
 - **严禁直调底层**：严禁脱离 `bootstrap/qam.cmd` 直接调用底层 `electron.exe` 或使用 `--no-sandbox` 破坏沙箱隔离。
 - **并发与锁控制**：同一 App 同时只允许一个 dev/package/store writer；进程清理只针对当前 run 的 PID/lock，严禁按名称批量强杀系统 Electron 或 Node。
 

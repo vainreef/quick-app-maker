@@ -45,3 +45,9 @@ test('template has explicit loading and persistence error paths', () => {
 test('development wrapper leaves DevTools opt-in', () => {
   assert.doesNotMatch(read('tools/dev.cjs'), /QAM_DEVTOOLS:\s*['"]1['"]/);
 });
+
+test('template contains render error boundary and uncloak fallback', () => {
+  const js = read('src/renderer/app.js');
+  assert.match(js, /app\.config\.errorHandler/);
+  assert.match(js, /removeAttribute\(['"]v-cloak['"]\)/);
+});
