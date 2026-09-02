@@ -6,7 +6,7 @@ import { appRoot, assertWithin, ensureWorkspace, loadToolchain, configureNpmEnvi
 import { createElectronApp } from '@quick-app/generator-electron';
 import { EXIT, PHASES, normalizePhase, loadDesired, saveDesired, validateDesired, importListingMarkdown, runId, loadCheckpoint, saveCheckpoint, EvidenceStore, Deadline, reconcilePhase } from '@quick-app/store-core';
 import { runPreflight } from '@quick-app/store-preflight';
-import { BrowserSession, resolveBrowserType, StoreDriver, phaseAdapters, capturePage, waitForPageKind, waitUntil, observeOverview, reserveProduct, verifyAppMount } from '@quick-app/store-playwright';
+import { BrowserSession, resolveBrowserType, StoreDriver, phaseAdapters, capturePage, waitForPageKind, waitUntil, observeOverview, reserveProduct, verifyAppMount, captureAppScreenshot } from '@quick-app/store-playwright';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const TOOLCHAIN = loadToolchain(ROOT);
@@ -35,12 +35,27 @@ async function dispatch(name, options) {
   if (name === 'test') return appCommand('test', options);
   if (name === 'package') return appCommand('package:store', options);
   if (name === 'store') return store(options);
+  if (name === 'screenshot' || name === 'capture') return screenshot(options);
   if (name === 'reveal' || name === 'open') return reveal(options);
   throw Object.assign(new Error(`unknown command: ${name}; run qam help`), { code: 'CONFIG' });
 }
 
 function help() {
-  console.log(`Quick App Maker V2\n\nCommands:\n  doctor\n  bootstrap\n  self-test\n  create --name NAME --slug SLUG\n  dev APP\n  test APP\n  package APP --profile store\n  store launch|reserve|preflight|discover|inspect|plan|apply|run|verify|status|stop --app APP [--browser chrome|edge|safari]\n  reveal PATH (opens in Finder / Explorer)\n  check\n`);
+  console.log(`Quick App Maker V2\n\nCommands:\n  doctor\n  bootstrap\n  self-test\n  create --name NAME --slug SLUG\n  dev APP\n  test APP\n  screenshot APP [--output PATH] [--width 1366] [--height 768]\n  package APP --profile store\n  store launch|reserve|preflight|discover|inspect|plan|apply|run|verify|status|stop --app APP [--browser chrome|edge|safari]\n  reveal PATH (opens in Finder / Explorer)\n  check\n`);
+  return 0;
+}
+
+async function screenshot(options) {
+  const target = options.app ?? options._[0] ?? '.';
+  const root = appRoot(workspace, target);
+  if (!fs.existsSync(path.join(root, 'package.json'))) throw Object.assign(new Error(`app package.json not found: ${root}`), { code: 'CONFIG' });
+  const width = Number(options.width ?? 1366);
+  const height = Number(options.height ?? 768);
+  const defaultOut = path.join(root, 'store-submission-assets', `01_应用主界面高清截图_${width}x${height}.png`);
+  const outputPath = path.resolve(root, options.output ?? options.o ?? defaultOut);
+  console.log(`[QAM_SCREENSHOT] Capturing headless screenshot of ${path.basename(root)} (${width}x${height})...`);
+  const result = await captureAppScreenshot(root, { width, height, outputPath });
+  console.log(`[QAM_SCREENSHOT] Screenshot saved: ${result.outputPath} (${result.sizeBytes} bytes)`);
   return 0;
 }
 

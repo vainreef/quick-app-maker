@@ -56,7 +56,7 @@ PageKind → Direct-Apply（完整填表）→ 保存收敛 → 记录检查点
 12. **单阶段精准生效（最小操作集）**：严禁在已有模块完成时盲目跑全量 6 阶段轮询（`store run`），优先针对未完成模块执行 `store apply --phase <phase>`，最后通过 `store verify` 一次性总验；
 13. **严格串行执行与 CDP 独占防死锁**：严禁并发派发多个 Edge / Playwright / Store 相关的命令或后台 Task；所有 CDP 操作必须单任务串行执行，前序任务彻底退出后方可执行下一个；
 14. **全交互显式日志记录与禁绝控制台噪音**：所有与浏览器发生的交互（导航 goto、元素读取、输入 fill、选择 choose、保存 save、冷导航刷新 coldVerify、总览校验 overviewVerify）必须全部打印清晰明确的 `[BROWSER_ACTION]` 日志，严禁打印 `BROWSER_CONSOLE` 冗余控制台噪音；
-15. **真机截图 `v-cloak` 彻底卸载与 Promise 契约铁律**：截屏渲染必须注入符合 `window.qam` 异步 Promise 契约（`appInfo` 必须返回 Promise，`loadState` 结构与 `app.js` 严格对齐）的真实 Mock，且截屏前必须显式断言 `[v-cloak]` 节点彻底卸载并确认核心文字节点已呈现，严禁截取未激活的空黑背景；
+15. **原生真机截图与禁止申请系统桌面权限铁律**：严禁向操作系统申请屏幕截屏权限（严禁加载所谓“桌面操作技能”）；所有真机界面截图必须且仅能通过官方原生命令 `qam screenshot .\app-slug` 无头捕获；工具底层已注入符合 `window.qam` 异步 Promise 契约的 Proxy Mock 并断言 `[v-cloak]` 彻底脱落，严禁截取未激活的空黑背景；
 16. **程序包故障行与删除态自愈铁律**：程序包上传页面若出现 `已暂停 (Paused)`、`错误 (Error)` 或 `This package will be removed` 状态，必须自动识别并点击 `a[data-l10n-key="app_package_action_delete"]` 清理故障项，或点击 `a[data-l10n-key="app_package_action_revert"]` 恢复正常包状态，点亮保存按钮，严禁在故障项未清除时强行点击 disabled 保存按钮；
 17. **云端大包解包异步等待与刷新重载铁律**：对于 50MB+ 的安装包，Partner Center 在云端解包验签需要 1~2 分钟。若提示“程序包需要长时间进行处理”，必须等待就绪或通过 `page.reload()` 重新同步云端真实就绪状态。
 
@@ -116,7 +116,7 @@ PageKind → Direct-Apply（完整填表）→ 保存收敛 → 记录检查点
        - 方案 C（混合模式）：文案/截图由 Agent 生成，特定 Logo 由用户提供；
      - Agent 等待用户确认方案后，再开始执行真实素材生成与整理；
    - **第 3 步（真机素材生成、交互弹窗与用户确认，铁律）**：
-     - 严禁使用脚手架纯色占位图；Agent 基于真实应用渲染捕获高清截图并设计图标；
+     - 严禁使用脚手架纯色占位图；必须使用官方命令 `qam screenshot .\app-slug` 自动捕获 1366x768 高清截图并设计图标，严禁申请操作系统桌面截屏权限；
      - Agent 将素材统一整理在 `store-submission-assets` 文件夹，**所有文件名必须全部采用纯中文清晰命名，明确标注用途与分辨率规格；文字说明绝对禁止使用 md，一律采用 txt 格式**（如 `00_时光回忆录_完整文案与亮点特性说明.txt`、`01_微软商店详情页_主运行界面高清截图_1366x768.png` 等）；
      - Agent **必须通过交互式任务指令拉起文件管理器，并通过 `OpenInputDesktop` 显式检测窗口句柄确保弹窗已置顶展示在用户屏幕前**；
      - Agent **向用户逐一说明每个素材的作用与规格，提醒用户核对确认**；

@@ -133,11 +133,10 @@
 
 1. **应用名称保留人机边界**：必须由用户在独立 Edge 中亲自输入并点击保留，Agent 仅提供建议与方案；
 2. **材料盘点与来源协同**：生成或整理素材前，必须向用户全面列清材料清单并确认来源意向；
-3. **拒绝纯色与未卸载遮罩截图（`window.qam` Promise 契约铁律）**：
-   - 真机截图渲染前必须在 Playwright 中通过 `addInitScript` 注入与业务完全一致的 `window.qam` 异步 Mock：
-     - `appInfo` 必须是 `async () => ({ name, version })` 返回 Promise（以满足 `app.js` 中的 `.then()` 链式调用）；
-     - `loadState` 必须返回与应用 `reactive` 模型字段完全一致的数据（如 `{ version: 1, items: [...] }`）；
-   - 截屏前必须显式执行 `await page.waitForSelector('[v-cloak]', { state: 'detached', timeout: 5000 })` 确认 Vue 实例已完成挂载，并验证核心文字节点已呈现在页面上，**严禁在 `v-cloak` 遮罩未卸载时截取纯色或空背景**；
+3. **原生无头截图与 Promise 契约铁律（`qam screenshot` 命令）**：
+   - 严禁向操作系统申请物理桌面截屏权限（严禁加载所谓“桌面操作技能”）；
+   - 统一使用原生命令 `qam screenshot .\app-slug --width 1366 --height 768 --output .\app-slug\store-submission-assets\01_应用主界面高清截图_1366x768.png`；
+   - 工具内置了符合 `window.qam` 异步 Promise 契约的 Proxy Mock，并自动断言 `v-cloak` 彻底脱落与 DOM 渲染稳定后捕获 1366x768 高清 PNG，零依赖、零系统权限、确定性生成；严禁截取纯色或未激活的空背景；
 4. **全中文清晰命名与 txt 文本规范**：素材文件夹内文件必须全中文命名并注明用途分辨率；文字说明禁止使用 `.md`，一律使用 `.txt` 纯文本格式；
 5. **单阶段精准生效**：优先执行 `store apply --phase <phase>` 单点填报，严禁全量重复轮询；
 6. **打包 EBUSY 防御**：生产打包配置必须显式忽略 `.cache`、`build`、`out` 等运行时目录，防止复制独占锁定的 Edge profile；

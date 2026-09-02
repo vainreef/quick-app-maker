@@ -128,3 +128,111 @@ export async function verifyAppMount(appRoot, options = {}) {
     await browser.close();
   }
 }
+
+/**
+ * Capture a deterministic high-resolution headless screenshot of the rendered Electron app.
+ *
+ * @param {string} appRoot - Absolute path to application root
+ * @param {object} [options]
+ * @param {number} [options.width=1366] - Viewport width
+ * @param {number} [options.height=768] - Viewport height
+ * @param {string} [options.outputPath] - Target file path for the screenshot
+ * @returns {Promise<{ ok: boolean, outputPath: string, width: number, height: number, sizeBytes: number }>}
+ */
+export async function captureAppScreenshot(appRoot, options = {}) {
+  const htmlPath = path.join(appRoot, 'src', 'renderer', 'index.html');
+  if (!fs.existsSync(htmlPath)) throw new Error(`index.html not found at: ${htmlPath}`);
+
+  const width = Number(options.width || 1366);
+  const height = Number(options.height || 768);
+  const defaultOut = path.join(appRoot, 'store-submission-assets', `01_应用主界面高清截图_${width}x${height}.png`);
+  const outputPath = path.resolve(options.outputPath || defaultOut);
+
+  const browserType = process.platform === 'win32' ? 'edge' : 'chrome';
+  let executablePath;
+  try {
+    executablePath = resolveBrowserPath(browserType);
+  } catch {
+    try { executablePath = resolveBrowserPath('chrome'); } catch {}
+  }
+
+  const browser = await chromium.launch({
+    executablePath: executablePath || undefined,
+    headless: true,
+    args: ['--allow-file-access-from-files', '--no-sandbox', '--disable-gpu']
+  });
+
+  const page = await browser.newPage({
+    viewport: { width, height },
+    deviceScaleFactor: options.scale || 1
+  });
+
+  const pageErrors = [];
+  page.on('pageerror', err => pageErrors.push(err.message));
+
+  // Fallback route for vue.global.js
+  await page.route('**/*', async route => {
+    const url = route.request().url();
+    if (url.includes('vue.global.js')) {
+      const candidates = [
+        path.join(appRoot, 'node_modules', 'vue', 'dist', 'vue.global.js'),
+        path.join(appRoot, '..', 'node_modules', 'vue', 'dist', 'vue.global.js'),
+        path.join(appRoot, '..', '..', 'node_modules', 'vue', 'dist', 'vue.global.js')
+      ];
+      for (const cand of candidates) {
+        if (fs.existsSync(cand)) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'text/javascript',
+            body: fs.readFileSync(cand)
+          });
+        }
+      }
+    }
+    return route.continue();
+  });
+
+  // Inject robust Mock window.qam
+  await page.addInitScript(() => {
+    window.qam = new Proxy({
+      loadState: async () => ({ version: 1, items: [], letters: [] }),
+      saveState: async (v) => v,
+      appInfo: async () => ({ name: 'App', version: '0.1.0' })
+    }, {
+      get(target, prop) {
+        if (prop in target) return target[prop];
+        return async () => ({});
+      }
+    });
+  });
+
+  try {
+    const fileUrl = pathToFileURL(htmlPath).href;
+    await page.goto(fileUrl, { waitUntil: 'load', timeout: 15_000 });
+
+    // Assert v-cloak detachment
+    await page.waitForSelector('#app:not([v-cloak])', { timeout: 10_000 });
+    await page.waitForTimeout(options.delay || 600);
+
+    const errBoxText = await page.evaluate(() => {
+      const errBox = document.querySelector('#qam-render-error');
+      return errBox ? errBox.innerText.trim() : '';
+    });
+    if (errBoxText) throw new Error(`Cannot capture screenshot: Vue render error detected:\n${errBoxText}`);
+    if (pageErrors.length) throw new Error(`Cannot capture screenshot: Uncaught runtime error:\n  ${pageErrors.join('\n  ')}`);
+
+    const buffer = await page.screenshot({ type: 'png', fullPage: false });
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, buffer);
+
+    return {
+      ok: true,
+      outputPath,
+      width,
+      height,
+      sizeBytes: buffer.length
+    };
+  } finally {
+    await browser.close();
+  }
+}

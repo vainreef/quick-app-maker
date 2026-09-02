@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
 import { PHASES, normalizePhase } from '@quick-app/store-core';
 import { phaseAdapters } from './src/phases.mjs';
 import { waitUntil } from './src/inspector.mjs';
 import { resolveBrowserType, normalizeBrowserType, SUPPORTED_BROWSERS } from './src/browser-types.mjs';
 import { resolveBrowserPath, buildBrowserLaunchArgs } from './src/browser-launcher.mjs';
 import { BrowserSession, EdgeSession } from './src/browser-session.mjs';
-import { verifyAppMount } from './src/verifier.mjs';
+import { verifyAppMount, captureAppScreenshot } from './src/verifier.mjs';
 
 test('phase names normalize once', () => { assert.equal(normalizePhase('ageRatings'), 'age-ratings'); assert.deepEqual(PHASES.length, 6); });
 test('phase adapter registry exposes one uniform interface', () => { const driver = {}; const adapters = phaseAdapters(driver); for (const phase of PHASES) assert.ok(adapters[phase].acceptedPageKinds.length); });
@@ -52,4 +53,15 @@ test('verifyAppMount verifies template index.html uncloaks and mounts cleanly', 
     assert.equal(result.check.cloaked, false);
     assert.equal(result.check.exists, true);
   }
+});
+
+test('captureAppScreenshot captures a valid PNG screenshot of template without OS permissions', async () => {
+  const templateRoot = path.resolve(process.cwd(), 'templates', 'electron-vue-runtime');
+  const outPath = path.resolve(process.cwd(), '.cache', 'test-screenshot.png');
+  const result = await captureAppScreenshot(templateRoot, { width: 1366, height: 768, outputPath: outPath });
+  assert.equal(result.ok, true);
+  assert.equal(result.width, 1366);
+  assert.equal(result.height, 768);
+  assert.ok(result.sizeBytes > 1000);
+  assert.ok(fs.existsSync(outPath));
 });
