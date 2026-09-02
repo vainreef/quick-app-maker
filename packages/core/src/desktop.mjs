@@ -7,9 +7,10 @@ import { spawn } from 'node:child_process';
  * @param {string} targetPath - Absolute or relative path to file or directory
  * @param {object} options
  * @param {boolean} [options.select=true] - Whether to highlight/select the specific file
+ * @param {boolean} [options.dryRun=false] - Whether to skip spawning the native process
  * @returns {Promise<{ ok: boolean, platform: string, command: string, args: string[] }>}
  */
-export async function openFileManager(targetPath, { select = true } = {}) {
+export async function openFileManager(targetPath, { select = true, dryRun = false } = {}) {
   const absolutePath = path.resolve(targetPath);
   if (!fs.existsSync(absolutePath)) {
     throw new Error(`Target path does not exist: ${absolutePath}`);
@@ -39,6 +40,10 @@ export async function openFileManager(targetPath, { select = true } = {}) {
     command = 'xdg-open';
     const isDir = fs.statSync(absolutePath).isDirectory();
     args = [isDir ? absolutePath : path.dirname(absolutePath)];
+  }
+
+  if (dryRun) {
+    return { ok: true, platform, command, args };
   }
 
   return new Promise((resolve, reject) => {

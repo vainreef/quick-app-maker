@@ -18,7 +18,15 @@ test('openFileManager handles cross-platform file opening', async () => {
   await assert.rejects(() => openFileManager(path.join(root, 'non-existent-file.txt')), /Target path does not exist/);
   const testFile = path.join(root, 'test-asset.txt');
   fs.writeFileSync(testFile, 'hello');
-  const res = await openFileManager(testFile, { select: false });
+  const res = await openFileManager(testFile, { select: false, dryRun: true });
   assert.equal(res.ok, true);
   assert.equal(res.platform, process.platform);
+  assert.ok(res.command);
+  assert.ok(Array.isArray(res.args));
+  const selectRes = await openFileManager(testFile, { select: true, dryRun: true });
+  assert.equal(selectRes.ok, true);
+  if (process.platform === 'darwin') {
+    assert.deepEqual(selectRes.args, ['-R', testFile]);
+    assert.deepEqual(res.args, [testFile]);
+  }
 });
