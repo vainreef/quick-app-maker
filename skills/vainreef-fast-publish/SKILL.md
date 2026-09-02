@@ -19,13 +19,21 @@ description: 使用 Quick App Maker 创建、修改和验收 Windows 桌面应�
 按需读取资料：
 
 - 创建或修改应用：[需求访谈](references/discovery-interview.md)
+- 技术限制与能力边界：[能力边界与降解](references/capability-boundary.md)
 - 执行现有命令：[命令手册](references/commands.md)
 - Microsoft Store 流程与页面操作：[发布手册](references/store.md)
 - 已经遇到过的页面、打包问题和图片交付：[发布手册](references/store.md)
 - 国内网络和工作区缓存：[网络与缓存](references/network.md)
 
-## 共同约束
+## 共同约束与技术边界（八字契约）
 
+Quick App Maker 恪守 **“免费、本地、个人、通用”** 八字契约，绝不越界（详见 [能力边界规范](references/capability-boundary.md)）：
+
+- **自建服务器边界为空**：自建后端服务边界为 0。严禁自建 Backend、数据库服务器或微服务，所有核心计算与状态逻辑 100% 运行在本地 Electron 进程内。
+- **单机个人免登录**：严禁手机号登录、短信验证码、用户注册登录系统或集中式多端同步；应用定位为纯单机个人工具，打开即用。
+- **本地离线优先**：严格使用 `window.qam.saveState()` 与 `window.qam.loadState()` 在本地持久化 JSON 数据，严禁向任何云端上传用户个人数据。
+- **网络不等于后端**：仅允许客户端纯 HTTPS 直连公网公开 API 或由用户在设置中填写用户自有 API Key 直连服务商，客户端不得硬编码项目方统一私钥或代充额度。
+- **本地化降解铁律（Fast Mode Projection）**：当用户提出包含后端、服务器、手机号登录或云同步需求时，**严禁迎合或构思服务端**，必须当轮使用生活化语言说明原因，引导其降解为“安全纯净的本地单机免登录版”。
 - Windows 命令统一通过 `bootstrap/qam.cmd`；工作区中的便携 Node、Git、npm 和缓存保持隔离。
 - macOS/Linux 使用仓库现有入口；浏览器选择沿用当前已跑通的配置。
 - 自动识别工具仓库、工作区和应用目录。英文目录名由 Agent 内部推导，不向普通用户询问。
