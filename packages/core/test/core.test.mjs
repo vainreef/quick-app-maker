@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertWithin, writeAtomic, readJson, configureNpmEnvironment, npmInvocation, run, WorkspaceLock, Logger } from '../src/index.mjs';
+import { assertWithin, writeAtomic, readJson, configureNpmEnvironment, npmInvocation, run, WorkspaceLock, Logger, openFileManager } from '../src/index.mjs';
 
 const root = path.resolve('.cache', `core-test-${process.pid}`);
 fs.mkdirSync(root, { recursive: true });
@@ -14,3 +14,11 @@ test('npm invocation uses the bundled Node CLI instead of a command shim', () =>
 test('process start errors include the exact command and working directory', async () => { const missing = path.join(root, 'missing-command'); await assert.rejects(run(missing, ['--probe'], { cwd: root }), error => error.message.includes(missing) && error.message.includes(root) && error.result?.command === missing); });
 test('workspace lock prevents overlapping writers and releases cleanly', () => { const lockRoot = path.join(root, `lock-${Date.now()}`); const first = new WorkspaceLock(lockRoot, 'app-demo').acquire(); assert.throws(() => new WorkspaceLock(lockRoot, 'app-demo').acquire(), /workspace is busy/); first.release(); const second = new WorkspaceLock(lockRoot, 'app-demo').acquire(); second.release(); });
 test('logger writes a compact result artifact beside events', () => { const logRoot = path.join(root, `logger-${Date.now()}`); const logger = new Logger({ runId: 'logger-test', root: logRoot, quiet: true }); logger.pass('done', { code: 0 }); const result = readJson(path.join(logRoot, 'result.json')); assert.equal(result.runId, 'logger-test'); assert.equal(result.status, 'complete'); assert.equal(result.ok, true); });
+test('openFileManager handles cross-platform file opening', async () => {
+  await assert.rejects(() => openFileManager(path.join(root, 'non-existent-file.txt')), /Target path does not exist/);
+  const testFile = path.join(root, 'test-asset.txt');
+  fs.writeFileSync(testFile, 'hello');
+  const res = await openFileManager(testFile, { select: false });
+  assert.equal(res.ok, true);
+  assert.equal(res.platform, process.platform);
+});

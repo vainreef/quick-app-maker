@@ -22,8 +22,16 @@ export function resolveBundledNpmCli(nodePath = process.execPath) {
   const nodeDir = path.dirname(nodePath);
   const candidates = [
     path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
-    path.resolve(nodeDir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')
+    path.resolve(nodeDir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    path.resolve(nodeDir, '..', '..', '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')
   ];
+  const npmBin = path.join(nodeDir, 'npm');
+  if (fs.existsSync(npmBin)) {
+    try {
+      const real = fs.realpathSync(npmBin);
+      if (real.endsWith('npm-cli.js')) candidates.unshift(real);
+    } catch {}
+  }
   const found = candidates.find(file => fs.existsSync(file));
   if (found) return found;
   const error = new Error(`bundled npm CLI was not found beside ${nodePath}`);

@@ -15,7 +15,8 @@ export async function capturePage(page) {
       listingGrid: /managelanguages/i.test(url) || has('submission-listing-summary,he-data-grid'),
       listingForm: (/listings\?|languageid=/i.test(url) && has('textarea,input')) || has('textarea[name="description"],#description'),
       options: /options/i.test(url) && has('textarea,input[type="radio"]'),
-      overview: /\/submissions\/[^/?#]+\/overview/i.test(url) || /\/products\/[^/?#]+(?:\/overview|\/identity)?/i.test(url) || (/\/overview(?:[/?#]|$)/i.test(url) && has('a[href*="/submissions/"]')),
+      submissionOverview: /\/submissions\/[^/?#]+\/overview/i.test(url) || (/\/overview(?:[/?#]|$)/i.test(url) && has('a[href*="/submissions/"]')),
+      productOverview: /\/products\/[^/?#]+/i.test(url) || /\/dashboard\/(?:apps-and-games|products|home)/i.test(url) || (/\/overview(?:[/?#]|$)/i.test(url) && !has('a[href*="/submissions/"]')),
       certification: /in certification|正在认证/i.test(text),
       fatal: /something went wrong|出现问题|error-page/i.test(text)
     };
@@ -32,7 +33,9 @@ export async function capturePage(page) {
     else if (signals.ageQuestionnaire) kind = 'AgeRatingsQuestionnaire';
     else if (signals.packages) kind = 'PackagesForm';
     else if (signals.options) kind = 'OptionsForm';
-    else if (signals.overview) kind = 'SubmissionOverview';
+    else if (signals.submissionOverview) kind = 'SubmissionOverview';
+    else if (signals.productOverview) kind = 'ProductOverview';
+    else if (/partner\.microsoft\.com/i.test(url)) kind = 'ProductOverview';
     return { kind, ready: !['Unknown', 'LoadingShell'].includes(kind), url, title: document.title || '', textPreview: text.slice(0, 1800), signals, buttons: [...document.querySelectorAll('button,[role="button"]')].map(x => (x.innerText || x.getAttribute('aria-label') || '').trim()).filter(Boolean).slice(0, 40), errors: [...document.querySelectorAll('[role="alert"],.alert-error,.alert-danger')].map(x => (x.innerText || '').trim()).filter(Boolean).slice(0, 20) };
   });
   if (!PAGE_KINDS.includes(data.kind)) data.kind = 'Unknown';

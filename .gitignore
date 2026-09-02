@@ -17,3 +17,7 @@ coverage/
 playwright-report/
 test-results/
 .DS_Store
+developer/
+dev/
+tools/
+store-submission-assets/

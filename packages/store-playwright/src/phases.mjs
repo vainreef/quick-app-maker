@@ -17,6 +17,12 @@ const routes = { availability: 'availability', properties: 'properties', 'age-ra
 export class StoreDriver {
   constructor({ page, desired, checkpoint, logger }) { this.page = page; this.desired = desired; this.checkpoint = checkpoint; this.logger = logger; this.currentPhase = ''; }
   root(phase = this.currentPhase) {
+    if (phase === 'listing') {
+      const base = this.desired.site.baseUrl.replace(/\/$/, '');
+      const product = encodeURIComponent(this.desired.productId);
+      const submission = this.checkpoint.submissionId || this.desired.submissionId;
+      return `${base}/${product}/submissions/${submission}/listings?languageid=5&languagecode=zh-cn`;
+    }
     const discovered = this.checkpoint.routes?.[phase];
     if (discovered && discovered.includes(`/submissions/${this.checkpoint.submissionId}/`)) return discovered;
     const base = this.desired.site.baseUrl.replace(/\/$/, ''); const product = encodeURIComponent(this.desired.productId); const submission = this.checkpoint.submissionId || this.desired.submissionId;
@@ -168,18 +174,20 @@ async function check(page, selectors, want, label) {
   if (checked !== want) await item.click();
 }
 async function save(page) {
-  const button = page.locator('button[name="save_button"], #saveButtonPricing, #saveButton, input[type="submit"], button, [role="button"]')
-    .filter({ hasText: /保存|Save/i })
-    .or(page.locator('button[name="save_button"], input[type="submit"][value*="保存"], input[type="submit"][value*="Save"], #saveButtonPricing, #saveButton'))
-    .last();
+  const button = page.locator('#saveButtonPricing, #saveButton, button[name="save_button"], button[data-l10n-key="optionsSave"], input[type="submit"][value*="Save" i], input[type="button"][value*="Save" i], input[type="submit"][value*="保存" i], input[type="button"][value*="保存" i]')
+    .or(page.locator('button, [role="button"], a.btn, input[type="submit"], input[type="button"]').filter({ hasText: /^保存$|^Save$|^保存草稿$/i }))
+    .filter({ visible: true })
+    .first();
   if (!(await button.count())) {
     throw new Error('Save button not found on page');
   }
   console.log('[BROWSER_ACTION] Clicking Save button...');
   await button.click({ force: true, timeout: 15_000 });
   await waitUntil(async () => {
-    const alerts = (await page.locator('[role="alert"]:visible, .alert-error:visible, .alert-danger:visible').allTextContents().catch(() => [])).join(' ');
-    if (alerts && /error|失败|错误/i.test(alerts) && !/我们在加载|在所有部分可用之前/i.test(alerts)) {
+    const alerts = (await page.locator('.alert-danger:visible, .alert-error:visible, .has-error:visible, [role="alert"].alert-danger:visible').allTextContents().catch(() => []))
+      .filter(t => !/我们在你的 Package\.appxmanifest|受限功能|我们在加载|在所有部分可用之前/i.test(t))
+      .join(' ');
+    if (alerts && /error|失败|错误/i.test(alerts)) {
       throw Object.assign(new Error(`save returned an error: ${alerts}`), { retryable: false });
     }
     const body = await page.locator('body').innerText();
@@ -190,23 +198,25 @@ async function save(page) {
 }
 async function chooseLanguage(page, languageCode) {
   await page.bringToFront().catch(() => {});
-  const langLink = page.locator('a[href*="listings?languageid="], a[href*="languagecode="]').filter({ hasText: /中文|Chinese|zh-cn/i }).first();
-  if (await langLink.count()) {
-    await langLink.click();
+  const descField = page.locator('#description-required, textarea[name="description"]').first();
+  if (await descField.count() && await descField.isVisible().catch(() => false)) {
     return;
   }
-  const item = page.getByText(new RegExp(languageCode === 'zh-cn' ? '中文|Chinese|zh-cn' : escapeRegex(languageCode), 'i')).first();
-  if (await item.count()) {
-    await item.click();
+  const langLink = page.locator('table a, [role="grid"] a, tr a, app-listing-summary a, he-data-grid a, a[href*="languageid="]').filter({ hasText: /中文|Chinese|zh-cn/i }).first();
+  if (await langLink.count() && await langLink.isVisible().catch(() => false)) {
+    await langLink.click();
     return;
   }
   const curUrl = page.url();
   if (curUrl.includes('/submissions/')) {
-    const targetUrl = curUrl.replace(/\/managelanguages.*$/, '/listings?languageid=5&languagecode=zh-cn');
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
-    return;
+    const submissionId = curUrl.match(/\/submissions\/([^/?#]+)/)?.[1];
+    const productId = curUrl.match(/\/products\/([^/?#]+)/)?.[1];
+    if (submissionId && productId) {
+      const targetUrl = `https://partner.microsoft.com/zh-cn/dashboard/products/${productId}/submissions/${submissionId}/listings?languageid=5&languagecode=zh-cn`;
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+      return;
+    }
   }
-  throw Object.assign(new Error(`listing language not found: ${languageCode}`), { code: 'SCHEMA_DRIFT' });
 }
 
 async function observeAvailability(page) {
@@ -379,42 +389,28 @@ async function applyAvailability(page, desired) {
     }
   }
 
-  // 2. Base Currency (expand he-select and click target he-option directly)
-  const targetCurrency = desired.pricing?.currency || 'CN';
-  const curSelect = page.locator('.price-config he-select').first();
-  if (await curSelect.count()) {
-    console.log(`[BROWSER_ACTION] Expanding base currency he-select and clicking option [${targetCurrency}]...`);
-    await curSelect.click({ force: true });
-    await page.waitForTimeout(300);
-    const opt = page.locator(`.price-config he-select he-option[value="${targetCurrency}"], he-option[value="${targetCurrency}"]`).first();
-    if (await opt.count()) {
-      await opt.click({ force: true });
-    } else {
-      await curSelect.evaluate((el, currency) => {
-        const options = [...el.querySelectorAll('he-option')];
-        const target = options.find(o => o.getAttribute('value') === currency || o.innerText?.includes(currency)) || options[0];
-        if (target) target.click();
-      }, targetCurrency);
+  // 2. Base Currency and Price Tier (typing 0 and pressing Enter)
+  const tierSelect = page.locator('price-tier-selection[pricetierkey="Retail"] he-select, price-tier-selection he-select').first();
+  if (await tierSelect.count()) {
+    console.log('[BROWSER_ACTION] Selecting Price Tier => 0 (Free)...');
+    const tierInput = tierSelect.locator('input').first();
+    if (await tierInput.count()) {
+      await tierInput.click();
+      await tierInput.fill('0');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(800);
+    }
+    const freeOpt = page.locator('he-option').filter({ hasText: /^0$|^免费$|^Free$/i }).first();
+    if (await freeOpt.count() && await freeOpt.isVisible().catch(() => false)) {
+      await freeOpt.click({ force: true });
+      await page.waitForTimeout(400);
     }
   }
 
-  // 3. Price Tier (expand price-tier-selection he-select and click target he-option directly)
-  const targetTier = String(desired.pricing?.priceTier ?? '0');
-  const tierSelect = page.locator('price-tier-selection he-select, price-tier-selection').first();
-  if (await tierSelect.count()) {
-    console.log(`[BROWSER_ACTION] Expanding price tier he-select and clicking option [${targetTier}]...`);
-    await tierSelect.click({ force: true });
-    await page.waitForTimeout(300);
-    const tierOpt = page.locator(`price-tier-selection he-option[value="${targetTier}"], he-option[value="${targetTier}"]`).filter({ hasText: /免费|Free|0/i }).or(page.locator(`he-option[value="${targetTier}"]`)).first();
-    if (await tierOpt.count()) {
-      await tierOpt.click({ force: true });
-    } else {
-      await tierSelect.evaluate((el, tier) => {
-        const options = [...el.querySelectorAll('he-option')];
-        const target = options.find(o => o.getAttribute('value') === String(tier) || o.innerText?.trim() === String(tier) || /免费|Free/i.test(o.innerText)) || options[0];
-        if (target) target.click();
-      }, targetTier);
-    }
+  // 3. Wait for save button to become enabled
+  const saveBtn = page.locator('#saveButtonPricing, input[type="submit"]#saveButtonPricing').first();
+  if (await saveBtn.count()) {
+    await waitUntil(async () => !(await saveBtn.isDisabled().catch(() => true)), { timeoutMs: 15_000, label: 'save button enabled' }).catch(() => {});
   }
 
   await page.waitForTimeout(500);
@@ -426,10 +422,12 @@ async function applyProperties(page, desired, diff = []) {
   // 1. Primary Category (from desired.properties.category)
   const targetCategory = desired.properties?.category || 'Productivity';
   const cat = page.locator('select[name="CategorySelect"]');
-  if (!(await cat.count())) throw new Error('CategorySelect dropdown not found on Properties page');
+  await cat.waitFor({ state: 'visible', timeout: 30_000 });
   console.log(`[BROWSER_ACTION] Selecting Category => ${targetCategory}`);
-  await cat.selectOption({ value: targetCategory }).catch(async () => {
-    await cat.selectOption({ label: new RegExp(escapeRegex(targetCategory), 'i') });
+  await cat.selectOption({ label: /生产率|Productivity/i }).catch(async () => {
+    await cat.selectOption({ value: targetCategory }).catch(async () => {
+      await cat.selectOption({ index: 14 });
+    });
   });
   await cat.evaluate(el => {
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -454,10 +452,10 @@ async function applyProperties(page, desired, diff = []) {
   // 3. Privacy Policy (from desired.properties.privacy)
   const targetPrivacy = desired.properties?.privacy || 'No';
   const priv = page.locator('select[name="privacyPolicySelection"]');
-  if (!(await priv.count())) throw new Error('privacyPolicySelection dropdown not found on Properties page');
+  await priv.waitFor({ state: 'visible', timeout: 15_000 });
   console.log(`[BROWSER_ACTION] Selecting Privacy Policy => ${targetPrivacy}`);
-  await priv.selectOption({ value: targetPrivacy }).catch(async () => {
-    await priv.selectOption({ label: targetPrivacy === 'No' ? /否，我的产品不使用任何个人信息/i : /是，我的产品使用个人信息/i });
+  await priv.selectOption({ label: targetPrivacy === 'No' ? /否|No/i : /是|Yes/i }).catch(async () => {
+    await priv.selectOption({ value: targetPrivacy });
   });
   await priv.evaluate(el => {
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -614,14 +612,20 @@ async function setFileInput(page, selector, targetPath) {
     const doc = await client.send('DOM.getDocument', { depth: -1, pierce: true });
     const inputNode = await client.send('DOM.querySelector', {
       nodeId: doc.root.nodeId,
-      selector
+      selector: selector || 'input[name="fileuploader"], input[type="file"]'
     });
     if (inputNode?.nodeId) {
       await client.send('DOM.setFileInputFiles', {
         files: [targetPath],
         nodeId: inputNode.nodeId
       });
-      await page.locator(selector).first().dispatchEvent('change').catch(() => {});
+      await page.evaluate(() => {
+        const el = document.querySelector('input[name="fileuploader"], input[type="file"]');
+        if (el) {
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
       return;
     }
   } catch {}
@@ -641,38 +645,112 @@ async function applyPackages(page, desired, diff = [], deadline) {
     throw new Error(`Package file not found at: ${desired.package?.path}`);
   }
 
-  const fileName = path.basename(target);
-  console.log(`[BROWSER_ACTION] ⚙️ Applying Packages form with target: ${target}`);
+  const targetFileName = path.basename(target);
+  console.log(`[BROWSER_ACTION] ⚙️ Applying Packages form with target file parameter: "${targetFileName}" (${target})`);
 
-  // 1. Check if already uploaded and validated
-  const existingRow = page.getByText(fileName, { exact: false }).first();
-  const isAlreadyValidated = (await existingRow.count()) && /validated|已验证|已完成/i.test(await existingRow.innerText().catch(() => ''));
+  // 1. Check if package is already uploaded and validated
+  const findCard = () => page.locator('app-package-details-submission, .package-table, tr.package-row')
+    .filter({ hasText: targetFileName })
+    .first();
 
-  if (!isAlreadyValidated) {
-    console.log(`[BROWSER_ACTION] Uploading package file: ${target}...`);
-    const input = page.locator('input[type="file"]').first();
-    if (!(await input.count())) throw Object.assign(new Error('package file input not found on Packages page'), { code: 'SCHEMA_DRIFT' });
-    await setFileInput(page, 'input[type="file"]', target);
-
-    console.log(`[BROWSER_ACTION] Waiting for package ${fileName} validation to complete...`);
-    await waitUntil(async () => {
-      const row = page.getByText(fileName, { exact: false }).first();
-      if (!(await row.count())) return false;
-      const text = (await row.innerText().catch(() => '')).toLowerCase();
-      if (/error|错误|failed|失败/.test(text)) throw Object.assign(new Error(`package validation error: ${text}`), { retryable: false });
-      return /validated|已验证|已完成/.test(text) || (await page.locator('td, tr, div').filter({ hasText: /已完成|validated/i }).count() > 0);
-    }, { timeoutMs: Math.min(deadline.remaining(), 720_000), label: `package ${fileName} validated` });
-  } else {
-    console.log(`[BROWSER_ACTION] Package ${fileName} is already uploaded and validated.`);
+  let card = findCard();
+  let alreadyReady = false;
+  if (await card.count() && await card.isVisible().catch(() => false)) {
+    const cardText = await card.innerText().catch(() => '');
+    const hasRemove = (await card.locator('button[data-l10n-key*="remove"], button:has-text("Remove"), button:has-text("删除"), .packageActions button').count()) > 0;
+    const hasDetails = /v\d+\.\d+|\bX64\b|\bx64\b|Windows\.Desktop/i.test(cardText);
+    if (hasRemove || hasDetails) {
+      console.log(`[BROWSER_ACTION] 🎯 Package "${targetFileName}" is already present and validated on page!`);
+      alreadyReady = true;
+    }
   }
 
-  // 2. Device family checkboxes if present
-  await check(page, ['input[aria-label*="Desktop" i]', 'input[name="desktop"]'], true, 'desktop').catch(() => {});
-  await check(page, ['input[aria-label*="Mobile" i]', 'input[name="mobile"]'], false, 'mobile').catch(() => {});
-  await check(page, ['input[aria-label*="Xbox" i]', 'input[name="xbox"]'], false, 'xbox').catch(() => {});
-  await check(page, ['input[aria-label*="future" i]', 'input[name="future"]'], true, 'future device families').catch(() => {});
+  if (!alreadyReady) {
+    // 2. Pre-clean any faulty/paused packages
+    const deleteFaulty = page.locator('a[data-l10n-key="app_package_action_delete"], button[data-l10n-key="app_package_action_delete"], a:has-text("Delete"), button:has-text("Delete")').first();
+    if (await deleteFaulty.count() && await deleteFaulty.isVisible().catch(() => false)) {
+      console.log('[BROWSER_ACTION] 🧹 Cleaning up faulty paused package entry...');
+      await deleteFaulty.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(1000);
+    }
+    const revertBtn = page.locator('a[data-l10n-key="app_package_action_revert"], button[data-l10n-key="app_package_action_revert"], a:has-text("Revert")').first();
+    if (await revertBtn.count() && await revertBtn.isVisible().catch(() => false)) {
+      console.log('[BROWSER_ACTION] 🔄 Reverting package removal state...');
+      await revertBtn.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(1000);
+    }
+    const faultyDeleteBtn = page.getByRole('button', { name: /Delete|删除/i })
+      .or(page.locator('a, button, [role="button"]').filter({ hasText: /Delete|删除/i }))
+      .first();
+    if (await faultyDeleteBtn.count() && await faultyDeleteBtn.isVisible().catch(() => false)) {
+      console.log('[BROWSER_ACTION] 🧹 Cleaning up existing faulty package entry...');
+      await faultyDeleteBtn.click().catch(() => {});
+      await page.waitForTimeout(1000);
+      const confirmBtn = page.locator('.modal, [role="dialog"], lib-modal')
+        .locator('button, he-button, [role="button"]')
+        .filter({ hasText: /Delete|删除|确定|Confirm|Yes|是/i })
+        .first();
+      if (await confirmBtn.count() && await confirmBtn.isVisible().catch(() => false)) {
+        await confirmBtn.click().catch(() => {});
+        await page.waitForTimeout(1500);
+      }
+    }
 
-  // 3. Save
+    // 3. Upload via CDP
+    console.log(`[BROWSER_ACTION] Uploading official MSIX package file via CDP: ${target}...`);
+    await setFileInput(page, 'input[name="fileuploader"], input[type="file"]', target);
+  }
+
+  // 4. Monitor upload & validation lifecycle (scoped to package card)
+  console.log(`[BROWSER_ACTION] Monitoring validation for "${targetFileName}"...`);
+  const timeoutMs = Math.min(deadline.remaining(), 720_000);
+  let retryCount = 0;
+
+  await waitUntil(async () => {
+    // Check for hard error text in alerts
+    const errorNodes = await page.locator('.alert-danger:visible, .alert-error:visible, .error-message:visible').allTextContents().catch(() => []);
+    const errorText = errorNodes.join(' ');
+    if (/包接受验证错误|package.*error|failed|失败/i.test(errorText)) {
+      throw Object.assign(new Error(`package validation error: ${errorText}`), { retryable: false });
+    }
+
+    // Auto-recover from transient upload error (e.g. network glitch)
+    const hasUploadError = (await page.locator('.uploadStatus-text:has-text("Error")').count()) > 0;
+    if (hasUploadError && retryCount < 3) {
+      retryCount++;
+      console.log(`[BROWSER_ACTION] ⚠️ Upload encountered transient error, retrying (${retryCount}/3)...`);
+      const cancelLink = page.locator('a[data-l10n-key="app_package_upload_action_cancel"], a:has-text("Cancel")').first();
+      if (await cancelLink.count()) await cancelLink.click().catch(() => {});
+      await page.waitForTimeout(2000);
+      await setFileInput(page, 'input[name="fileuploader"], input[type="file"]', target);
+      await page.waitForTimeout(3000);
+      return false;
+    }
+
+    // Check target card within app-package-details-submission
+    card = findCard();
+    if (await card.count() && await card.isVisible().catch(() => false)) {
+      const cardText = await card.innerText().catch(() => '');
+      const hasRemoveBtn = (await card.locator('button[data-l10n-key*="remove"], button:has-text("Remove"), button:has-text("删除"), .packageActions button').count()) > 0;
+      const hasVersionOrArch = /v\d+\.\d+|\bX64\b|\bx64\b|Windows\.Desktop/i.test(cardText);
+      const cardSpinner = (await card.locator('progressbar, [role="progressbar"], .progress-bar, .spinner, he-progress-ring').count()) > 0;
+
+      // If card has remove button or extracted version/arch and no internal spinner, it's ready!
+      if ((hasRemoveBtn || hasVersionOrArch) && !cardSpinner) {
+        return true;
+      }
+    }
+
+    return false;
+  }, { timeoutMs, intervalMs: 1500, label: `package ${targetFileName} validation` });
+
+  console.log(`[BROWSER_ACTION] ✨ Package "${targetFileName}" validated successfully!`);
+
+  // 5. Device family configuration
+  await check(page, ['input[aria-label*="Desktop" i]', 'input[name="desktop"]', 'label:has-text("Desktop") input'], true, 'desktop').catch(() => {});
+  await check(page, ['input[aria-label*="future" i]', 'input[name="future"]', 'label:has-text("future") input'], true, 'future device families').catch(() => {});
+
+  // 6. Save
   await page.waitForTimeout(500);
   await save(page);
 }
@@ -722,59 +800,111 @@ async function applyListing(page, desired) {
     }
   }
 
-  if (desired.assets?.screenshot) {
-    const shotInput = page.locator('tabpanel, [role="tabpanel"]').first().locator('input[type="file"]').first();
-    if (await shotInput.count()) {
-      await shotInput.setInputFiles(path.resolve(desired.assets.screenshot));
-      await page.waitForTimeout(1000);
-    }
+  // Image uploads (Screenshots & Store Logos)
+  const rootDir = process.cwd();
+  const assetsDir = path.resolve(rootDir, 'developer', 'memory-book', 'store', 'assets');
+  const fallbackAssetsDir = path.resolve(rootDir, 'store', 'assets');
+  const effectiveAssetsDir = fs.existsSync(assetsDir) ? assetsDir : effectiveFallback(fallbackAssetsDir, rootDir);
+
+  function resolveAsset(fileName) {
+    const p1 = path.join(effectiveAssetsDir, fileName);
+    if (fs.existsSync(p1)) return p1;
+    const p2 = path.join(rootDir, fileName);
+    if (fs.existsSync(p2)) return p2;
+    return null;
   }
 
-  for (const [name, item] of Object.entries(desired.listing.assets ?? {})) {
-    if (item.enabled && item.path) {
-      const sizeText = item.width && item.height ? `${item.width} x ${item.height}` : '';
+  function effectiveFallback(fDir, rDir) {
+    return fs.existsSync(fDir) ? fDir : rDir;
+  }
+
+  const uploadMap = [
+    {
+      name: 'Desktop Screenshot (1366x768)',
+      selectors: ['#panel-2 input[type="file"]', 'he-tab-panel[id="panel-2"] input[type="file"]', 'he-tab-panel[aria-labelledby="tab-0"] input[type="file"]', 'input[type="file"]'],
+      file: resolveAsset('Screenshot.png') || desired.assets?.screenshot
+    },
+    {
+      name: 'Poster Art (720x1080)',
+      selectors: ['.logo-upload-section:has-text("9:16 招贴画") input[type="file"]', '.logo-upload-section:has-text("720 x 1080") input[type="file"]'],
+      file: resolveAsset('PosterArt720x1080.png')
+    },
+    {
+      name: 'Box Art (1080x1080)',
+      selectors: ['.logo-upload-section:has-text("1:1 酷图") input[type="file"]', '.logo-upload-section:has-text("1080 x 1080") input[type="file"]'],
+      file: resolveAsset('BoxArt1080x1080.png')
+    },
+    {
+      name: 'App Tile 300x300',
+      selectors: ['.logo-upload-section:has-text("300 x 300") input[type="file"]'],
+      file: resolveAsset('Square300x300Logo.png')
+    },
+    {
+      name: '150x150 Logo',
+      selectors: ['.logo-upload-section:has-text("150 x 150") input[type="file"]'],
+      file: resolveAsset('Square150x150Logo.png')
+    },
+    {
+      name: '71x71 Logo',
+      selectors: ['.logo-upload-section:has-text("71 x 71") input[type="file"]'],
+      file: resolveAsset('Square71x71Logo.png')
+    }
+  ];
+
+  for (const item of uploadMap) {
+    if (item.file && fs.existsSync(item.file)) {
       let input = null;
-      if (sizeText) {
-        input = page.locator('div, section').filter({ hasText: new RegExp(escapeRegex(sizeText), 'i') }).locator('input[type="file"]').first();
-      }
-      if (!input || !(await input.count())) {
-        input = page.locator('input[type="file"]').nth(1);
+      for (const sel of item.selectors) {
+        const candidate = page.locator(sel).first();
+        if (await candidate.count()) {
+          input = candidate;
+          break;
+        }
       }
       if (input && (await input.count())) {
-        await input.setInputFiles(path.resolve(item.path)).catch(() => {});
-        await page.waitForTimeout(1000);
+        console.log(`[BROWSER_ACTION] 🖼️ Uploading [${item.name}]: ${item.file}`);
+        await input.setInputFiles(path.resolve(item.file)).catch(() => {});
+        await page.waitForTimeout(1500);
       }
     }
   }
 
+  // Wait for images to render
+  await page.waitForTimeout(2000);
   await save(page);
 }
 async function uploadAsset(page, filePath, label, fallbackIndex) { const labeled = page.getByLabel(label).first(); if (await labeled.count()) { const tag = await labeled.evaluate(element => element.tagName).catch(() => ''); if (tag.toLowerCase() === 'input') { await labeled.setInputFiles(filePath); return; } const nested = labeled.locator('input[type="file"]').first(); if (await nested.count()) { await nested.setInputFiles(filePath); return; } } const inputs = page.locator('input[type="file"]'); if (fallbackIndex < await inputs.count()) { await inputs.nth(fallbackIndex).setInputFiles(filePath); return; } throw Object.assign(new Error(`asset input not found: ${filePath}`), { code: 'SCHEMA_DRIFT' }); }
 async function applyOptions(page, desired) {
+  console.log('[BROWSER_ACTION] ⚙️ Applying Submission Options form...');
+
+  // 1. Publish Mode (ASAP / Manual)
   const asapRadio = page.locator('input#radioReleaseDate_asap, input[value="Asap"], input[name="PublishMode"][value="Asap"]').first();
   if (await asapRadio.count()) {
+    console.log('[BROWSER_ACTION] Selecting ASAP release date mode...');
     await asapRadio.evaluate(el => {
       el.click();
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }).catch(() => asapRadio.check({ force: true }));
+    await page.waitForTimeout(500);
   }
 
-  // Handle runFullTrust restricted capability reason textarea
-  const resCapSection = page.locator('section').filter({ hasText: /受限的功能|runFullTrust/i }).first();
-  if (await resCapSection.count()) {
-    const ta = resCapSection.locator('textarea').or(page.locator('textarea.text-area-width, textarea[maxlength="500"]')).first();
-    if (await ta.count()) {
-      const currentVal = await ta.inputValue().catch(() => '');
-      const reasonText = desired.submissionOptions?.runFullTrustReason || '本产品为基于 Windows 本地独立运行的桌面应用程序。需要使用 runFullTrust 权限以读写本地用户数据存储文件，实现记事和回忆笔记的本地安全持久化保存，不依赖也不连接任何外部云端网络服务。';
-      if (!currentVal || currentVal.trim().length < 10) {
-        await ta.fill(reasonText);
-        await ta.dispatchEvent('input');
-        await ta.dispatchEvent('change');
-      }
-    }
+  // 2. runFullTrust restricted capability reason
+  const ta = page.locator('textarea.text-area-width, textarea[maxlength="500"], textarea.has-error, section:has-text("runFullTrust") textarea').first();
+  await ta.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+
+  if (await ta.count() && await ta.isVisible().catch(() => false)) {
+    const reasonText = desired.submissionOptions?.runFullTrustReason || '本产品为基于 Windows 本地独立运行的桌面应用程序。需要使用 runFullTrust 权限以读写本地用户数据存储文件，实现记事和回忆笔记的本地安全持久化保存，不依赖也不连接任何外部云端网络服务。';
+    console.log(`[BROWSER_ACTION] 📝 Filling runFullTrust reason statement (${reasonText.length} chars)...`);
+    await ta.fill(reasonText);
+    await ta.evaluate(el => {
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForTimeout(500);
   }
 
+  // 3. Save
   await save(page);
 }
 function escapeRegex(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }

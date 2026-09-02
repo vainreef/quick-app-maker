@@ -45,13 +45,18 @@ PageKind → 完整 Observe → Diff → Apply (直接填表并保存成功) →
 3. **Web Components 支持**：`<he-select>` 需通过内部 input 键入回车或 DOM 点击 `<he-option>` 触发；`<he-button>` 必须支持复合定位；
 4. **可见性过滤（`:visible` 铁律）**：错误与警告断言必须严格过滤 `:visible` 伪类，严禁误读隐藏在 DOM 中的未激活错误模板节点；
 5. **MSIX 打包 EBUSY 防御**：生产打包必须显式忽略 `.cache`、`build`、`out` 等运行时目录，防止复制被 Edge 独占锁定的 profile 引发 EBUSY；
-6. **大包 CDP 注入**：50MB+ 大安装包上传必须使用 CDP 会话 `DOM.setFileInputFiles` 注入，规避 websocket 50MB 传输上限；
-7. **受限功能声明**：「提交选项」页面若包含 `runFullTrust` 受限功能，必须显式等待异步审核区块并填入本地离线隐私合规声明，消除 `<textarea class="has-error">` 校验拦截；
-8. **属性页隐私策略**：「属性」页面必须提供纯本地隐私策略声明文本（`#privacyPolicyText`），防止全信任桌面权限被微软后台拦截；
-9. **完全就绪 DOM 调试**：发生报错时，必须显式等待所有 progressbar 和 loading 遮罩彻底卸载，抓取真实、完整的全量 DOM 结构与 ARIA 树进行深度分析；
-10. **单阶段精准生效（最小操作集）**：严禁在已有模块完成时盲目跑全量 6 阶段轮询（`store run`），优先针对未完成模块执行 `store apply --phase <phase>`，最后通过 `store verify` 一次性总验；
-11. **严格串行执行与 CDP 独占防死锁**：严禁并发派发多个 Edge / Playwright / Store 相关的命令或后台 Task；所有 CDP 操作必须单任务串行执行，前序任务彻底退出后方可执行下一个；
-12. **全交互显式日志记录**：所有与浏览器发生的交互（导航 goto、元素读取、输入 fill、选择 choose、保存 save、冷导航刷新 coldVerify、总览校验 overviewVerify）必须全部打印清晰明确的 `[BROWSER_ACTION]` 日志，严禁静默黑盒操作。
+6. **官方原生 `makemsix` 64KB 块对齐铁律**：微软云端严苛依赖 64KB 块边界物理对齐与 `AppxBlockMap.xml` 的 `LfhSize` 精确匹配；严禁使用第三方普通 ZIP 压缩生成 MSIX，必须通过微软官方跨平台编译的原生 `makemsix` 或 Windows 下 `@microsoft/winappcli` 打包；
+7. **大包 CDP 注入**：50MB+ 大安装包上传必须使用 CDP 会话 `DOM.setFileInputFiles` 注入，规避 websocket 50MB 传输上限；
+8. **受限功能显式等待**：「提交选项」页面若包含 `runFullTrust` 受限功能，必须显式 `waitFor` 异步审核文本域并填入本地离线隐私合规声明，消除 `<textarea class="has-error">` 校验拦截；
+9. **静态官方说明横幅甄别**：保存与报错断言必须排除包含“错误”字样的静态官方声明横幅（如 `我们在你的 Package.appxmanifest`），严禁误判为保存失败；
+10. **属性页隐私策略**：「属性」页面必须提供纯本地隐私策略声明文本（`#privacyPolicyText`），防止全信任桌面权限被微软后台拦截；
+11. **完全就绪 DOM 调试**：发生报错时，必须显式等待所有 progressbar 和 loading 遮罩彻底卸载，抓取真实、完整的全量 DOM 结构与 ARIA 树进行深度分析；
+12. **单阶段精准生效（最小操作集）**：严禁在已有模块完成时盲目跑全量 6 阶段轮询（`store run`），优先针对未完成模块执行 `store apply --phase <phase>`，最后通过 `store verify` 一次性总验；
+13. **严格串行执行与 CDP 独占防死锁**：严禁并发派发多个 Edge / Playwright / Store 相关的命令或后台 Task；所有 CDP 操作必须单任务串行执行，前序任务彻底退出后方可执行下一个；
+14. **全交互显式日志记录与禁绝控制台噪音**：所有与浏览器发生的交互（导航 goto、元素读取、输入 fill、选择 choose、保存 save、冷导航刷新 coldVerify、总览校验 overviewVerify）必须全部打印清晰明确的 `[BROWSER_ACTION]` 日志，严禁打印 `BROWSER_CONSOLE` 冗余控制台噪音；
+15. **真机截图 `v-cloak` 彻底卸载与 Promise 契约铁律**：截屏渲染必须注入符合 `window.qam` 异步 Promise 契约（`appInfo` 必须返回 Promise，`loadState` 结构与 `app.js` 严格对齐）的真实 Mock，且截屏前必须显式断言 `[v-cloak]` 节点彻底卸载并确认核心文字节点已呈现，严禁截取未激活的空黑背景；
+16. **程序包故障行与删除态自愈铁律**：程序包上传页面若出现 `已暂停 (Paused)`、`错误 (Error)` 或 `This package will be removed` 状态，必须自动识别并点击 `a[data-l10n-key="app_package_action_delete"]` 清理故障项，或点击 `a[data-l10n-key="app_package_action_revert"]` 恢复正常包状态，点亮保存按钮，严禁在故障项未清除时强行点击 disabled 保存按钮；
+17. **云端大包解包异步等待与刷新重载铁律**：对于 50MB+ 的安装包，Partner Center 在云端解包验签需要 1~2 分钟。若提示“程序包需要长时间进行处理”，必须等待就绪或通过 `page.reload()` 重新同步云端真实就绪状态。
 
 ## 运行要求与进程模型
 

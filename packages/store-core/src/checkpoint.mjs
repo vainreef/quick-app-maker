@@ -41,7 +41,8 @@ export function mark(checkpoint, phase, status, detail = {}) {
   return checkpoint;
 }
 
-export function markConverged(checkpoint, phase, evidence = {}) {
+export function markConverged(checkpoint, phase, evidence) {
+  if (!evidence || Object.keys(evidence).length === 0) throw new Error(`phase ${phase} lacks evidence for convergence`);
   mark(checkpoint, phase, 'Converged', evidence);
   if (!checkpoint.convergedPhases.includes(phase)) checkpoint.convergedPhases.push(phase);
   return checkpoint;

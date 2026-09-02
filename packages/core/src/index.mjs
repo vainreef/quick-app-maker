@@ -5,3 +5,4 @@ export * from './process.mjs';
 export * from './download.mjs';
 export * from './config.mjs';
 export * from './lock.mjs';
+export * from './desktop.mjs';

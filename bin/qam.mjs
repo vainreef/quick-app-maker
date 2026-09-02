@@ -2,11 +2,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appRoot, assertWithin, ensureWorkspace, loadToolchain, configureNpmEnvironment, Logger, runNpm, runNodeScript, resolvePortableNode, sha256Sync, withWorkspaceLock, writeAtomic, readJson } from '@quick-app/core';
+import { appRoot, assertWithin, ensureWorkspace, loadToolchain, configureNpmEnvironment, Logger, runNpm, runNodeScript, resolvePortableNode, sha256Sync, withWorkspaceLock, writeAtomic, readJson, openFileManager } from '@quick-app/core';
 import { createElectronApp } from '@quick-app/generator-electron';
 import { EXIT, PHASES, normalizePhase, loadDesired, saveDesired, validateDesired, importListingMarkdown, runId, loadCheckpoint, saveCheckpoint, EvidenceStore, Deadline, reconcilePhase } from '@quick-app/store-core';
 import { runPreflight } from '@quick-app/store-preflight';
-import { EdgeSession, StoreDriver, phaseAdapters, capturePage, waitForPageKind, waitUntil, observeOverview, reserveProduct } from '@quick-app/store-playwright';
+import { BrowserSession, resolveBrowserType, StoreDriver, phaseAdapters, capturePage, waitForPageKind, waitUntil, observeOverview, reserveProduct } from '@quick-app/store-playwright';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const TOOLCHAIN = loadToolchain(ROOT);
@@ -35,16 +35,26 @@ async function dispatch(name, options) {
   if (name === 'test') return appCommand('test', options);
   if (name === 'package') return appCommand('package:store', options);
   if (name === 'store') return store(options);
+  if (name === 'reveal' || name === 'open') return reveal(options);
   throw Object.assign(new Error(`unknown command: ${name}; run qam help`), { code: 'CONFIG' });
 }
 
 function help() {
-  console.log(`Quick App Maker V2\n\nCommands:\n  doctor\n  bootstrap\n  self-test\n  create --name NAME --slug SLUG\n  dev APP\n  test APP\n  package APP --profile store\n  store launch|reserve|preflight|discover|inspect|plan|apply|run|verify|status|stop --app APP\n  check\n`);
+  console.log(`Quick App Maker V2\n\nCommands:\n  doctor\n  bootstrap\n  self-test\n  create --name NAME --slug SLUG\n  dev APP\n  test APP\n  package APP --profile store\n  store launch|reserve|preflight|discover|inspect|plan|apply|run|verify|status|stop --app APP [--browser chrome|edge|safari]\n  reveal PATH (opens in Finder / Explorer)\n  check\n`);
+  return 0;
+}
+
+async function reveal(options) {
+  const target = options._[0] ?? '.';
+  const abs = path.resolve(workspace, target);
+  const isDir = fs.existsSync(abs) && fs.statSync(abs).isDirectory();
+  await openFileManager(abs, { select: !isDir });
+  console.log(`REVEALED: ${abs}`);
   return 0;
 }
 
 async function doctor() {
-  const lock = TOOLCHAIN; const node = process.versions.node; const major = Number(node.split('.')[0]); const nodePath = resolvePortableNode(workspace); const workspaceNode = isWorkspaceNode(workspace, nodePath); const npm = await npmVersion(workspace); const nodeOk = process.platform === 'win32' ? node === lock.node.version : major === 24; const report = { node, required: lock.node.version, npm, nodePath, workspaceNode, workspace, registry: lock.npm.registry, electron: lock.electron.version, playwright: lock.playwright.version, winapp: lock.winapp.version, platform: process.platform, ok: nodeOk && Boolean(npm) && (process.platform !== 'win32' || workspaceNode) };
+  const lock = TOOLCHAIN; const node = process.versions.node; const major = Number(node.split('.')[0]); const nodePath = resolvePortableNode(workspace); const workspaceNode = isWorkspaceNode(workspace, nodePath); const npm = await npmVersion(workspace); const nodeOk = process.platform === 'win32' ? node === lock.node.version : (major >= 24 && major < 27); const report = { node, required: lock.node.version, npm, nodePath, workspaceNode, workspace, registry: lock.npm.registry, electron: lock.electron.version, playwright: lock.playwright.version, winapp: lock.winapp.version, platform: process.platform, ok: nodeOk && Boolean(npm) && (process.platform !== 'win32' || workspaceNode) };
   console.log(JSON.stringify(report, null, 2));
   return report.ok ? 0 : 1;
 }
@@ -116,19 +126,20 @@ async function storeUnlocked(options) {
   const sub = options._[0] ?? 'help'; const root = appRoot(workspace, options.app ?? options._[1] ?? '.'); const desired = loadDesired(root); resolveDesiredPaths(root, desired); if (desired.listingMarkdown && fs.existsSync(desired.listingMarkdown)) importListingMarkdown(desired, desired.listingMarkdown); const stateDir = path.join(root, '.cache', 'store'); fs.mkdirSync(stateDir, { recursive: true }); const storeRunId = runId(`store-${sub}`); const manifestFile = desired.package?.manifestPath && fs.existsSync(desired.package.manifestPath) ? desired.package.manifestPath : ''; const manifestHash = manifestFile ? sha256Sync(manifestFile) : ''; const checkpoint = loadCheckpoint(stateDir, { productId: desired.productId, submissionId: desired.submissionId, manifestHash }); checkpoint.manifestHash = manifestHash || checkpoint.manifestHash; const logger = new Logger({ runId: storeRunId, root: path.join(workspace, '.cache/qam/runs', storeRunId) });
   if (sub === 'preflight') { const result = runPreflight({ workspace, appRoot: root, desired, outputPath: path.join(logger.root, 'preflight-result.json') }); console.log(JSON.stringify(result, null, 2)); return 0; }
   if (sub === 'status') { console.log(JSON.stringify({ checkpoint, session: readJson(path.join(stateDir, 'session.json'), null) }, null, 2)); return 0; }
-  const session = new EdgeSession({ workspace, stateDir, baseUrl: appsOverviewUrl(desired.site.baseUrl), logger });
-  if (sub === 'launch') { const sessionInfo = await session.ensure(); console.log(JSON.stringify({ ok: true, launched: true, session: sessionInfo, message: 'Edge launched. Please sign in to Microsoft Partner Center, then reply when ready.' }, null, 2)); return 0; }
-  if (sub === 'stop') { if (fs.existsSync(session.statePath())) { session.session = readJson(session.statePath(), null); await session.close(); } else console.log('No active QAM Edge session.'); return 0; }
+  const browserType = resolveBrowserType({ option: options.browser, config: desired });
+  const session = new BrowserSession({ workspace, stateDir, baseUrl: appsOverviewUrl(desired.site.baseUrl), browserType, browserPath: options['browser-path'] ?? options.browserPath, logger });
+  if (sub === 'launch') { const sessionInfo = await session.ensure(); console.log(JSON.stringify({ ok: true, launched: true, browser: sessionInfo.browserType, session: sessionInfo, message: `${sessionInfo.browserType} launched. Please sign in to Microsoft Partner Center, then reply when ready.` }, null, 2)); return 0; }
+  if (sub === 'stop') { if (fs.existsSync(session.statePath())) { session.session = readJson(session.statePath(), null); await session.close(); console.log(`Active ${session.session?.browserType ?? 'browser'} session stopped.`); } else console.log('No active QAM browser session.'); return 0; }
   let connected = null;
   try {
     connected = await session.connect(); const { page } = connected;
-  if (sub === 'reserve') { const name = options.name ?? desired.productName; if (!name) throw Object.assign(new Error('store reserve requires --name'), { code: 'CONFIG' }); await waitForSignedIn(page); const result = await reserveProduct({ page, appRoot: root, desired, name, logger }); desired.productId = result.productId; checkpoint.productId = result.productId; saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
-  await waitForSignedIn(page);
-  if (sub === 'discover') { const result = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = result.submissionId; checkpoint.routes = result.routes; saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
-  if (sub === 'inspect') { console.log(JSON.stringify(await capturePage(page), null, 2)); await connected.browser.close(); return 0; }
-  if (sub === 'verify') { const result = await verifyAll(page, desired, checkpoint, logger); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return result.ok ? 0 : EXIT.DIFF; }
-  if (sub === 'plan' || sub === 'apply') { const phase = normalizePhase(options.phase); if (phase === 'age-ratings' && options.confirmAgeRatings) { desired.ageRatings.confirmed = true; saveDesired(root, desired); } const validationErrors = validateDesired(desired, { strict: sub === 'apply', checkAge: phase === 'age-ratings' }); if (validationErrors.length) throw Object.assign(new Error(validationErrors.join('; ')), { code: 'CONFIG' }); if (!checkpoint.submissionId) { const discovery = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = discovery.submissionId; checkpoint.routes = discovery.routes; saveCheckpoint(workspace, stateDir, checkpoint); } const driver = new StoreDriver({ page, desired, checkpoint, logger }); const adapters = phaseAdapters(driver); const runRoot = path.join(workspace, '.cache/qam/runs', logger.runId); const evidence = new EvidenceStore(workspace, runRoot); let result; try { result = await reconcilePhase({ phase, adapter: adapters[phase], desired, checkpoint, evidence, logger, apply: sub === 'apply', deadline: new Deadline(Number(options.deadline ?? 3_600_000)) }); } finally { saveCheckpoint(workspace, stateDir, checkpoint); } console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return result.exitCode; }
-  if (sub === 'run') { const apply = Boolean(options.apply); if (apply && options.confirmAgeRatings) { desired.ageRatings.confirmed = true; saveDesired(root, desired); } const validationErrors = validateDesired(desired, { strict: apply }); if (validationErrors.length) throw Object.assign(new Error(validationErrors.join('; ')), { code: 'CONFIG' }); if (!checkpoint.submissionId) { const discovery = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = discovery.submissionId; checkpoint.routes = discovery.routes; saveCheckpoint(workspace, stateDir, checkpoint); } let exit = 0; const deadline = new Deadline(Number(options.deadline ?? 3_600_000)); for (const phase of PHASES) { const driver = new StoreDriver({ page, desired, checkpoint, logger }); const adapters = phaseAdapters(driver); try { const result = await reconcilePhase({ phase, adapter: adapters[phase], desired, checkpoint, evidence: new EvidenceStore(workspace, path.join(logger.root, 'evidence')), logger, apply, deadline }); if (result.exitCode !== 0) { exit = result.exitCode; if (!apply) break; } } finally { saveCheckpoint(workspace, stateDir, checkpoint); } } await connected.browser.close(); return exit; }
+    if (sub === 'inspect') { console.log(JSON.stringify(await capturePage(page), null, 2)); await connected.browser.close(); return 0; }
+    if (sub === 'reserve') { const name = options.name ?? desired.productName; if (!name) throw Object.assign(new Error('store reserve requires --name'), { code: 'CONFIG' }); await waitForSignedIn(page); const result = await reserveProduct({ page, appRoot: root, desired, name, logger }); desired.productId = result.productId; checkpoint.productId = result.productId; saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
+    await waitForSignedIn(page);
+    if (sub === 'discover') { const result = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = result.submissionId; checkpoint.routes = result.routes; saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
+    if (sub === 'verify') { const result = await verifyAll(page, desired, checkpoint, logger); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return result.ok ? 0 : EXIT.DIFF; }
+    if (sub === 'plan' || sub === 'apply') { const phase = normalizePhase(options.phase); if (phase === 'age-ratings' && options.confirmAgeRatings) { desired.ageRatings.confirmed = true; saveDesired(root, desired); } const validationErrors = validateDesired(desired, { strict: sub === 'apply', checkAge: phase === 'age-ratings' }); if (validationErrors.length) throw Object.assign(new Error(validationErrors.join('; ')), { code: 'CONFIG' }); if (!checkpoint.submissionId) { const discovery = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = discovery.submissionId; checkpoint.routes = discovery.routes; saveCheckpoint(workspace, stateDir, checkpoint); } const driver = new StoreDriver({ page, desired, checkpoint, logger }); const adapters = phaseAdapters(driver); const runRoot = path.join(workspace, '.cache/qam/runs', logger.runId); const evidence = new EvidenceStore(workspace, runRoot); let result; try { result = await reconcilePhase({ phase, adapter: adapters[phase], desired, checkpoint, evidence, logger, apply: sub === 'apply', deadline: new Deadline(Number(options.deadline ?? 3_600_000)) }); } finally { saveCheckpoint(workspace, stateDir, checkpoint); } console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return result.exitCode; }
+    if (sub === 'run') { const apply = Boolean(options.apply); if (apply && options.confirmAgeRatings) { desired.ageRatings.confirmed = true; saveDesired(root, desired); } const validationErrors = validateDesired(desired, { strict: apply }); if (validationErrors.length) throw Object.assign(new Error(validationErrors.join('; ')), { code: 'CONFIG' }); if (!checkpoint.submissionId) { const discovery = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = discovery.submissionId; checkpoint.routes = discovery.routes; saveCheckpoint(workspace, stateDir, checkpoint); } let exit = 0; const deadline = new Deadline(Number(options.deadline ?? 3_600_000)); for (const phase of PHASES) { const driver = new StoreDriver({ page, desired, checkpoint, logger }); const adapters = phaseAdapters(driver); try { const result = await reconcilePhase({ phase, adapter: adapters[phase], desired, checkpoint, evidence: new EvidenceStore(workspace, path.join(logger.root, 'evidence')), logger, apply, deadline }); if (result.exitCode !== 0) { exit = result.exitCode; if (!apply) break; } } finally { saveCheckpoint(workspace, stateDir, checkpoint); } } await connected.browser.close(); return exit; }
     throw Object.assign(new Error(`unknown store command: ${sub}`), { code: 'CONFIG' });
   } finally {
     try { if (connected?.browser) await connected.browser.close(); else if (session.session) await session.close(); } catch {}
@@ -142,10 +153,66 @@ function resolveDesiredPaths(root, desired) {
   return desired;
 }
 
-async function waitForSignedIn(page) { await waitUntil(async () => { const snap = await capturePage(page); return snap.ready && snap.kind !== 'SignIn' && snap.kind !== 'ErrorPage' && /partner\.microsoft\.com/i.test(snap.url); }, { timeoutMs: 900_000, label: 'Partner Center sign-in' }); }
+async function waitForSignedIn(page) { await waitUntil(async () => { const snap = await capturePage(page); return !snap.signals?.signIn && snap.kind !== 'SignIn' && snap.kind !== 'ErrorPage' && /partner\.microsoft\.com/i.test(snap.url); }, { timeoutMs: 900_000, label: 'Partner Center sign-in' }); }
 function appsOverviewUrl(baseUrl) { const parsed = new URL(baseUrl); const locale = parsed.pathname.split('/').filter(Boolean)[0] || 'zh-cn'; return `${parsed.origin}/${locale}/dashboard/apps-and-games/overview`; }
-async function discoverSubmission(page, desired, checkpoint, logger) { const base = desired.site.baseUrl.replace(/\/$/, ''); const url = `${base}/${encodeURIComponent(desired.productId)}/overview`; await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 }); await waitForPageKind(page, ['ProductOverview', 'SubmissionOverview'], { operation: 'product overview' }); await waitUntil(async () => { const text = await page.locator('body').innerText(); const hasLinks = (await page.locator('a').evaluateAll(items => items.map(item => item.getAttribute('href') || item.href).filter(h => h && h.includes('/submissions/')))).length > 0; return hasLinks || /开始提交|Start submission|新建提交/i.test(text); }, { timeoutMs: 30_000, label: 'submission overview render' }); let links = await page.locator('a').evaluateAll(items => items.map(item => item.getAttribute('href') || item.href).filter(h => h && h.includes('/submissions/'))); let id = links.map(x => x.match(/\/submissions\/([^/]+)/i)?.[1]).find(Boolean) ?? checkpoint.submissionId ?? desired.submissionId; if (!id) { const start = page.locator('he-button').filter({ hasText: /开始提交|Start submission|新建提交/i }).or(page.getByRole('button', { name: /开始提交|Start submission|新建提交/i })).or(page.getByText(/开始提交|Start submission/i)).first(); if (!(await start.count())) throw Object.assign(new Error('active submission not found and start button is missing'), { code: 'SCHEMA_DRIFT' }); await start.click(); await waitUntil(async () => page.url().includes('/submissions/'), { timeoutMs: 60_000, label: 'submission draft creation' }); id = page.url().match(/\/submissions\/([^/]+)/i)?.[1]; }
-  if (!id) throw new Error('submissionId was not found'); links = await page.locator('a').evaluateAll(items => items.map(item => item.getAttribute('href') || item.href).filter(h => h && h.includes('/submissions/'))); const routes = {}; for (const phase of PHASES) { const hint = phase === 'age-ratings' ? 'ageratings' : phase === 'listing' ? 'managelanguages|listings' : phase; const found = links.find(x => new RegExp(hint, 'i').test(x)); routes[phase] = found ? (found.startsWith('http') ? found : `${new URL(desired.site.baseUrl).origin}${found}`) : `${base}/${encodeURIComponent(desired.productId)}/submissions/${id}/${phase === 'age-ratings' ? 'ageratings' : phase === 'listing' ? 'managelanguages?producttype=app' : phase}`; } logger?.pass('submission discovered', { submissionId: id, routes }); return { submissionId: id, routes, url: page.url() }; }
+async function discoverSubmission(page, desired, checkpoint, logger) {
+  const prodId = desired.productId && desired.productId !== 'PENDING' ? desired.productId : (desired.product?.productId || 'PENDING');
+  desired.productId = prodId;
+  const base = desired.site.baseUrl.replace(/\/$/, '');
+  const overviewUrl = `${base}/${encodeURIComponent(prodId)}/overview`;
+  if (!page.url().includes('/submissions/') && !page.url().includes(`/products/${prodId}/overview`)) {
+    await page.goto(overviewUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+  }
+  await waitForPageKind(page, ['ProductOverview', 'SubmissionOverview'], { operation: 'product overview' });
+
+  let id = page.url().match(/\/submissions\/([^/?#]+)/i)?.[1] ?? checkpoint.submissionId ?? desired.submissionId;
+  const getSubmissionHrefs = async () => {
+    return await page.evaluate(() => {
+      const anchors = [...document.querySelectorAll('a')];
+      return anchors.map(a => a.getAttribute('href') || a.href).filter(h => h && h.includes('/submissions/'));
+    });
+  };
+
+  let foundHrefs = await getSubmissionHrefs();
+  for (const href of foundHrefs) {
+    const match = href.match(/\/submissions\/([^/?#]+)/i);
+    if (match && match[1]) { id = match[1]; break; }
+  }
+
+  if (!id) {
+    await page.evaluate(() => {
+      const heBtn = document.querySelector('he-button[data-l10n-key="Start_Submission"]') || document.querySelector('he-button');
+      const innerBtn = heBtn?.shadowRoot?.querySelector('button') || heBtn?.querySelector('button') || heBtn;
+      innerBtn?.click();
+    });
+
+    await waitUntil(async () => {
+      foundHrefs = await getSubmissionHrefs();
+      return foundHrefs.length > 0 || page.url().includes('/submissions/');
+    }, { timeoutMs: 30_000, label: 'submission draft generation' });
+
+    id = page.url().match(/\/submissions\/([^/?#]+)/i)?.[1];
+    for (const href of foundHrefs) {
+      const match = href.match(/\/submissions\/([^/?#]+)/i);
+      if (match && match[1]) { id = match[1]; break; }
+    }
+  }
+
+  if (!id) throw new Error('未能从当前产品页面中识别到 submissionId');
+
+  const routes = {};
+  for (const phase of PHASES) {
+    const hint = phase === 'age-ratings' ? 'ageratings' : phase === 'listing' ? 'managelanguages|listings' : phase;
+    const found = foundHrefs.find(x => new RegExp(hint, 'i').test(x));
+    routes[phase] = found ? (found.startsWith('http') ? found : `${new URL(desired.site.baseUrl).origin}${found}`) : `${base}/${encodeURIComponent(desired.productId)}/submissions/${id}/${phase === 'age-ratings' ? 'ageratings' : phase === 'listing' ? 'managelanguages?producttype=app' : phase}`;
+  }
+
+  desired.submissionId = id;
+  checkpoint.submissionId = id;
+  checkpoint.routes = routes;
+  logger?.pass('submission discovered', { submissionId: id, routes });
+  return { submissionId: id, routes, url: page.url() };
+}
 async function verifyAll(page, desired, checkpoint, logger) { const url = `${desired.site.baseUrl.replace(/\/$/, '')}/${encodeURIComponent(desired.productId)}/overview`; await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 }); const overview = await observeOverview(page); const incomplete = PHASES.filter(phase => overview.modules[phase]?.status !== 'Complete'); const result = { ok: incomplete.length === 0, url: overview.url, pageKind: overview.pageKind, modules: overview.modules, incomplete }; logger?.event(result.ok ? 'PRODUCT_VERIFIED' : 'PRODUCT_INCOMPLETE', result); writeAtomic(workspace, path.join(logger.root, 'verify-result.json'), result); return result; }
 
 async function check() {
