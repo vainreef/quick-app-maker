@@ -634,14 +634,8 @@ async function setFileInput(page, selector, targetPath) {
 }
 
 async function applyPackages(page, desired, diff = [], deadline) {
-  let target = path.resolve(desired.package?.path || '');
-  if (!fs.existsSync(target)) {
-    target = path.resolve(process.cwd(), 'memory-book', desired.package?.path || '');
-  }
-  if (!fs.existsSync(target)) {
-    target = path.resolve(process.cwd(), desired.package?.path || '');
-  }
-  if (!fs.existsSync(target)) {
+  const target = path.resolve(desired.package?.path || '');
+  if (!desired.package?.path || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
     throw new Error(`Package file not found at: ${desired.package?.path}`);
   }
 
@@ -802,9 +796,9 @@ async function applyListing(page, desired) {
 
   // Image uploads (Screenshots & Store Logos)
   const rootDir = process.cwd();
-  const assetsDir = path.resolve(rootDir, 'developer', 'memory-book', 'store', 'assets');
-  const fallbackAssetsDir = path.resolve(rootDir, 'store', 'assets');
-  const effectiveAssetsDir = fs.existsSync(assetsDir) ? assetsDir : effectiveFallback(fallbackAssetsDir, rootDir);
+  const configuredScreenshot = desired.assets?.screenshot ? path.resolve(desired.assets.screenshot) : '';
+  const configuredAsset = Object.values(desired.listing?.assets ?? {}).find(item => item?.path)?.path;
+  const effectiveAssetsDir = configuredScreenshot ? path.dirname(configuredScreenshot) : configuredAsset ? path.dirname(path.resolve(configuredAsset)) : rootDir;
 
   function resolveAsset(fileName) {
     const p1 = path.join(effectiveAssetsDir, fileName);
@@ -814,15 +808,11 @@ async function applyListing(page, desired) {
     return null;
   }
 
-  function effectiveFallback(fDir, rDir) {
-    return fs.existsSync(fDir) ? fDir : rDir;
-  }
-
   const uploadMap = [
     {
       name: 'Desktop Screenshot (1366x768)',
       selectors: ['#panel-2 input[type="file"]', 'he-tab-panel[id="panel-2"] input[type="file"]', 'he-tab-panel[aria-labelledby="tab-0"] input[type="file"]', 'input[type="file"]'],
-      file: resolveAsset('Screenshot.png') || desired.assets?.screenshot
+      file: configuredScreenshot || resolveAsset('Screenshot.png')
     },
     {
       name: 'Poster Art (720x1080)',

@@ -13,7 +13,7 @@ Electron production packager、JavaScript、Vue browser runtime、secure preload
 
 ## Store 自动化
 
-`packages/store-core` 管 Desired、Observed、Diff、Checkpoint、证据和时间预算；`packages/store-playwright` 管 Edge session、PageKind、Overview、六个阶段和脱敏 fixtures；`packages/store-preflight` 管 MSIX/manifest/PNG/文案静态检查。
+`packages/store-core` 管 Desired、Checkpoint、阶段执行和时间预算；`packages/store-playwright` 管浏览器 session、PageKind、Overview、六个阶段和脱敏 fixtures；`packages/store-preflight` 管现有 MSIX、manifest、PNG 和文案静态检查。图片视觉质量由用户确认。
 
 ## 设计边界
 

@@ -22,7 +22,7 @@
 # Windows
 & "$qamRoot\bootstrap\qam.cmd" doctor     # 诊断便携 Node 24、Git、npm、Electron 镜像与沙箱健康度
 & "$qamRoot\bootstrap\qam.cmd" bootstrap  # 初始化工作区依赖与 Electron 运行时
-& "$qamRoot\bootstrap\qam.cmd" self-test   # 运行引擎 34 项全量契约测试
+& "$qamRoot\bootstrap\qam.cmd" self-test   # 运行引擎全量契约测试
 
 # macOS / Linux
 node bin/qam.mjs doctor
@@ -41,7 +41,7 @@ node bin/qam.mjs self-test
 # 2. 自动化契约质量验收（Agent 必跑，秒级退出，提供确凿证据）
 & "$qamRoot\bootstrap\qam.cmd" test .\app-slug
 
-# 3. 启动开发热重载（长驻 Watcher 进程，供用户体验）
+# 3. 在后台启动开发热重载（长驻 Watcher 进程，直接向用户展示窗口）
 & "$qamRoot\bootstrap\qam.cmd" dev .\app-slug
 ```
 
@@ -73,7 +73,7 @@ node bin/qam.mjs self-test
 & "$qamRoot\bootstrap\qam.cmd" store apply --app .\app-slug --phase listing
 & "$qamRoot\bootstrap\qam.cmd" store apply --app .\app-slug --phase options
 
-# 冷加载总体验证（确认 6 个模块均为 Complete 绿标）：
+# 执行现有总体验证（确认 6 个模块均为 Complete 绿标）：
 & "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug
 
 # 第 5 步：提示用户在浏览器中做最后人工核对并点击「提交进行认证」

@@ -36,6 +36,13 @@ async function reconcilePhaseCore({ phase, adapter, desired, checkpoint, evidenc
     return { phase, status: 'Converged', diff: [], cold: { diff: [] }, overview, exitCode: 0 };
   }
 
+  if (!apply) {
+    const observed = await adapter.observe();
+    const diff = await adapter.diff(desired, observed);
+    logger?.info(`[PLAN] ${phase} observed`, { pageKind: page.kind, diffCount: diff.length });
+    return { phase, status: diff.length ? 'NeedsChanges' : 'Observed', observed, diff, exitCode: diff.length ? 4 : 0 };
+  }
+
   // 纯直接填报模式：彻底删除一切差异比对算法，进入页面即从头到尾直接填表并保存
   logger?.info(`[DIRECT_APPLY] Starting full form application for ${phase}...`);
   mark(checkpoint, phase, 'Applying', { pageKind: page.kind });

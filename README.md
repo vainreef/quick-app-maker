@@ -12,7 +12,7 @@
   - `Project/`：用户的工作区根目录；
   - `Project/node/` & `Project/git/`：工作区内置便携运行环境；
   - `Project/quick-app-maker/`：核心工具链与自动化 CLI；
-  - `Project/.agent/`：注入给 AI Agent 的规则、技能包与工作流 SOP；
+  - `Project/.agents/skills/`：Codex 使用的项目级 Skill；
   - `Project/<app-slug>/`：实际开发生成的具体业务应用。
 
 > Edge 与 PowerShell 视为 Windows 内置能力；Git、Node.js 和 npm 只取工作区便携副本。`qam-toolchain.lock.json` 保留在 `quick-app-maker/` 引擎目录，命令会显式加载，不要求把它复制到工作区根目录。
@@ -46,40 +46,35 @@ Project/                                 <- 工作区根目录 ($workspaceRoot)
 └── quick-app-maker/                     <- 【自动克隆】核心工具链仓库
     ├── bin/qam.mjs
     ├── packages/
-    ├── skills/
+    ├── skills/vainreef-fast-publish/      <- Skill 源文件
+    ├── .agents/skills/                    <- Codex 仓库内发现链接
     └── docs/
 ```
 
 ---
 
-## 第 1 步：初始化 Agent 规则与技能（配置 `.agent` 目录）
+## 第 1 步：初始化 Agent 规则与技能
 
-引导完成后，在根目录执行以下指令，将 `quick-app-maker` 内的规则与技能复制到工作区根目录的 `.agent/`，让 AI Agent（Antigravity / Cursor / Claude 等）一打开项目即具备全套专家能力：
+引导完成后，在工作区根目录安装 Codex 项目级 Skill。其他 AI 工具按各自的项目规则目录单独适配：
 
 ```powershell
-# 1. 创建 .agent 目录结构
-New-Item -ItemType Directory -Force -Path .agent\rules, .agent\skills\fast-publish, .agent\workflows | Out-Null
+# 1. 创建 Codex Skill 目录
+New-Item -ItemType Directory -Force -Path .agents\skills\vainreef-fast-publish | Out-Null
 
-# 2. 复制规则与约束
-Copy-Item -Force quick-app-maker\AGENTS.md .agent\rules\AGENTS.md
-Copy-Item -Force quick-app-maker\docs\partner-center\运行契约.md .agent\rules\store-contract.md
+# 2. 工作区没有项目规则时复制根规则
+if (-not (Test-Path .\AGENTS.md)) { Copy-Item -Force quick-app-maker\AGENTS.md .\AGENTS.md }
 
-# 3. 复制 fast-publish 核心技能包
-Copy-Item -Recurse -Force quick-app-maker\skills\vainreef-fast-publish\* .agent\skills\fast-publish\
-
-# 4. 复制标准工作流 SOP
-Copy-Item -Force quick-app-maker\docs\v2\one-hour-runbook.md .agent\workflows\
-Copy-Item -Force quick-app-maker\docs\v2\windows-smoke-test.md .agent\workflows\
+# 3. 复制 Skill
+Copy-Item -Recurse -Force quick-app-maker\skills\vainreef-fast-publish\* .agents\skills\vainreef-fast-publish\
 ```
 
 ### 配置完成后的完整工作区
 
 ```text
 Project/
-├── .agent/                              <- 【Agent 专属大脑】自动加载规则、技能与工作流
-│   ├── rules/                           <- 运行约束（工具链沙箱、Store 契约）
-│   ├── skills/fast-publish/             <- 核心技能（访谈、命令速查、Store 指南、README 模板）
-│   └── workflows/                       <- 1 小时极速发布 runbook、冒烟验收清单
+├── .agents/skills/
+│   └── vainreef-fast-publish/           <- Codex 项目级 Skill
+├── AGENTS.md                           <- 工作区根规则
 ├── node/                                <- 便携 Node.js 运行时
 ├── git/                                 <- 便携 Git 运行时
 ├── .cache/                              <- 沙箱缓存
@@ -147,7 +142,7 @@ Project/
 > **进程边界与 Agent 运行须知**：
 > - `qam dev` 是**交互式长驻 Watcher 进程**，窗口打开后会持续挂起监听，按 `Ctrl+C` 退出；
 > - **AI Agent 严禁在同步阻塞终端中无限期等待 `dev` 退出**（否则会导致超时强杀并误判为崩溃）；
-> - Agent 在自动化流程中应使用 `qam test` 取得质量证据，并通过文字指引用户在独立终端运行 `dev` 或使用后台守护任务启动。
+> - Agent 在自动化流程中使用 `qam test` 取得质量证据，随后在后台启动 `dev` 并直接向用户展示窗口。
 
 ---
 
@@ -158,7 +153,7 @@ Project/
 > [!NOTE]
 > - **开发者账号**：微软账号与个人开发者认证免费，无需高昂费用；若未认证，`store launch` 启动 Edge 后在网页中指引用户完成个人认证；
 > - **代码签名**：MSIX 包由微软商店云端统一自动完成签名，**完全不需要开发者购买或提供第三方代码签名证书**；
-> - **人机协同流程**：`store launch`（秒级拉起 Edge） $\rightarrow$ 提示用户在窗口登录，用户在聊天框回复「我登录好了」 $\rightarrow$ 一键全自动填报 6 大表 $\rightarrow$ 人工点击最终提交。
+> - **人机协同流程**：`store launch`（秒级拉起 Edge） $\rightarrow$ 用户登录并保留名称 $\rightarrow$ 用户确认文案和图片 $\rightarrow$ 按状态逐阶段填报 $\rightarrow$ 人工点击最终提交。
 
 ```powershell
 # 1. 启动独立隔离的 Edge 浏览器，引导用户登录 Partner Center（秒级返回）
@@ -171,16 +166,16 @@ Project/
 # 3. 生产封装生成符合 Store 规范的 MSIX 程序包
 .\quick-app-maker\bootstrap\qam.cmd package .\countdown-app --profile store
 
-# 4. 离线静态预检（严格校验 MSIX 格式、manifest 字段、图标资产尺寸与文案）
+# 4. 离线预检（检查现有 MSIX、manifest 和素材文件；图片视觉效果由用户确认）
 .\quick-app-maker\bootstrap\qam.cmd store preflight --app .\countdown-app
 
 # 5. 发现或创建本次提交的草稿会话
 .\quick-app-maker\bootstrap\qam.cmd store discover --app .\countdown-app
 
-# 6. 一键自动化填写 Store 六大阶段（定价与可用性、属性、年龄分级、程序包、Store 一览与提交选项）
-.\quick-app-maker\bootstrap\qam.cmd store run --app .\countdown-app --apply --confirm-age-ratings --deadline 3600000
+# 6. 读取状态，对未完成模块使用下文的单阶段 apply 命令
+.\quick-app-maker\bootstrap\qam.cmd store status --app .\countdown-app
 
-# 7. 冷加载总体验证（确认六个模块冷加载后状态均为 Complete 绿标）
+# 7. 执行现有总体验证（确认六个模块均为 Complete 绿标）
 .\quick-app-maker\bootstrap\qam.cmd store verify --app .\countdown-app
 ```
 

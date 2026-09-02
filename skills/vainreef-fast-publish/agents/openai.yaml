@@ -1,4 +1,6 @@
 interface:
   display_name: "Vainreef Fast Publish V2"
-  short_description: "Node.js/Electron Windows App 与 Microsoft Store 工作流"
-default_prompt: "$vainreef-fast-publish"
+  short_description: "创建 Windows 应用并执行 Microsoft Store 发布流程"
+  default_prompt: "Use $vainreef-fast-publish to build this Windows app and continue the existing Microsoft Store workflow."
+policy:
+  allow_implicit_invocation: true

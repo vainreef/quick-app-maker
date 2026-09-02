@@ -33,7 +33,7 @@ $qamRoot = if (Test-Path .\quick-app-maker\bootstrap\qam.cmd) { '.\quick-app-mak
 & "$qamRoot\bootstrap\qam.cmd" store preflight --app .\smoke-app
 ```
 
-检查 MSIX、manifest Identity、Executable、Assets、zh-CN、x64 和 SHA-256；通用占位文案和占位截图不计入通过。
+检查现有 MSIX、manifest Identity、Executable、Assets、zh-CN、x64 和 SHA-256。图片文件整理完成后打开素材目录，由用户确认视觉效果。
 
 ## 4. Partner Center
 
@@ -41,8 +41,9 @@ $qamRoot = if (Test-Path .\quick-app-maker\bootstrap\qam.cmd) { '.\quick-app-mak
 & "$qamRoot\bootstrap\qam.cmd" store launch --app .\smoke-app
 & "$qamRoot\bootstrap\qam.cmd" store reserve --app .\smoke-app --name SmokeApp
 & "$qamRoot\bootstrap\qam.cmd" store discover --app .\smoke-app
-& "$qamRoot\bootstrap\qam.cmd" store run --app .\smoke-app --apply --deadline 3600000
+& "$qamRoot\bootstrap\qam.cmd" store status --app .\smoke-app
+# 根据状态对未完成模块使用 store apply --phase <phase>
 & "$qamRoot\bootstrap\qam.cmd" store verify --app .\smoke-app
 ```
 
-所有阶段检查 cold Diff、Overview 模块和证据目录。最终认证提交由用户在浏览器完成。若当前机器不是 Windows，报告静态检查结果并把动态项标记为待 Windows 验证，不把进程列表当作 UI 证据。
+所有阶段处理后执行现有总检。最终认证提交由用户在浏览器完成。macOS 使用仓库已跑通的现有流程；Windows 仍按本清单执行平台相关包和发布步骤。
