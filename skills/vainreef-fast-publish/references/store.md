@@ -10,14 +10,56 @@
 
 ## 0. 账号、证书与浏览器常识
 
-- **Edge 浏览器驱动机制**：自动化发布采用**宿主机内置 Microsoft Edge 独立实例**（Mac 环境自动兼容 Edge/Chrome），通过 Chrome DevTools Protocol (`connectOverCDP`) 由 Playwright 控制，使用工作区独立 profile 沙箱（`.cache/qam/session`），不读取、不影响用户日常浏览数据；
-- **开发者账号**：微软账号与个人开发者认证免费，无需高昂费用；若用户未注册或未认证，运行 `store launch` 自动拉起 Edge 浏览器，指引用户在网页中完成注册或个人认证；
+- **浏览器驱动机制**：自动化发布采用**宿主机内置独立浏览器实例**（Windows 优先使用 Edge，macOS/Linux 自动兼容 Chrome 与 Edge），通过 Chrome DevTools Protocol (`connectOverCDP`) 由 Playwright 控制，使用工作区独立 profile 沙箱（`.cache/store`），不读取、不影响用户日常浏览数据；
+- **开发者账号**：微软账号与个人开发者认证免费，无需高昂费用；若用户未注册或未认证，运行 `store launch` 自动拉起浏览器，指引用户在网页中完成注册或个人认证；
 - **代码签名**：上架微软商店的 MSIX 包由**微软商店官方在云端自动完成安全签名**（Store Signing），**完全不需要开发者购买或提供第三方代码签名证书**，严禁向用户询问证书问题！
+
+### 0.1. `product/NotFound` 故障根因与诊断恢复 SOP（铁律）
+- **现象**：浏览器跳转到 `https://partner.microsoft.com/zh-cn/dashboard/product/NotFound?locationHref=...`，页面显示“抱歉，我们找不到该页”。
+- **三大本质原因**：
+  1. **未登录或 Token 失效（最普遍）**：`store launch` 启动的是独立全新沙箱环境，没有日常浏览器的 Cookie。微软前端路由对未鉴权会话直接访问具体产品详情页时，为了防止外部恶意探测 Product ID，不会跳转到登录页，而是**直接安全脱敏重定向至 `NotFound` 页面**；
+  2. **租户 / 账号错位（Tenant Mismatch）**：用户在浏览器中登录了个人微软账号（MSA），而该应用是在 Azure AD / Entra ID 组织工作租户下创建的（或反之）；或者登录的账号 A 与拥有该产品的开发者账号 B 不一致；
+  3. **产品名尚未完成最终保留或已被释放**：在保留名称时仅输入了文字但未点击「保留产品名称」，或者保留期满未提交已被云端释放。
+- **排查与恢复 SOP（20 秒恢复）**：
+  1. 提示用户在当前独立浏览器右上角点击 **「登录」**（或直接访问 `https://partner.microsoft.com/zh-cn/dashboard/apps-and-games/overview`）；
+  2. 确认登录的微软账号拥有开发者权限，并在右上角检查租户切换；
+  3. 在「应用和游戏」大厅查看列表中是否有该产品：
+     - 若有：直接在列表中点击进入；
+     - 若无：点击「新产品」$\rightarrow$「MSIX 或 PWA 应用」输入名称重新保留。
+
+### 0.2. CDP 自动化凭据嗅探原理与用户透明度契约（人机沟通铁律）
+- **自动化工作原理**：
+  - `store launch` 启动浏览器时通过 `--remote-debugging-port` 开启了本地安全调试管道（CDP）；
+  - 当用户在网页上点击「保留产品名称」后，Partner Center 自动跳转至产品概览页，URL 地址栏携带分配好的 12 位 ProductId（如 `9N3LCK2GWVL7`），页面标题显示应用中文名称；
+  - 用户回复“我保留好了”后，脚本通过本地调试端口向浏览器读取当前激活 Tab 的 URL 与 Title，并自动跳转至 `/identity` 页面抓取官方 `Package/Identity/Name` 与 `Publisher`，回填进 `Package.appxmanifest` 与 `desired-state.json`。
+- **透明度沟通铁律（防疑虑）**：
+  - 在第 1 步向用户发送登录指引时，**必须提前向用户告知该自动化机制**：
+    > “在保留成功后，工具会自动通过浏览器本地通道读取新生成的 Product ID 与微软官方开发者凭据并回填工程，无需您手动查找和复制任何繁琐的代码！”
+  - 严禁在未做任何机制解释的情况下直接贴出抓取的 ID，防止用户产生“我没告诉你任何信息，你怎么拿到的”黑盒恐慌。
+
+### 0.3. 「产品草稿」与「提交版本草稿」两级生命周期（`Start_Submission` 铁律）
+- **两级生命周期界限**：
+  - **Level 1：产品草稿态 (Product Draft)**：仅在云端占坑保留了名称和 Product ID，页面显示“处于草稿状态”，此时**尚未生成版本提交草稿**，页面上只有基础信息与一个醒目的 **「开始提交」** 按钮（`<he-button data-l10n-key="Start_Submission">`），此时不存在 6 个阶段的填报路由；
+  - **Level 2：提交版本草稿态 (Submission Draft)**：必须显式触发「开始提交」后，云端才会生成 `Submission 1: 正在草拟`，并在页面上渲染出 6 大模块卡片与各自对应的子路由。
+- **发现机制契约**：
+  - `store discover` 必须优先检查当前页面是否包含 `Start_Submission` 按钮；若处于产品概述页且无 submissionId，必须主动点击该按钮完成初始提交创建，等待 6 大模块行加载完毕后再提取真实 `submissionId` 与 routes。
+
+### 0.4. CLI 进程确定性退出与工作区锁防死锁（`process.exit` 铁律）
+- **根因分析**：Playwright 通过 CDP 连接 Chrome/Edge 时，Node.js 底层 libuv 事件循环可能存在未及时清理的网络句柄。如果 CLI 脚本仅设置 `process.exitCode` 而未显式调用 `process.exit()`，会导致进程驻留变成僵尸进程（Zombie CLI）。
+- **死锁后果**：该僵尸进程会持续持有工作区锁（`app-slug.lock`），导致后续任何命令都报 `workspace is busy (pid xxx)`。
+- **规范铁律**：
+  - 业务代码在 `dispatch` 之后必须显式调用 `process.exit(code ?? 0)`；
+  - 遇到 `workspace is busy` 报错时，排查该 PID 是否属于已输出 PASS 的前序任务，确认后安全清理锁文件。
+
+### 0.5. 外置驱动器与跨工程工具链解耦规范 (`QAM_TOOLCHAIN_ROOT` 铁律)
+- 当被操作的 App 位于外部挂载卷（如移动硬盘 `/Volumes/...`）或非 quick-app-maker 目录下时：
+  - `bin/qam.mjs` 会自动将该 App 的父目录解析为 `workspace`，防止抛出 `app is outside WORKSPACE_ROOT`；
+  - 必须同时导出 `QAM_TOOLCHAIN_ROOT` 与 `QAM_ENGINE_ROOT`，确保打包脚本能准确寻址微软原生 `makemsix` 编译器与运行时模板。
 
 ## 1. 微软商店发布五步人机协同标准流程
 
 ```text
-第 1 步：登录与应用名称保留协同 (store launch -> 用户在 Edge 中亲自点击保留 -> store reserve 回填)
+第 1 步：登录与应用名称保留协同 (store launch -> 用户在浏览器中亲自点击保留 -> store reserve 回填)
   ↓
 第 2 步：上架材料全面盘点与来源协同 (向用户列出文案、图片规格，确认由 Agent 生成还是用户提供)
   ↓
@@ -31,14 +73,15 @@
 ## 2. 自动化流水线标准指令（严禁跳步或颠倒时序）
 
 ```powershell
-# 1. 启动独立 Edge 引导用户登录/注册 Partner Center (秒级返回)
+# ==================== Windows (PowerShell) ====================
+# 1. 启动独立浏览器引导用户登录/注册 Partner Center (秒级返回)
 & "$qamRoot\bootstrap\qam.cmd" store launch --app .\app-slug
-# -> 用户在 Edge 中登录并亲自保留名称后，在聊天框回复「我保留好了」
+# -> 用户在浏览器中登录并亲自保留名称后，在聊天框回复「我保留好了」
 
 # 2. 自动化同步应用名称与回填 Identity 信息到 manifest
 & "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称"
 
-# 3. 生产封装 MSIX（必须在 reserve 之后执行）
+# 3. 生产封装 MSIX（必须在 reserve 之后执行，跨平台生成 64KB 对齐包）
 & "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store
 
 # 4. 离线静态预检（校验 MSIX、manifest、素材尺寸与文案）
@@ -57,6 +100,15 @@
 
 # 7. 执行现有总检（确认 6 个模块均为 Complete 绿标）
 & "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug
+
+# ==================== macOS / Linux (终端 Bash / Zsh) ====================
+# node bin/qam.mjs store launch --app /path/to/app-slug
+# node bin/qam.mjs store reserve --app /path/to/app-slug --name "应用名称"
+# node bin/qam.mjs package /path/to/app-slug --profile store
+# node bin/qam.mjs store preflight --app /path/to/app-slug
+# node bin/qam.mjs store discover --app /path/to/app-slug
+# node bin/qam.mjs store apply --app /path/to/app-slug --phase <phase>
+# node bin/qam.mjs store verify --app /path/to/app-slug
 ```
 
 ## 3. 页面自动化操作与收敛判定
@@ -156,4 +208,8 @@
 20. **全交互显式日志记录与禁绝控制台噪音**：所有浏览器交互必须打印清晰的 `[BROWSER_ACTION]` 结构化日志，严禁打印 `BROWSER_CONSOLE` 冗余日志；
 21. **程序包故障行与删除态自愈（Packages Error Recovery）铁律**：在程序包上传页面，若因云端网络瞬态出现 `已暂停 (Paused)`、`错误 (Error)` 或 `This package will be removed (指示删除)` 状态时，必须自动识别并点击 `a[data-l10n-key="app_package_action_delete"]` 清理故障项，或点击 `a[data-l10n-key="app_package_action_revert"]` 恢复正常包状态，点亮保存按钮，严禁在故障项未清除时强行点击 disabled 的保存按钮；
 22. **云端大包解包异步等待与刷新重载铁律**：对于 50MB+ 的安装包，微软 Partner Center 在云端解包验签通常需要 1~2 分钟。若提示“程序包需要长时间进行处理”，必须等待就绪或通过 `page.reload()` 重新同步云端真实就绪状态；
-23. **本地持久化与数据模型全链路一致性铁律**：任何在 Mock、Renderer、Main 与 Store 之间流转的数据，字段名必须 100% 严格一致（如 `state.items`），严禁使用未对齐的字段格式。
+23. **本地持久化与数据模型全链路一致性铁律**：任何在 Mock、Renderer、Main 与 Store 之间流转的数据，字段名必须 100% 严格一致（如 `state.items`），严禁使用未对齐的字段格式；
+24. **表单 SPA 瞬态加载错误自愈（ng-hide 与页面加载重试机制）**：在各 phase 填报中，若保存按钮存在但处于不可见状态（如父容器包含 `ng-hide` 且显示“我们在加载此页面时遇到问题。请刷新页面或在几分钟后重试”），这是 Partner Center 内部微前端服务的瞬态网络异常；严禁盲目判定为“保存按钮丢失”，必须执行 `page.reload({ waitUntil: 'domcontentloaded' })` 重新挂载表单；
+25. **CLI 进程确定性退出与工作区锁清理**：自动化 CLI 在完成所有 Playwright CDP 操作后必须显式调用 `process.exit(code)` 彻底释放 libuv 事件循环中的活跃网络句柄，防止进程驻留持有 `WorkspaceLock` 引发下一次执行的 `workspace is busy` 死锁；
+26. **全套商店提审资产规格清单（非占位图）**：必须使用真机截图（1366x768），全套包含：00_完整文案与亮点.txt、01_1366x768截图.png、02_50x50徽标.png、03_150x150中磁贴.png、04_44x44小图标.png、05_310x150宽磁贴.png、06_权限理由.txt、07_隐私策略.txt、08_300x300磁贴.png、09_71x71小图标.png；
+27. **两级提交草稿生命周期管理**：在 `store discover` 中，新创建的产品仅有“产品草稿态”，必须定位并触发 `<he-button data-l10n-key="Start_Submission">`（开始提交）生成 `Submission 1` 后方可获取 6 大模块的完整填报路由。

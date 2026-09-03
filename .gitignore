@@ -19,5 +19,5 @@ test-results/
 .DS_Store
 developer/
 dev/
-tools/
+/tools/
 store-submission-assets/

@@ -9,19 +9,23 @@ import { runPreflight } from '@quick-app/store-preflight';
 import { BrowserSession, resolveBrowserType, StoreDriver, phaseAdapters, capturePage, waitForPageKind, waitUntil, observeOverview, reserveProduct, verifyAppMount, captureAppScreenshot } from '@quick-app/store-playwright';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
+process.env.QAM_TOOLCHAIN_ROOT ||= ROOT;
+process.env.QAM_ENGINE_ROOT ||= ROOT;
 const TOOLCHAIN = loadToolchain(ROOT);
 const command = process.argv[2] ?? 'help';
 const args = parseArgs(process.argv.slice(3));
-const workspace = ensureWorkspace(args.workspaceRoot ?? process.env.QAM_WORKSPACE_ROOT ?? process.cwd());
+const targetCandidate = args.app ?? args._[0] ?? args._[1];
+const deducedWorkspace = resolveWorkspace(args.workspaceRoot ?? process.env.QAM_WORKSPACE_ROOT, targetCandidate);
+const workspace = ensureWorkspace(deducedWorkspace);
 
 try {
   const code = await dispatch(command, args);
-  process.exitCode = code ?? 0;
+  process.exit(code ?? 0);
 } catch (error) {
   const code = error.code === 'DEADLINE' ? EXIT.DEADLINE : error.code === 'SCHEMA_DRIFT' ? EXIT.SCHEMA_DRIFT : error.code === 'SESSION' || error.code === 'TOOLCHAIN' ? EXIT.SESSION : error.code === 'CONFIG' ? EXIT.CONFIG : error.code === 'DIFF' ? EXIT.DIFF : EXIT.ERROR;
   if (args.json) process.stdout.write(JSON.stringify({ ok: false, code, error: error.message, result: error.result ?? undefined }, null, 2) + '\n');
   else process.stderr.write(`[ERROR ${code}] ${error.message}\n`);
-  process.exitCode = code;
+  process.exit(code);
 }
 
 async function dispatch(name, options) {
@@ -164,9 +168,9 @@ async function storeUnlocked(options) {
   try {
     connected = await session.connect(); const { page } = connected;
     if (sub === 'inspect') { console.log(JSON.stringify(await capturePage(page), null, 2)); await connected.browser.close(); return 0; }
-    if (sub === 'reserve') { const name = options.name ?? desired.productName; if (!name) throw Object.assign(new Error('store reserve requires --name'), { code: 'CONFIG' }); await waitForSignedIn(page); const result = await reserveProduct({ page, appRoot: root, desired, name, logger }); desired.productId = result.productId; checkpoint.productId = result.productId; saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
+    if (sub === 'reserve') { const name = options.name ?? desired.productName; if (!name) throw Object.assign(new Error('store reserve requires --name'), { code: 'CONFIG' }); await waitForSignedIn(page); const result = await reserveProduct({ page, appRoot: root, desired, name, logger }); desired.productId = result.productId; checkpoint.productId = result.productId; saveDesired(root, desired); saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
     await waitForSignedIn(page);
-    if (sub === 'discover') { const result = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = result.submissionId; checkpoint.routes = result.routes; saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
+    if (sub === 'discover') { const result = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = result.submissionId; checkpoint.routes = result.routes; desired.submissionId = result.submissionId; saveDesired(root, desired); saveCheckpoint(workspace, stateDir, checkpoint); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return 0; }
     if (sub === 'verify') { const result = await verifyAll(page, desired, checkpoint, logger); console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return result.ok ? 0 : EXIT.DIFF; }
     if (sub === 'plan' || sub === 'apply') { const phase = normalizePhase(options.phase); const apply = sub === 'apply'; if (apply && phase === 'age-ratings' && options.confirmAgeRatings) { desired.ageRatings.confirmed = true; saveDesired(root, desired); } const validationErrors = validateDesired(desired, { strict: apply, checkAge: phase === 'age-ratings' }); if (validationErrors.length) throw Object.assign(new Error(validationErrors.join('; ')), { code: 'CONFIG' }); if (!checkpoint.submissionId) { if (!apply) throw Object.assign(new Error('store plan requires an existing submission checkpoint; run store discover first'), { code: 'CONFIG' }); const discovery = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = discovery.submissionId; checkpoint.routes = discovery.routes; saveCheckpoint(workspace, stateDir, checkpoint); } const driver = new StoreDriver({ page, desired, checkpoint, logger }); const adapters = phaseAdapters(driver); const runRoot = path.join(workspace, '.cache/qam/runs', logger.runId); const evidence = new EvidenceStore(workspace, runRoot); let result; try { result = await reconcilePhase({ phase, adapter: adapters[phase], desired, checkpoint, evidence, logger, apply, deadline: new Deadline(Number(options.deadline ?? 3_600_000)) }); } finally { if (apply) saveCheckpoint(workspace, stateDir, checkpoint); } console.log(JSON.stringify(result, null, 2)); await connected.browser.close(); return result.exitCode; }
     if (sub === 'run') { const apply = Boolean(options.apply); if (apply && options.confirmAgeRatings) { desired.ageRatings.confirmed = true; saveDesired(root, desired); } const validationErrors = validateDesired(desired, { strict: apply }); if (validationErrors.length) throw Object.assign(new Error(validationErrors.join('; ')), { code: 'CONFIG' }); if (!checkpoint.submissionId) { if (!apply) throw Object.assign(new Error('read-only store run requires an existing submission checkpoint; run store discover first'), { code: 'CONFIG' }); const discovery = await discoverSubmission(page, desired, checkpoint, logger); checkpoint.submissionId = discovery.submissionId; checkpoint.routes = discovery.routes; saveCheckpoint(workspace, stateDir, checkpoint); } let exit = 0; const deadline = new Deadline(Number(options.deadline ?? 3_600_000)); for (const phase of PHASES) { const driver = new StoreDriver({ page, desired, checkpoint, logger }); const adapters = phaseAdapters(driver); try { const result = await reconcilePhase({ phase, adapter: adapters[phase], desired, checkpoint, evidence: new EvidenceStore(workspace, path.join(logger.root, 'evidence')), logger, apply, deadline }); if (result.exitCode !== 0) { exit = result.exitCode; if (!apply) break; } } finally { if (apply) saveCheckpoint(workspace, stateDir, checkpoint); } } await connected.browser.close(); return exit; }
@@ -210,11 +214,16 @@ async function discoverSubmission(page, desired, checkpoint, logger) {
   }
 
   if (!id) {
-    await page.evaluate(() => {
-      const heBtn = document.querySelector('he-button[data-l10n-key="Start_Submission"]') || document.querySelector('he-button');
-      const innerBtn = heBtn?.shadowRoot?.querySelector('button') || heBtn?.querySelector('button') || heBtn;
-      innerBtn?.click();
-    });
+    const startBtn = page.locator('he-button[data-l10n-key="Start_Submission"], he-button:has-text("开始提交"), button:has-text("开始提交"), a:has-text("开始提交")').first();
+    if (await startBtn.count()) {
+      await startBtn.click().catch(() => {});
+    } else {
+      await page.evaluate(() => {
+        const heBtn = document.querySelector('he-button[data-l10n-key="Start_Submission"]') || document.querySelector('he-button');
+        const innerBtn = heBtn?.shadowRoot?.querySelector('button') || heBtn?.querySelector('button') || heBtn;
+        innerBtn?.click();
+      });
+    }
 
     await waitUntil(async () => {
       foundHrefs = await getSubmissionHrefs();
@@ -284,3 +293,20 @@ function assertAppDependencies(root, needsWinApp) { const status = appDependency
 function packageVersionMatches(file, expected) { const value = readJson(file, null); return Boolean(value && value.version === expected); }
 function isWorkspaceNode(root, nodePath) { const expected = process.platform === 'win32' ? path.join(root, 'node', 'node.exe') : path.join(root, 'node', 'bin', 'node'); return path.resolve(nodePath) === path.resolve(expected); }
 function* walk(root) { for (const entry of fs.readdirSync(root, { withFileTypes: true })) { if (['.git', 'node_modules', '.cache'].includes(entry.name)) continue; const file = path.join(root, entry.name); if (entry.isDirectory()) yield* walk(file); else yield file; } }
+function resolveWorkspace(explicitRoot, targetCandidate) {
+  if (explicitRoot) return path.resolve(explicitRoot);
+  if (process.env.QAM_WORKSPACE_ROOT) return path.resolve(process.env.QAM_WORKSPACE_ROOT);
+  if (targetCandidate && typeof targetCandidate === 'string') {
+    const candidate = path.resolve(targetCandidate);
+    if (fs.existsSync(candidate)) {
+      const isDir = fs.statSync(candidate).isDirectory();
+      if (isDir && fs.existsSync(path.join(candidate, 'package.json'))) {
+        const rel = path.relative(process.cwd(), candidate);
+        if (rel.startsWith('..') || path.isAbsolute(rel)) {
+          return path.dirname(candidate);
+        }
+      }
+    }
+  }
+  return process.cwd();
+}

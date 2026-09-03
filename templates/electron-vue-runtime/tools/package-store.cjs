@@ -52,9 +52,17 @@ const manifest = path.join(storeRoot, 'Package.appxmanifest');
   const msixPath = path.join(packageOut, msixName);
 
   const workspaceRoot = process.env.QAM_WORKSPACE_ROOT || path.resolve(root, '..', '..');
-  const makemsixBin = path.join(workspaceRoot, 'tools', 'makemsix', 'makemsix');
+  const engineRoot = process.env.QAM_TOOLCHAIN_ROOT || process.env.QAM_ENGINE_ROOT || '';
+  const makemsixCandidates = [
+    engineRoot ? path.join(engineRoot, 'tools', 'makemsix', 'makemsix') : '',
+    path.join(workspaceRoot, 'tools', 'makemsix', 'makemsix'),
+    path.resolve(root, '..', '..', 'tools', 'makemsix', 'makemsix'),
+    path.resolve(root, '..', 'tools', 'makemsix', 'makemsix')
+  ].filter(Boolean);
 
-  if (fs.existsSync(makemsixBin)) {
+  const makemsixBin = makemsixCandidates.find(p => fs.existsSync(p));
+
+  if (makemsixBin) {
     console.log(`Packing official MSIX via makemsix: ${makemsixBin}...`);
     const res = spawnSync(makemsixBin, ['pack', '-d', layoutRoot, '-p', msixPath], { cwd: root, stdio: 'inherit' });
     if (res.error) throw res.error;

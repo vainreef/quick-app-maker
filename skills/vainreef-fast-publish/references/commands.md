@@ -50,9 +50,11 @@ node bin/qam.mjs self-test
 ## 3. Microsoft Store 自动化发布（五步标准流程）
 
 ```powershell
-# 第 1 步：启动独立 Edge 引导用户登录 Partner Center 并保留名称（秒级返回）
+# 第 1 步：启动独立浏览器引导用户登录 Partner Center 并保留名称（秒级返回）
 & "$qamRoot\bootstrap\qam.cmd" store launch --app .\app-slug
-# -> 用户在 Edge 中登录并亲自点击「保留产品名称」后，在聊天框回复「我保留好了」
+# -> 用户在浏览器中登录并亲自点击「保留产品名称」后，在聊天框回复「我保留好了」
+# -> Agent 立即同步应用名称与回填 Identity 信息到 manifest：
+& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称"
 
 # 第 2 步：盘点全部素材规格，与用户确认素材来源方案（全自动生成 / 用户提供）
 
@@ -62,10 +64,9 @@ node bin/qam.mjs self-test
 # -> 用户核对无误后，在聊天框回复「确认素材」或「继续」
 
 # 第 4 步：自动化接力与按需精准生效
-& "$qamRoot\bootstrap\qam.cmd" store reserve --app .\app-slug --name "应用名称"   # 同步 Identity
-& "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store                  # 生产封装 MSIX
+& "$qamRoot\bootstrap\qam.cmd" package .\app-slug --profile store                  # 生产封装 MSIX（64KB 块对齐）
 & "$qamRoot\bootstrap\qam.cmd" store preflight --app .\app-slug                    # 离线静态预检
-& "$qamRoot\bootstrap\qam.cmd" store discover --app .\app-slug                     # 发现提交草稿
+& "$qamRoot\bootstrap\qam.cmd" store discover --app .\app-slug                     # 发现/生成提交草稿
 
 # 单阶段精准直接填报（按需对未完成阶段执行直接填报）：
 & "$qamRoot\bootstrap\qam.cmd" store apply --app .\app-slug --phase availability
@@ -77,6 +78,17 @@ node bin/qam.mjs self-test
 
 # 执行现有总体验证（确认 6 个模块均为 Complete 绿标）：
 & "$qamRoot\bootstrap\qam.cmd" store verify --app .\app-slug
+
+# macOS / Linux 对应指令：
+# node bin/qam.mjs store launch --app /path/to/app-slug
+# node bin/qam.mjs store reserve --app /path/to/app-slug --name "应用名称"
+# node bin/qam.mjs screenshot /path/to/app-slug --width 1366 --height 768 --output /path/to/app-slug/store-submission-assets/01_应用主界面高清截图_1366x768.png
+# node bin/qam.mjs reveal /path/to/app-slug/store-submission-assets
+# node bin/qam.mjs package /path/to/app-slug --profile store
+# node bin/qam.mjs store preflight --app /path/to/app-slug
+# node bin/qam.mjs store discover --app /path/to/app-slug
+# node bin/qam.mjs store apply --app /path/to/app-slug --phase <phase>
+# node bin/qam.mjs store verify --app /path/to/app-slug
 
 # 第 5 步：提示用户在浏览器中做最后人工核对并点击「提交进行认证」
 ```

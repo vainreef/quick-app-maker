@@ -174,10 +174,22 @@ async function check(page, selectors, want, label) {
   if (checked !== want) await item.click();
 }
 async function save(page) {
-  const button = page.locator('#saveButtonPricing, #saveButton, button[name="save_button"], button[data-l10n-key="optionsSave"], input[type="submit"][value*="Save" i], input[type="button"][value*="Save" i], input[type="submit"][value*="保存" i], input[type="button"][value*="保存" i]')
+  let button = page.locator('#saveButtonPricing, #saveButton, button[name="save_button"], button[data-l10n-key="optionsSave"], input[type="submit"][value*="Save" i], input[type="button"][value*="Save" i], input[type="submit"][value*="保存" i], input[type="button"][value*="保存" i]')
     .or(page.locator('button, [role="button"], a.btn, input[type="submit"], input[type="button"]').filter({ hasText: /^保存$|^Save$|^保存草稿$/i }))
     .filter({ visible: true })
     .first();
+  if (!(await button.count())) {
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    if (/我们在加载此页面时遇到问题|请刷新页面或在几分钟后重试/i.test(bodyText)) {
+      console.log('[BROWSER_ACTION] ⚠️ Detected transient page loading error, attempting reload...');
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(4000);
+      button = page.locator('#saveButtonPricing, #saveButton, button[name="save_button"], button[data-l10n-key="optionsSave"], input[type="submit"][value*="Save" i], input[type="button"][value*="Save" i], input[type="submit"][value*="保存" i], input[type="button"][value*="保存" i]')
+        .or(page.locator('button, [role="button"], a.btn, input[type="submit"], input[type="button"]').filter({ hasText: /^保存$|^Save$|^保存草稿$/i }))
+        .filter({ visible: true })
+        .first();
+    }
+  }
   if (!(await button.count())) {
     throw new Error('Save button not found on page');
   }
