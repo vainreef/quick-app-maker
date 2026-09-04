@@ -230,15 +230,32 @@ export class BrowserSession {
   attachDiagnostics(page) {
     if (!page || this.diagnosticPage === page) return;
     this.diagnosticPage = page;
-    page.on('pageerror', error =>
-      this.logger?.event('BROWSER_PAGE_ERROR', { message: redact(error.message), stack: redact(error.stack || '') })
-    );
-    page.on('requestfailed', request =>
+    const isTelemetryUrl = (url = '') => {
+      const u = url.toLowerCase();
+      return u.includes('applicationinsights') ||
+        u.includes('vortex.data.microsoft.com') ||
+        u.includes('dc.services.visualstudio.com') ||
+        u.includes('pipe.aria.microsoft.com') ||
+        u.includes('clarity.ms') ||
+        u.includes('activity.windows.com') ||
+        u.includes('telemetry');
+    };
+    const isTelemetryError = (msg = '') => {
+      const m = msg.toLowerCase();
+      return m.includes('instrumentation key') || m === 'failed to fetch';
+    };
+
+    page.on('pageerror', error => {
+      if (isTelemetryError(error?.message || '')) return;
+      this.logger?.event('BROWSER_PAGE_ERROR', { message: redact(error.message), stack: redact(error.stack || '') });
+    });
+    page.on('requestfailed', request => {
+      if (isTelemetryUrl(request.url())) return;
       this.logger?.event('BROWSER_REQUEST_FAILED', {
         url: redact(request.url()),
         error: redact(request.failure()?.errorText || '')
-      })
-    );
+      });
+    });
   }
 
   async close() {

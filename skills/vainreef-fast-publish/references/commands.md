@@ -59,7 +59,10 @@ node bin/qam.mjs self-test
 # 第 2 步：盘点全部素材规格，与用户确认素材来源方案（全自动生成 / 用户提供）
 
 # 第 3 步：真机渲染高清截图与图标，整理至 store-submission-assets，置顶呼出供用户检视确认
+# 首页/默认视图截图：
 & "$qamRoot\bootstrap\qam.cmd" screenshot .\app-slug --width 1366 --height 768 --output .\app-slug\store-submission-assets\01_应用主界面高清截图_1366x768.png
+# 子页面/特定视图截图（支持 --eval 动态执行 JS 或 --click 触发按钮点击，无侵入捕获）：
+& "$qamRoot\bootstrap\qam.cmd" screenshot .\app-slug --output .\app-slug\store-submission-assets\02_目录页截图_1366x768.png --eval "window.__qam_set_view?.('directory')"
 & "$qamRoot\bootstrap\qam.cmd" reveal .\app-slug\store-submission-assets
 # -> 用户核对无误后，在聊天框回复「确认素材」或「继续」
 

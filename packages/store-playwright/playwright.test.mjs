@@ -68,3 +68,17 @@ test('captureAppScreenshot captures a valid PNG screenshot of template without O
   assert.ok(result.sizeBytes > 1000);
   assert.ok(fs.existsSync(outPath));
 });
+
+test('captureAppScreenshot supports eval to manipulate DOM before capture', async () => {
+  const templateRoot = path.resolve(process.cwd(), 'templates', 'electron-vue-runtime');
+  const outPath = path.resolve(process.cwd(), '.cache', 'test-eval-screenshot.png');
+  const result = await captureAppScreenshot(templateRoot, {
+    width: 800,
+    height: 600,
+    outputPath: outPath,
+    eval: "document.body.style.backgroundColor = 'purple'"
+  });
+  assert.equal(result.ok, true);
+  assert.ok(fs.existsSync(outPath));
+});
+

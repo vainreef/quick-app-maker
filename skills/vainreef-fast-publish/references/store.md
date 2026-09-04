@@ -219,4 +219,10 @@
     - `03_MSIX程序包全套图标集合`（50x50、150x150、44x44、310x150、300x300、71x71 等）；
     - `04_runFullTrust权限理由与离线声明.txt`；
     - `05_隐私策略声明说明.txt`；
-27. **两级提交草稿生命周期管理**：在 `store discover` 中，新创建的产品仅有“产品草稿态”，必须定位并触发 `<he-button data-l10n-key="Start_Submission">`（开始提交）生成 `Submission 1` 后方可获取 6 大模块的完整填报路由。
+27. **两级提交草稿生命周期管理**：在 `store discover` 中，新创建的产品仅有“产品草稿态”，必须定位并触发 `<he-button data-l10n-key="Start_Submission">`（开始提交）生成 `Submission 1` 后方可获取 6 大模块的完整填报路由；
+28. **收敛比对与价格阶层 Fail-Fast 铁律**：定价与可用性阶段必须严格匹配选中价格阶层（如 `0 免费`），价格下拉框为空时绝对严禁判定为匹配收敛；未选中有效阶层时底层自动化强制抛错阻断，保存后必须做表单字段二次回读确认，杜绝未选价格报告 Complete 的假阳性事故；
+29. **视觉自查第一铁律与无侵入多视图截图**：初版开发完成后必须通过 `qam screenshot` 进行核心交互按钮是否可见、深浅背景文字对比度是否清晰、界面是否无残留技术调试字样的视觉自查；非首屏截图统一使用 `qam screenshot .\app-slug --eval "..."` 或 `--click "..."`，绝对严禁为截图而临时篡改业务源码；
+30. **文案单一真理源自动同步机制**：`store-submission-assets/00_*.txt` 由底层 `loadDesired` 自动嗅探解析并回填至 `desired-state.json`，确保自动填报所使用的就是用户确认的正式文案，严禁上传脚手架占位文案；
+31. **告警零容忍阻断铁律**：日志中凡出现 `failed`、`not found`、`has-error`、`REQUEST_FAILED`，即使退出码为 0，也一律视为存在潜在风险，必须主动就地核实与排查；
+32. **阶段切换工作区锁协同**：进入 `store launch` / `store apply` 发布流程前，必须先停止后台正在运行的 `qam dev` 任务，释放工作区互斥锁（`WorkspaceLock`），避免触发 `workspace is busy`。
+

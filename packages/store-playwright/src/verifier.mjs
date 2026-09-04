@@ -214,6 +214,25 @@ export async function captureAppScreenshot(appRoot, options = {}) {
     await page.waitForSelector('#app:not([v-cloak])', { timeout: 10_000 });
     await page.waitForTimeout(options.delay || 600);
 
+    // Optional view switching or JS evaluation before screenshot
+    if (options.view) {
+      await page.evaluate((targetView) => {
+        if (typeof window.__qam_set_view === 'function') window.__qam_set_view(targetView);
+        window.dispatchEvent(new CustomEvent('qam:view', { detail: targetView }));
+      }, options.view);
+      await page.waitForTimeout(options.delay || 600);
+    }
+    if (options.click) {
+      await page.click(options.click);
+      await page.waitForTimeout(options.delay || 600);
+    }
+    if (options.eval) {
+      await page.evaluate((code) => {
+        return (0, eval)(code);
+      }, options.eval);
+      await page.waitForTimeout(options.delay || 600);
+    }
+
     const errBoxText = await page.evaluate(() => {
       const errBox = document.querySelector('#qam-render-error');
       return errBox ? errBox.innerText.trim() : '';

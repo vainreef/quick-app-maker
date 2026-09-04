@@ -120,11 +120,23 @@ if (-not (Test-Path -LiteralPath (Join-Path $Destination '.git'))) {
         if ($items.Count -gt 0) { throw "Destination exists and is not empty: $Destination" }
     }
     Write-Step "Cloning quick-app-maker into $Destination"
-    & $gitPath clone --branch $Branch 'https://gitee.com/freevian/quick-app-maker.git' $Destination
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $gitPath clone --branch $Branch 'https://gitee.com/freevian/quick-app-maker.git' $Destination 2>&1 | ForEach-Object { Write-Host $_ }
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
     if ($LASTEXITCODE -ne 0) { throw "Git clone failed with exit code $LASTEXITCODE" }
 } elseif ($Destination -ne $workspaceRoot) {
     Write-Step "Updating quick-app-maker from Gitee"
-    & $gitPath -C $Destination pull --ff-only origin $Branch
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $gitPath -C $Destination pull --ff-only origin $Branch 2>&1 | ForEach-Object { Write-Host $_ }
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
     if ($LASTEXITCODE -ne 0) { throw "Git pull failed with exit code $LASTEXITCODE" }
 }
 

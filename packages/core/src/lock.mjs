@@ -28,7 +28,7 @@ export class WorkspaceLock {
       } catch (error) {
         if (error.code !== 'EEXIST' || !this.removeStale()) {
           const owner = readOwner(this.file);
-          const detail = owner ? ` (pid ${owner.pid}, started ${owner.startedAt})` : '';
+          const detail = owner ? ` (pid ${owner.pid}, started ${owner.startedAt}). Hint: If 'qam dev' or another command is running in the background, stop it first.` : '';
           const lockError = new Error(`workspace is busy: ${this.name}${detail}`);
           lockError.code = 'LOCK';
           lockError.lockPath = this.file;

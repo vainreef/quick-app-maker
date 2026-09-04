@@ -426,7 +426,7 @@ function diffValues(phase, desired, observed) {
     if (desired.pricing.priceTier !== undefined) {
       const matchTier = (obs, des) => {
         if (String(obs) === String(des)) return true;
-        if (String(des) === '0' && (/^0$|^免费$|^Free$/i.test(String(obs)) || obs === '')) return true;
+        if (String(des) === '0' && /^0$|^免费$|^Free$/i.test(String(obs))) return true;
         return false;
       };
       if (!matchTier(observed.priceTier, desired.pricing.priceTier)) {
@@ -596,11 +596,24 @@ async function applyAvailability(page, desired) {
   }, wantTier);
 
   console.log(`[BROWSER_ACTION] Price tier selection result: ${selectedTier}`);
+  if (!selectedTier || selectedTier === 'option not found' || selectedTier === 'he-select not found') {
+    throw Object.assign(new Error(`Failed to select Price Tier "${wantTier}": ${selectedTier}. Partner Center options did not load or were not selectable.`), { code: 'PRICE_TIER_FAILED' });
+  }
   await page.waitForTimeout(1500);
 
-  // 4. Save
+  // 4. Save & Verify Field
   await page.waitForTimeout(1000);
   await save(page);
+  await page.waitForTimeout(1500);
+
+  // 5. Cold Read-back Verification on availability form if still on page
+  const recheck = await observeAvailability(page).catch(() => null);
+  if (recheck && recheck.priceTier === '') {
+    const isOverview = await page.locator('he-button[data-l10n-key="Start_Submission"], .submission-overview-container').count().catch(() => 0);
+    if (!isOverview) {
+      throw Object.assign(new Error('Availability form saved but Price Tier remains empty in DOM!'), { code: 'PRICE_TIER_EMPTY' });
+    }
+  }
 }
 async function applyProperties(page, desired, diff = []) {
   console.log('[BROWSER_ACTION] ⚙️ Applying Properties form with dynamic configuration...');
@@ -1072,7 +1085,9 @@ async function applyListing(page, desired) {
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
         }).catch(() => {});
-        await page.waitForTimeout(3000);
+        console.log('[BROWSER_ACTION] ⏳ Waiting for desktop screenshot thumbnail to mount in DOM...');
+        await page.locator('#panel-2 img[src], #panel-2 app-image-display img[src], #panel-2 .screenshot-swap-container').first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+        await page.waitForTimeout(1000);
       }
     }
   }

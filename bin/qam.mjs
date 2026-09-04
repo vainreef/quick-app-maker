@@ -45,7 +45,7 @@ async function dispatch(name, options) {
 }
 
 function help() {
-  console.log(`Quick App Maker V2\n\nCommands:\n  doctor\n  bootstrap\n  self-test\n  create --name NAME --slug SLUG\n  dev APP\n  test APP\n  screenshot APP [--output PATH] [--width 1366] [--height 768]\n  package APP --profile store\n  store launch|reserve|preflight|discover|inspect|plan|apply|run|verify|status|stop --app APP [--browser chrome|edge|safari]\n  reveal PATH (opens in Finder / Explorer)\n  check\n`);
+  console.log(`Quick App Maker V2\n\nCommands:\n  doctor\n  bootstrap\n  self-test\n  create --name NAME --slug SLUG\n  dev APP\n  test APP\n  screenshot APP [--output PATH] [--width 1366] [--height 768] [--view VIEW] [--eval CODE] [--click SELECTOR]\n  package APP --profile store\n  store launch|reserve|preflight|discover|inspect|plan|apply|run|verify|status|stop --app APP [--browser chrome|edge|safari]\n  reveal PATH (opens in Finder / Explorer)\n  check\n`);
   return 0;
 }
 
@@ -56,9 +56,14 @@ async function screenshot(options) {
   const width = Number(options.width ?? 1366);
   const height = Number(options.height ?? 768);
   const defaultOut = path.join(root, 'store-submission-assets', `01_应用主界面高清截图_${width}x${height}.png`);
-  const outputPath = path.resolve(root, options.output ?? options.o ?? defaultOut);
+  const userOut = options.output ?? options.o;
+  const outputPath = userOut ? path.resolve(process.cwd(), userOut) : defaultOut;
+  const evalCode = options.eval ?? null;
+  const view = options.view ?? null;
+  const click = options.click ?? null;
+  const delay = Number(options.delay ?? 600);
   console.log(`[QAM_SCREENSHOT] Capturing headless screenshot of ${path.basename(root)} (${width}x${height})...`);
-  const result = await captureAppScreenshot(root, { width, height, outputPath });
+  const result = await captureAppScreenshot(root, { width, height, outputPath, eval: evalCode, view, click, delay });
   console.log(`[QAM_SCREENSHOT] Screenshot saved: ${result.outputPath} (${result.sizeBytes} bytes)`);
   return 0;
 }
