@@ -1,3 +1,7 @@
+<p align="right">
+  <b>简体中文</b> | <a href="README_en.md">English</a>
+</p>
+
 # Quick App Maker V2
 
 用自然语言对话做出可试用的 Windows Electron 桌面应用，生成 MSIX 并自动化完成 Microsoft Store 提交资料。
@@ -120,11 +124,14 @@ Project/
 3. **视觉样式**（`src/renderer/styles.css`）：编写深色主题、排版与动效；
 4. **数据契约**（`src/main/main.cjs`）：若需要特定的持久化数据结构，按需扩展主进程的 IPC 校验。
 
-### 2.3 运行自动化测试与冒烟验收
+### 2.3 运行自动化测试与视觉自检
 
 ```powershell
-# 运行单元与冒烟自动化测试（秒级退出，提供确凿质量证据）
+# 1. 运行单元与冒烟自动化测试（秒级退出，提供确凿质量证据）
 .\quick-app-maker\bootstrap\qam.cmd test .\countdown-app
+
+# 2. 捕获真实真机无头截图进行视觉自查（自检按钮可见性、深浅色彩对比度、无残留技术调试字样）
+.\quick-app-maker\bootstrap\qam.cmd screenshot .\countdown-app --width 1366 --height 768
 ```
 
 ---
@@ -217,6 +224,10 @@ Project/
 | **误区 4：使用 localStorage 替代 Electron IPC** | 无法做到桌面应用可靠文件持久化，破坏安全沙箱数据契约 | 必须使用 `window.qam.saveState` 与 `window.qam.loadState` 并在主进程校验 |
 | **误区 5：移除 CSP 中的 unsafe-eval 声明** | Vue 3 在浏览器端无法动态编译 HTML 模板，导致 `v-cloak` 锁死全黑屏 | `index.html` 的 CSP 必须保留 `script-src 'self' 'unsafe-eval'` |
 | **误区 6：向用户暴露代码与技术黑话** | 逼迫非技术用户理解底层实现，交付体验极差 | 严禁提 slug/IPC/Vue/函数名等；后台直接打开应用窗口供体验 |
+| **误区 7：缺少真机截图视觉自查** | 按钮藏在隐藏容器、深色背景叠深色字、残留“已读取”字样 | 必须执行 `qam screenshot` 进行核心按钮、深浅对比度、无残留技术文字视觉自检 |
+| **误区 8：忽视告警与假阳性日志** | 价格阶层下拉框未填却因假阳性报告 Complete，导致微软审核被驳回 | 告警零容忍阻断铁律：日志中出现 `failed`、`not found` 必须就地核实与二次回读 |
+| **误区 9：为截图子页面临时篡改源码** | 中途中断会导致源码被污染或损坏 | 统一使用 `qam screenshot --eval` 或 `--click` 进行无侵入式多视图截屏 |
+| **误区 10：切换到发布时未关停 dev 进程** | 占用工作区写入锁导致 `workspace is busy` | 启动 `store launch` 前必须先停止后台长驻的 `dev` 任务释放锁 |
 
 ---
 
