@@ -106,3 +106,27 @@ node bin/qam.mjs self-test
 & "$qamRoot\bootstrap\qam.cmd" store status --app .\app-slug                      # 查看当前检查点与会话状态
 & "$qamRoot\bootstrap\qam.cmd" store stop --app .\app-slug                        # 停止当前 Edge 会话
 ```
+
+---
+
+## 5. Windows 终端与 PowerShell 5.1 执行防御指南
+
+在 Windows 终端（尤其是系统默认的 Windows PowerShell 5.1）与批处理包装层交互时，遵守以下客观工程规范：
+
+1. **Windows PowerShell 5.1 语句连接**：
+   - Windows PowerShell 5.1 不支持 `&&` / `||` 管道链操作符（该语法仅在 PowerShell 7+ 可用）；在 PS 5.1 环境下多条命令串行必须使用分号 `;` 分隔：
+     ```powershell
+     & "$qamRoot\bootstrap\qam.cmd" doctor ; & "$qamRoot\bootstrap\qam.cmd" bootstrap
+     ```
+
+2. **跨 Shell 嵌套与变量展开上下文**：
+   - 从外层 Unix/bash Shell 向 PowerShell 传递命令时，若 PowerShell 源码中的 `$var` 或 `$_` 处于外层 Shell 会进行变量展开的上下文（如未加单引号或双引号字符串内），可能会被外层 Shell 提前展开置空；
+   - 跨 Shell 传递时，必须使用单引号字面量保护，或对 `$` 进行正确转义（如 `\$var`），复杂逻辑优先通过脚本文件执行。
+
+3. **PowerShell 5.1 源代码字符编码**：
+   - Windows PowerShell 5.1 在读取无 BOM 脚本文件时，默认使用系统当前 ANSI 代码页（例如简体中文 Windows 系统常见为 CP936）；
+   - 若生成的 `.ps1` 包含非 ASCII 字符，必须显式保存为 **UTF-8 with BOM** 编码，防止被错误解码为乱码；或在 PowerShell 7 环境下执行。
+
+4. **多层参数转发与已知入口**：
+   - 经由 PowerShell → `.cmd` → Node 多层调用时，参数中的引号与特殊符号展开规则极易受到破坏；
+   - 复杂交互应优先使用 CLI **已明确支持的**结构化参数（如 `--click`）、stdin 或脚本文件入口；若工具未提供此类入口，必须严格验证多层 Quoting 转义，严禁根据未验证的推论随意发明工具能力。
