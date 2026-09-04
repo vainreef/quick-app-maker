@@ -1,5 +1,5 @@
 export const SUPPORTED_BROWSERS = ['chrome', 'edge', 'safari'];
-export const DEFAULT_BROWSER = 'chrome';
+export const DEFAULT_BROWSER = process.platform === 'win32' ? 'edge' : 'chrome';
 
 export const BROWSER_ALIASES = new Map([
   ['chrome', 'chrome'],
@@ -13,8 +13,8 @@ export const BROWSER_ALIASES = new Map([
   ['webkit', 'safari']
 ]);
 
-export function normalizeBrowserType(value) {
-  if (!value) return DEFAULT_BROWSER;
+export function normalizeBrowserType(value, platform = process.platform) {
+  if (!value) return platform === 'win32' ? 'edge' : 'chrome';
   const clean = String(value).trim().toLowerCase();
   const normalized = BROWSER_ALIASES.get(clean);
   if (!normalized) {
@@ -23,10 +23,10 @@ export function normalizeBrowserType(value) {
   return normalized;
 }
 
-export function resolveBrowserType({ option, env = process.env, config = null } = {}) {
-  if (option) return normalizeBrowserType(option);
-  if (env.QAM_BROWSER) return normalizeBrowserType(env.QAM_BROWSER);
-  if (config?.browser) return normalizeBrowserType(config.browser);
-  if (config?.site?.browser) return normalizeBrowserType(config.site.browser);
-  return DEFAULT_BROWSER;
+export function resolveBrowserType({ option, env = process.env, config = null, platform = process.platform } = {}) {
+  if (option) return normalizeBrowserType(option, platform);
+  if (env.QAM_BROWSER) return normalizeBrowserType(env.QAM_BROWSER, platform);
+  if (config?.browser) return normalizeBrowserType(config.browser, platform);
+  if (config?.site?.browser) return normalizeBrowserType(config.site.browser, platform);
+  return platform === 'win32' ? 'edge' : 'chrome';
 }

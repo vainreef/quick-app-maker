@@ -14,8 +14,11 @@ test('phase names normalize once', () => { assert.equal(normalizePhase('ageRatin
 test('phase adapter registry exposes one uniform interface', () => { const driver = {}; const adapters = phaseAdapters(driver); for (const phase of PHASES) assert.ok(adapters[phase].acceptedPageKinds.length); });
 test('non-retryable polling errors fail immediately', async () => { const started = Date.now(); await assert.rejects(waitUntil(async () => { throw Object.assign(new Error('fatal fixture error'), { retryable: false }); }, { timeoutMs: 5_000, intervalMs: 1_000 }), /fatal fixture error/); assert.ok(Date.now() - started < 1_000); });
 
-test('browser type resolver defaults to chrome and handles configuration', () => {
-  assert.equal(resolveBrowserType(), 'chrome');
+test('browser type resolver defaults to edge on Windows and chrome elsewhere', () => {
+  assert.equal(resolveBrowserType(), process.platform === 'win32' ? 'edge' : 'chrome');
+  assert.equal(resolveBrowserType({ platform: 'win32' }), 'edge');
+  assert.equal(resolveBrowserType({ platform: 'darwin' }), 'chrome');
+  assert.equal(resolveBrowserType({ platform: 'linux' }), 'chrome');
   assert.equal(resolveBrowserType({ option: 'edge' }), 'edge');
   assert.equal(resolveBrowserType({ option: 'google-chrome' }), 'chrome');
   assert.equal(resolveBrowserType({ option: 'safari' }), 'safari');

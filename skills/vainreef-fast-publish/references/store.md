@@ -126,7 +126,8 @@
 ### 阶段 1：定价和可用性 (availability)
 1. **全量字段映射**：
    - 市场选择：`input[name="marketSelection"][value="true"]` $\rightarrow$ 全球所有市场（默认）；
-   - 定价层级：`price-tier-selection[pricetierkey="Retail"] he-select input` $\rightarrow$ **必须直接定位内部 input 键入 `'0'` 并回车（`press('Enter')`）或点击文本为 `'0'` 的 `<he-option>`**，彻底消除“应为价格计划设置有效的价格”红字校验拦截，点亮保存按钮；
+   - 基准币种（Base Currency）：`.price-config > he-select` $\rightarrow$ **必须优先在内部 input 填入目标币种（如 `CNY` 或 `USD`）并回车**；若未选择币种，右侧价格层级控件会被系统级联锁定为 `disabled=""` 并抛出“没有为可购买的产品创建 PriceSchedule”；
+   - 定价层级：等待 `price-tier-selection` 解除 `disabled` 后，定位 `price-tier-selection[pricetierkey="Retail"] he-select input` $\rightarrow$ **直接定位内部 input 键入 `'0'` 并回车（`press('Enter')`）或点击文本为 `'0'` 的 `<he-option>`**，彻底消除“必须为此产品配置价格”红字校验拦截，点亮保存按钮；
    - 免费试用：`select[aria-label="TrialType"]` $\rightarrow$ `string:NoTrial`；
    - 受众与可见性：`#radioDistribution_PublicAudience` 与 `#radioVisibility_Public`；
    - 组织批量分发许可：`#enterpriseonline_checkbox`（默认勾选）；
@@ -158,27 +159,27 @@
 
 ### 阶段 5：商店详情文案与资产 (listing)
 1. **语言选择与表单直达**：进入中文（zh-cn）表单，若在表格页则精准匹配表格行链接点击进入；
-2. **核心文案定位**：
-   - 详细描述：`#description-required`（派发 `input` 与 `change` 事件）；
-   - 简短摘要：`#shortDescription`（展开补充字段）；
-   - 功能特性：`#feature-${i}`（依次填充 3-5 项功能亮点）；
-   - 搜索词：`#search-terms he-select input`，填入关键词并回车；
-3. **图像资产精准映射上传**：
-   - 桌面截图：定位 `#panel-2 input[type="file"]`，上传 1366x768 高清截图；
-   - 9:16 招贴画：定位 `.logo-upload-section:has-text("9:16 招贴画") input[type="file"]`，上传 720x1080 图像；
-   - 1:1 酷图：定位 `.logo-upload-section:has-text("1:1 酷图") input[type="file"]`，上传 1080x1080 图像；
-   - 300x300 应用磁贴：定位 `.logo-upload-section:has-text("300 x 300") input[type="file"]`，上传 300x300 图像；
-   - 150x150 图标：定位 `.logo-upload-section:has-text("150 x 150") input[type="file"]`，上传 150x150 图像；
-   - 71x71 图标：定位 `.logo-upload-section:has-text("71 x 71") input[type="file"]`，上传 71x71 图像；
-4. **保存按钮**：点击保存并确保“需要至少一张屏幕截图”等红字校验消除。
+2. **六大精简核心字段填报**：
+   - **说明**：`#description-required` $\rightarrow$ 详细介绍正文（写个几百字），自动派发 `input` 与 `change` 事件；
+   - **简短描述**：`#shortDescription` $\rightarrow$ 200 字以内的精炼核心卖点；
+   - **产品功能**：依次填满页面预置的前 3 个功能条目（`#feature-0`、`#feature-1`、`#feature-2`）；
+   - **关键字**：`#search-terms he-select input` $\rightarrow$ 选上 3~5 个搜索关键词，逐个回车添加；
+   - **桌面截图**：定位 `#panel-2 input[type="file"]`，上传 1~4 张软件操作界面截图（1366x768 或更高），消除“需要至少一张屏幕截图”红色警告横幅；
+   - **1:1 酷图**：定位 `.logo-upload-section:has-text("1:1 酷图") input[type="file"]`，上传 1080x1080 高清图标，作为 Store 布局的核心主徽标；
+3. **附加美工与促销画（Additional Artwork / Xbox / 预告片）说明**：
+   - `#AdditionalArtwork-...` 和 `#promoImagesContainer` 属于预告片视频与 Xbox 主机游戏选填推广区，桌面纯单机应用全部留空，不产生任何拦截；
+4. **保存按钮**：定位 `button[name="save_button"]`，点击保存完成该阶段。
 
 ### 阶段 6：提交选项 (options)
-1. **发布模式**：选择 `Asap`（认证通过后立即发布）或 `Manual`；
+1. **发布暂缓选项（发布模式）**：
+   - 定位 `input#radioReleaseDate_asap`（认证通过后立即发布，默认）或 `input#radioReleaseDate_manual`（手动发布），派发事件选中；
 2. **受限功能声明（runFullTrust 铁律）**：
    - 必须对 `<textarea class="text-area-width">` 执行**显式等待（`waitFor({ state: 'visible' })`）**，防止 Angular 异步渲染导致漏填；
-   - 自动填入合规声明：“本产品为基于 Windows 本地独立运行的桌面应用程序。需要使用 runFullTrust 权限以读写本地用户数据存储文件，实现数据本地持久化保存，不依赖也不连接任何外部云端网络服务。”；
+   - 自动填入合规声明：“本产品（{AppName}）为基于 Windows 本地独立运行的桌面应用程序。需要使用 runFullTrust 权限以读写本地用户数据存储文件，实现数据本地安全持久化保存，不依赖也不连接任何外部云端网络服务。”；
    - 派发 `input` 与 `change` 事件消除 `has-error` 拦截；
-3. **保存与静态提示横幅甄别**：排除微软常驻黄色说明横幅（`我们在你的 Package.appxmanifest 文件中检测到...`），防止误判为报错。
+3. **认证说明与提交通知**：
+   - 如有需要可填写测试说明；通知受众按默认设置；
+4. **保存草稿**：排除微软常驻黄色说明横幅（`我们在你的 Package.appxmanifest 文件中检测到...`），定位 `button[data-l10n-key="optionsSave"]` 或 `button.btn-primary` 保存。
 
 
 ## 已验证场景的故障恢复经验
@@ -211,5 +212,11 @@
 23. **本地持久化与数据模型全链路一致性铁律**：任何在 Mock、Renderer、Main 与 Store 之间流转的数据，字段名必须 100% 严格一致（如 `state.items`），严禁使用未对齐的字段格式；
 24. **表单 SPA 瞬态加载错误自愈（ng-hide 与页面加载重试机制）**：在各 phase 填报中，若保存按钮存在但处于不可见状态（如父容器包含 `ng-hide` 且显示“我们在加载此页面时遇到问题。请刷新页面或在几分钟后重试”），这是 Partner Center 内部微前端服务的瞬态网络异常；严禁盲目判定为“保存按钮丢失”，必须执行 `page.reload({ waitUntil: 'domcontentloaded' })` 重新挂载表单；
 25. **CLI 进程确定性退出与工作区锁清理**：自动化 CLI 在完成所有 Playwright CDP 操作后必须显式调用 `process.exit(code)` 彻底释放 libuv 事件循环中的活跃网络句柄，防止进程驻留持有 `WorkspaceLock` 引发下一次执行的 `workspace is busy` 死锁；
-26. **全套商店提审资产规格清单（非占位图）**：必须使用真机截图（1366x768），全套包含：00_完整文案与亮点.txt、01_1366x768截图.png、02_50x50徽标.png、03_150x150中磁贴.png、04_44x44小图标.png、05_310x150宽磁贴.png、06_权限理由.txt、07_隐私策略.txt、08_300x300磁贴.png、09_71x71小图标.png；
+26. **全套商店提审资产规格清单（非占位图）**：必须使用真机高清截图与图标，全套包含：
+    - `00_完整文案与亮点特性说明.txt`（包含几百字详细说明、200字精炼卖点、3条产品功能、3~5个搜索词）；
+    - `01_应用主界面高清截图_1366x768.png`（传 1~4 张软件操作界面截图）；
+    - `02_1比1酷图主徽标_1080x1080.png`（软件图标放大成 1080x1080 作为 Store 主徽标）；
+    - `03_MSIX程序包全套图标集合`（50x50、150x150、44x44、310x150、300x300、71x71 等）；
+    - `04_runFullTrust权限理由与离线声明.txt`；
+    - `05_隐私策略声明说明.txt`；
 27. **两级提交草稿生命周期管理**：在 `store discover` 中，新创建的产品仅有“产品草稿态”，必须定位并触发 `<he-button data-l10n-key="Start_Submission">`（开始提交）生成 `Submission 1` 后方可获取 6 大模块的完整填报路由。

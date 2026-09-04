@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 import { execFileSync } from 'node:child_process';
-import { normalizeBrowserType } from './browser-types.mjs';
+import { normalizeBrowserType, DEFAULT_BROWSER } from './browser-types.mjs';
 
 export async function freePort() {
   return await new Promise((resolve, reject) => {
@@ -15,7 +15,7 @@ export async function freePort() {
   });
 }
 
-export function resolveBrowserPath(browserType = 'chrome', customPath = null) {
+export function resolveBrowserPath(browserType = DEFAULT_BROWSER, customPath = null) {
   const type = normalizeBrowserType(browserType);
   if (customPath) {
     if (fs.existsSync(customPath)) return customPath;
@@ -58,11 +58,14 @@ export function resolveBrowserPath(browserType = 'chrome', customPath = null) {
 
   if (type === 'edge') {
     if (platform === 'win32') {
-      for (const root of [process.env.ProgramFiles, process.env['ProgramFiles(x86)']]) {
-        if (root) {
-          const candidate = path.join(root, 'Microsoft', 'Edge', 'Application', 'msedge.exe');
-          if (fs.existsSync(candidate)) return candidate;
-        }
+      const roots = [
+        process.env.ProgramFiles,
+        process.env['ProgramFiles(x86)'],
+        process.env.LocalAppData
+      ].filter(Boolean);
+      for (const root of roots) {
+        const candidate = root.endsWith('msedge.exe') ? root : path.join(root, 'Microsoft', 'Edge', 'Application', 'msedge.exe');
+        if (fs.existsSync(candidate)) return candidate;
       }
       const found = probeCommand('where.exe', ['msedge.exe']);
       if (found) return found;
@@ -104,7 +107,7 @@ function probeCommand(runner, binaries) {
   return null;
 }
 
-export function buildBrowserLaunchArgs({ browserType = 'chrome', port, profile, url, extraArgs = [] }) {
+export function buildBrowserLaunchArgs({ browserType = DEFAULT_BROWSER, port, profile, url, extraArgs = [] }) {
   const type = normalizeBrowserType(browserType);
   if (type === 'chrome' || type === 'edge') {
     return [

@@ -157,7 +157,7 @@ async function store(options) {
 }
 
 async function storeUnlocked(options) {
-  const sub = options._[0] ?? 'help'; const root = appRoot(workspace, options.app ?? options._[1] ?? '.'); const desired = loadDesired(root); resolveDesiredPaths(root, desired); if (desired.listingMarkdown && fs.existsSync(desired.listingMarkdown)) importListingMarkdown(desired, desired.listingMarkdown); const stateDir = path.join(root, '.cache', 'store'); fs.mkdirSync(stateDir, { recursive: true }); const storeRunId = runId(`store-${sub}`); const manifestFile = desired.package?.manifestPath && fs.existsSync(desired.package.manifestPath) ? desired.package.manifestPath : ''; const manifestHash = manifestFile ? sha256Sync(manifestFile) : ''; const checkpoint = loadCheckpoint(stateDir, { productId: desired.productId, submissionId: desired.submissionId, manifestHash }); checkpoint.manifestHash = manifestHash || checkpoint.manifestHash; const logger = new Logger({ runId: storeRunId, root: path.join(workspace, '.cache/qam/runs', storeRunId) });
+  const sub = options._[0] ?? 'help'; const root = appRoot(workspace, options.app ?? options._[1] ?? '.'); const desired = loadDesired(root); desired.appRoot = root; resolveDesiredPaths(root, desired); if (desired.listingMarkdown && fs.existsSync(desired.listingMarkdown)) importListingMarkdown(desired, desired.listingMarkdown); const stateDir = path.join(root, '.cache', 'store'); fs.mkdirSync(stateDir, { recursive: true }); const storeRunId = runId(`store-${sub}`); const manifestFile = desired.package?.manifestPath && fs.existsSync(desired.package.manifestPath) ? desired.package.manifestPath : ''; const manifestHash = manifestFile ? sha256Sync(manifestFile) : ''; const checkpoint = loadCheckpoint(stateDir, { productId: desired.productId, submissionId: desired.submissionId, manifestHash }); checkpoint.manifestHash = manifestHash || checkpoint.manifestHash; const logger = new Logger({ runId: storeRunId, root: path.join(workspace, '.cache/qam/runs', storeRunId) });
   if (sub === 'preflight') { const result = runPreflight({ workspace, appRoot: root, desired, outputPath: path.join(logger.root, 'preflight-result.json') }); console.log(JSON.stringify(result, null, 2)); return 0; }
   if (sub === 'status') { console.log(JSON.stringify({ checkpoint, session: readJson(path.join(stateDir, 'session.json'), null) }, null, 2)); return 0; }
   const browserType = resolveBrowserType({ option: options.browser, config: desired });
@@ -194,17 +194,22 @@ async function discoverSubmission(page, desired, checkpoint, logger) {
   desired.productId = prodId;
   const base = desired.site.baseUrl.replace(/\/$/, '');
   const overviewUrl = `${base}/${encodeURIComponent(prodId)}/overview`;
-  if (!page.url().includes('/submissions/') && !page.url().includes(`/products/${prodId}/overview`)) {
+  if (!checkpoint.submissionId || (!page.url().includes('/submissions/') && !page.url().includes(`/products/${prodId}/overview`))) {
     await page.goto(overviewUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   }
   await waitForPageKind(page, ['ProductOverview', 'SubmissionOverview'], { operation: 'product overview' });
 
+  await page.waitForLoadState('networkidle').catch(() => {});
   let id = page.url().match(/\/submissions\/([^/?#]+)/i)?.[1] ?? checkpoint.submissionId ?? desired.submissionId;
   const getSubmissionHrefs = async () => {
-    return await page.evaluate(() => {
-      const anchors = [...document.querySelectorAll('a')];
-      return anchors.map(a => a.getAttribute('href') || a.href).filter(h => h && h.includes('/submissions/'));
-    });
+    try {
+      return await page.evaluate(() => {
+        const anchors = [...document.querySelectorAll('a')];
+        return anchors.map(a => a.getAttribute('href') || a.href).filter(h => h && h.includes('/submissions/'));
+      });
+    } catch {
+      return [];
+    }
   };
 
   let foundHrefs = await getSubmissionHrefs();
@@ -217,13 +222,12 @@ async function discoverSubmission(page, desired, checkpoint, logger) {
     const startBtn = page.locator('he-button[data-l10n-key="Start_Submission"], he-button:has-text("开始提交"), button:has-text("开始提交"), a:has-text("开始提交")').first();
     if (await startBtn.count()) {
       await startBtn.click().catch(() => {});
-    } else {
-      await page.evaluate(() => {
-        const heBtn = document.querySelector('he-button[data-l10n-key="Start_Submission"]') || document.querySelector('he-button');
-        const innerBtn = heBtn?.shadowRoot?.querySelector('button') || heBtn?.querySelector('button') || heBtn;
-        innerBtn?.click();
-      });
     }
+    await page.evaluate(() => {
+      const heBtn = document.querySelector('he-button[data-l10n-key="Start_Submission"]') || [...document.querySelectorAll('he-button')].find(b => (b.textContent || '').includes('开始提交'));
+      const innerBtn = heBtn?.shadowRoot?.querySelector('button') || heBtn?.querySelector('button') || heBtn;
+      innerBtn?.click();
+    }).catch(() => {});
 
     await waitUntil(async () => {
       foundHrefs = await getSubmissionHrefs();
@@ -252,7 +256,7 @@ async function discoverSubmission(page, desired, checkpoint, logger) {
   logger?.pass('submission discovered', { submissionId: id, routes });
   return { submissionId: id, routes, url: page.url() };
 }
-async function verifyAll(page, desired, checkpoint, logger) { const url = `${desired.site.baseUrl.replace(/\/$/, '')}/${encodeURIComponent(desired.productId)}/overview`; await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 }); const overview = await observeOverview(page); const incomplete = PHASES.filter(phase => overview.modules[phase]?.status !== 'Complete'); const result = { ok: incomplete.length === 0, url: overview.url, pageKind: overview.pageKind, modules: overview.modules, incomplete }; logger?.event(result.ok ? 'PRODUCT_VERIFIED' : 'PRODUCT_INCOMPLETE', result); writeAtomic(workspace, path.join(logger.root, 'verify-result.json'), result); return result; }
+async function verifyAll(page, desired, checkpoint, logger) { const submission = checkpoint.submissionId || desired.submissionId; const base = desired.site.baseUrl.replace(/\/$/, ''); const product = encodeURIComponent(desired.productId); const url = submission ? `${base}/${product}/submissions/${submission}/overview` : `${base}/${product}/overview`; await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 }); const overview = await observeOverview(page); const incomplete = PHASES.filter(phase => overview.modules[phase]?.status !== 'Complete'); const result = { ok: incomplete.length === 0, url: overview.url, pageKind: overview.pageKind, modules: overview.modules, incomplete }; logger?.event(result.ok ? 'PRODUCT_VERIFIED' : 'PRODUCT_INCOMPLETE', result); writeAtomic(workspace, path.join(logger.root, 'verify-result.json'), result); return result; }
 
 async function check() {
   const stale = []; const roots = ['toolchain', 'bootstrap/workers', 'skills/vainreef-fast-publish/references/toolchain/v1']; for (const item of roots) if (fs.existsSync(path.join(ROOT, item))) stale.push(item);

@@ -73,12 +73,31 @@ export class BrowserSession {
   async start() {
     const port = await freePort();
     const runId = `${Date.now()}-${process.pid}`;
-    const profile = assertWithin(
-      this.workspace,
-      path.join(this.stateDir, `profile-${this.browserType}-${runId}`),
-      'browser profile'
-    );
-    fs.mkdirSync(profile, { recursive: true });
+    let profile = null;
+    if (fs.existsSync(this.statePath())) {
+      try {
+        const oldSession = JSON.parse(fs.readFileSync(this.statePath(), 'utf8'));
+        if (oldSession?.profile && fs.existsSync(oldSession.profile)) {
+          profile = oldSession.profile;
+        }
+      } catch {}
+    }
+    if (!profile && fs.existsSync(this.stateDir)) {
+      const candidates = fs.readdirSync(this.stateDir)
+        .filter(f => f.startsWith(`profile-${this.browserType}-`))
+        .sort().reverse();
+      if (candidates.length > 0) {
+        profile = path.join(this.stateDir, candidates[0]);
+      }
+    }
+    if (!profile) {
+      profile = assertWithin(
+        this.workspace,
+        path.join(this.stateDir, `profile-${this.browserType}-${runId}`),
+        'browser profile'
+      );
+      fs.mkdirSync(profile, { recursive: true });
+    }
 
     const args = buildBrowserLaunchArgs({
       browserType: this.browserType,

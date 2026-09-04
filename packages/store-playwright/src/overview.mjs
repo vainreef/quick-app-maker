@@ -12,8 +12,8 @@ const routeHints = {
 
 export async function observeOverview(page) {
   const snapshot = await waitForPageKind(page, ['SubmissionOverview', 'ProductOverview'], { operation: 'submission overview' });
-  await page.locator('.accordion-body-list-itembox, .module-name, [class*="module"], a[href*="submissions"]').first().waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
-  await page.waitForTimeout(1000);
+  await page.locator('.accordion-body-list-itembox').first().waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
+  await page.waitForTimeout(2000);
   const modules = {};
 
   const boxes = page.locator('.accordion-body-list-itembox');

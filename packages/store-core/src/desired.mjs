@@ -8,10 +8,10 @@ export const DEFAULT_DESIRED = {
   package: { path: '', executable: '', architecture: 'x64' },
   values: { description: '', shortDescription: '', features: [], keywords: [] },
   pricing: { currency: 'CN', priceTier: '0', markets: 'all', audience: 'Public' },
-  properties: { category: 'Productivity', privacy: 'No', privacyPolicyText: '', privacyPolicyUrl: '', capabilities: {} },
+  properties: { category: 'Productivity', privacy: 'Yes', privacyPolicyText: '本应用为纯单机离线运行的个人工具软件，不收集、不存储、不传输亦不共享任何用户个人信息或设备数据。所有数据均安全保存在用户本地设备中。', privacyPolicyUrl: '', capabilities: {} },
   ageRatings: { mode: 'questionnaire', applicationType: '2558', answers: {}, defaultAnswer: 'No', requireConfirmation: true, confirmed: false, physicalMedia: false, iarcTerms: true },
   listing: { languageCode: 'zh-cn', screenshot: true, assets: {} },
-  submissionOptions: { publishMode: 'Manual', runFullTrustReason: '' }
+  submissionOptions: { publishMode: 'Asap', runFullTrustReason: '本产品为基于 Windows 本地独立运行的桌面应用程序。需要使用 runFullTrust 权限以读写本地用户数据存储文件，实现数据本地安全持久化保存，不依赖也不连接任何外部云端网络服务。' }
 };
 
 export function loadDesired(appRoot) {

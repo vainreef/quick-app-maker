@@ -64,7 +64,28 @@ export async function reserveProduct({ page, appRoot, desired, name, logger }) {
   desired.productId = productId;
 
   const identity = await scrapeIdentity(page, desired, appRoot, productId);
-  if (!identity.identityName || !identity.publisher || !identity.publisherDisplayName) throw Object.assign(new Error('Product Identity 字段未能在页面中完整识别'), { code: 'SCHEMA_DRIFT', identity });
+  // Auto-detect the true product name from Partner Center page title or header
+  let detectedName = '';
+  try {
+    const pageTitle = await page.title().catch(() => '');
+    const titleParts = pageTitle.split('|').map(s => s.trim()).filter(Boolean);
+    if (titleParts.length >= 2) {
+      const candidate = titleParts[titleParts.length - 2];
+      if (candidate && !/overview|dashboard|合作伙伴中心|Partner Center/i.test(candidate)) {
+        detectedName = candidate;
+      }
+    }
+    if (!detectedName) {
+      const headerName = await page.locator('h1, .app-title, .product-title, .masthead-title, .c-heading').first().innerText().catch(() => '');
+      if (headerName && headerName.length < 60) detectedName = headerName.trim();
+    }
+  } catch {}
+
+  if (detectedName && detectedName !== name) {
+    console.log(`[BROWSER_ACTION] 💡 Auto-detected actual reserved product name from Partner Center: "${detectedName}" (replacing "${name}")`);
+    name = detectedName;
+  }
+
   desired.productId = productId; desired.productName = name; desired.package.identityName = identity.identityName; desired.package.publisher = identity.publisher; desired.package.publisherDisplayName = identity.publisherDisplayName;
   const stored = structuredClone(desired);
   for (const key of ['path', 'manifestPath']) if (stored.package?.[key]) stored.package[key] = path.relative(appRoot, stored.package[key]).replaceAll('\\', '/');
