@@ -41,11 +41,16 @@ node bin/qam.mjs self-test
 # 2. 自动化契约质量验收（Agent 必跑，秒级退出，提供确凿证据）
 & "$qamRoot\bootstrap\qam.cmd" test .\app-slug
 
-# 3. 在后台启动开发热重载（长驻 Watcher 进程，直接向用户展示窗口）
+# 3. 生成无头界面截图；其他代表性状态按验收边界补充
+& "$qamRoot\bootstrap\qam.cmd" screenshot .\app-slug --width 1366 --height 768
+
+# 4. 在后台启动开发热重载（长驻 Watcher 进程，直接向用户展示窗口）
 & "$qamRoot\bootstrap\qam.cmd" dev .\app-slug
 ```
 
 ---
+
+测试覆盖、截图生成与用户视觉确认分别记录，详见 [验收边界](acceptance.md)。现有命令不等于内置全部业务回归或视觉评估；补充检查使用当前已支持入口并实际验证。
 
 ## 3. Microsoft Store 自动化发布（五步标准流程）
 
@@ -58,7 +63,7 @@ node bin/qam.mjs self-test
 
 # 第 2 步：盘点全部素材规格，与用户确认素材来源方案（全自动生成 / 用户提供）
 
-# 第 3 步：真机渲染高清截图与图标，整理至 store-submission-assets，置顶呼出供用户检视确认
+# 第 3 步：无头界面渲染高清截图与图标，整理至 store-submission-assets，置顶呼出供用户检视确认
 # 首页/默认视图截图：
 & "$qamRoot\bootstrap\qam.cmd" screenshot .\app-slug --width 1366 --height 768 --output .\app-slug\store-submission-assets\01_应用主界面高清截图_1366x768.png
 # 子页面/特定视图截图（支持 --eval 动态执行 JS 或 --click 触发按钮点击，无侵入捕获）：

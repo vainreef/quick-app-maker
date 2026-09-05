@@ -131,7 +131,7 @@ Implement user features inside the app directory (e.g. `countdown-app/`). **Zero
 # 1. Run headless contract & mount test (sub-second exit with deterministic code)
 .\quick-app-maker\bootstrap\qam.cmd test .\countdown-app
 
-# 2. Capture real headless screenshot for visual inspection (checks button visibility, contrast, absence of debug text)
+# 2. Generate headless screenshots, including representative populated/image states; the user confirms appearance
 .\quick-app-maker\bootstrap\qam.cmd screenshot .\countdown-app --width 1366 --height 768
 ```
 
@@ -230,7 +230,7 @@ To inspect or debug individual phases during automation:
 | **Using `localStorage`** | Fails desktop persistence contract, breaks sandbox | Always use `window.qam.saveState` and `window.qam.loadState` with IPC schema |
 | **Removing `unsafe-eval` from CSP** | Vue 3 compiler fails in browser, `v-cloak` stays locked | Keep `script-src 'self' 'unsafe-eval'` in `index.html` CSP |
 | **Exposing code jargon to users** | Poor user experience for non-technical users | Never mention slug, IPC, Vue; directly open the app window for testing |
-| **Omitting visual inspection** | Broken layout, hidden buttons, low contrast, or debug text | Must capture and inspect `qam screenshot` before delivery or asset submission |
+| **Treating screenshot generation as visual approval** | Unsupported layout claims from text-only models or OCR; populated states overlooked | Generate representative screenshots, distinguish program evidence from visual review, and let the user confirm appearance |
 | **Ignoring warning logs** | Silent false-positives (e.g. empty price tier) pass unnoticed | Zero unhandled warnings: any `not found` or `failed` must be investigated |
 | **Modifying source for screenshots** | Risk of source code corruption if interrupted | Use `qam screenshot --eval` or `--click` for non-invasive multi-view capture |
 | **Holding dev lock during publish** | Workspace locked, leading to `workspace is busy` | Stop background `dev` task before running `store launch` or package commands |
@@ -246,4 +246,4 @@ To inspect or debug individual phases during automation:
   .\quick-app-maker\bootstrap\qam.cmd check
   .\quick-app-maker\bootstrap\qam.cmd self-test
   ```
-- **Delivery Standard**: Automated verification is completed once `qam test` passes contract/syntax checks and `qam screenshot` confirms visual cleanliness; `qam dev` is then launched to present the window for the user to personally test and experience inputs, persistence, and UI behavior. DevTools is opt-in (`$env:QAM_DEVTOOLS='1'`).
+- **Delivery Standard**: Record the actual scope and pass/fail/skipped/not-run status of template, mounting, and isolated business checks. `qam screenshot` generates representative images, not proof of visual quality or real persistence. Text-only agents review program/text evidence and show the images without visual endorsements; desktop control and multimodal input are not prerequisites. Launch `qam dev` for the user to confirm appearance, interaction, file selection, and save/reopen behavior. See [acceptance boundaries](skills/vainreef-fast-publish/references/acceptance.md). DevTools is opt-in (`$env:QAM_DEVTOOLS='1'`).
