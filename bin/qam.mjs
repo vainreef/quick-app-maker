@@ -205,7 +205,6 @@ async function discoverSubmission(page, desired, checkpoint, logger) {
   await waitForPageKind(page, ['ProductOverview', 'SubmissionOverview'], { operation: 'product overview' });
 
   await page.waitForLoadState('networkidle').catch(() => {});
-  let id = page.url().match(/\/submissions\/([^/?#]+)/i)?.[1] ?? checkpoint.submissionId ?? desired.submissionId;
   const getSubmissionHrefs = async () => {
     try {
       return await page.evaluate(() => {
@@ -216,11 +215,16 @@ async function discoverSubmission(page, desired, checkpoint, logger) {
       return [];
     }
   };
-
   let foundHrefs = await getSubmissionHrefs();
+  let id = '';
   for (const href of foundHrefs) {
-    const match = href.match(/\/submissions\/([^/?#]+)/i);
-    if (match && match[1]) { id = match[1]; break; }
+    if (href.includes(`/products/${prodId}/`)) {
+      const match = href.match(/\/submissions\/([^/?#]+)/i);
+      if (match && match[1]) { id = match[1]; break; }
+    }
+  }
+  if (!id && page.url().includes(`/products/${prodId}/submissions/`)) {
+    id = page.url().match(/\/submissions\/([^/?#]+)/i)?.[1] || '';
   }
 
   if (!id) {
@@ -261,7 +265,37 @@ async function discoverSubmission(page, desired, checkpoint, logger) {
   logger?.pass('submission discovered', { submissionId: id, routes });
   return { submissionId: id, routes, url: page.url() };
 }
-async function verifyAll(page, desired, checkpoint, logger) { const submission = checkpoint.submissionId || desired.submissionId; const base = desired.site.baseUrl.replace(/\/$/, ''); const product = encodeURIComponent(desired.productId); const url = submission ? `${base}/${product}/submissions/${submission}/overview` : `${base}/${product}/overview`; await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 }); const overview = await observeOverview(page); const incomplete = PHASES.filter(phase => overview.modules[phase]?.status !== 'Complete'); const result = { ok: incomplete.length === 0, url: overview.url, pageKind: overview.pageKind, modules: overview.modules, incomplete }; logger?.event(result.ok ? 'PRODUCT_VERIFIED' : 'PRODUCT_INCOMPLETE', result); writeAtomic(workspace, path.join(logger.root, 'verify-result.json'), result); return result; }
+async function verifyAll(page, desired, checkpoint, logger) {
+  const submission = checkpoint.submissionId || desired.submissionId;
+  const base = desired.site.baseUrl.replace(/\/$/, '');
+  const product = encodeURIComponent(desired.productId);
+  const targetUrl = submission ? `${base}/${product}/submissions/${submission}` : `${base}/${product}/overview`;
+  const curUrl = page.url();
+  if (!submission || !curUrl.includes(`/submissions/${submission}`)) {
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+  }
+  const overview = await observeOverview(page);
+  const incomplete = PHASES.filter(phase => overview.modules[phase]?.status !== 'Complete');
+  const isSubmitEnabled = Boolean(overview.isSubmitEnabled);
+  const ok = incomplete.length === 0 && isSubmitEnabled;
+  const blockers = [
+    ...incomplete.map(phase => `Phase [${phase}] status is "${overview.modules[phase]?.status || 'Unknown'}"`),
+    ...(!isSubmitEnabled ? ['"提交进行认证" (Submit for certification) button is disabled, has "disable-submit" class, or not ready'] : [])
+  ];
+  const result = {
+    ok,
+    url: overview.url,
+    pageKind: overview.pageKind,
+    isSubmitEnabled,
+    submitButton: overview.submitButton,
+    modules: overview.modules,
+    incomplete,
+    blockers
+  };
+  logger?.event(result.ok ? 'PRODUCT_VERIFIED' : 'PRODUCT_INCOMPLETE', result);
+  writeAtomic(workspace, path.join(logger.root, 'verify-result.json'), result);
+  return result;
+}
 
 async function check() {
   const stale = []; const roots = ['toolchain', 'bootstrap/workers', 'skills/vainreef-fast-publish/references/toolchain/v1']; for (const item of roots) if (fs.existsSync(path.join(ROOT, item))) stale.push(item);

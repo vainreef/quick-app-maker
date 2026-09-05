@@ -22,10 +22,24 @@ export function importListingMarkdown(desired, filePath) {
     if (current) sections.get(current).push(line);
   }
   const values = desired.values ?? (desired.values = {});
-  if (sections.has('shortDescription')) values.shortDescription = clean(sections.get('shortDescription').join('\n'));
-  if (sections.has('description')) values.description = clean(sections.get('description').join('\n'));
-  if (sections.has('features')) values.features = sections.get('features').map(x => x.replace(/^\s*[-*+]\s+/, '').trim()).filter(Boolean);
-  if (sections.has('keywords')) values.keywords = sections.get('keywords').join('\n').split(/[;,，、\n]/).map(x => x.trim()).filter(Boolean);
+  const importedDesc = sections.has('description') ? clean(sections.get('description').join('\n')) : '';
+  const importedShort = sections.has('shortDescription') ? clean(sections.get('shortDescription').join('\n')) : '';
+  const importedFeatures = sections.has('features') ? sections.get('features').map(x => x.replace(/^\s*[-*+]\s+/, '').trim()).filter(Boolean) : [];
+  const importedKeywords = sections.has('keywords') ? sections.get('keywords').join('\n').split(/[;,，、\n]/).map(x => x.trim()).filter(Boolean) : [];
+
+  const isTemplateDesc = /是一款专为 Windows 平台打造的高性能纯单机个人桌面应用|模板应用|默认应用描述/i.test(importedDesc);
+  if (importedDesc && (!values.description || (!isTemplateDesc && importedDesc.length > 30))) {
+    values.description = importedDesc;
+  }
+  if (importedShort && (!values.shortDescription || importedShort.length > 10)) {
+    values.shortDescription = importedShort;
+  }
+  if (importedFeatures.length && (!values.features?.length || importedFeatures.length >= values.features.length)) {
+    values.features = importedFeatures;
+  }
+  if (importedKeywords.length && (!values.keywords?.length || importedKeywords.length >= values.keywords.length)) {
+    values.keywords = importedKeywords;
+  }
   return desired;
 }
 function clean(value) { return value.trim().replace(/\n{3,}/g, '\n\n'); }

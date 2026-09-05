@@ -7,7 +7,7 @@ import { observeOverview } from './overview.mjs';
 const accepted = {
   availability: ['AvailabilityForm'],
   properties: ['PropertiesForm'],
-  'age-ratings': ['AgeRatingsQuestionnaire', 'AgeRatingsSummary'],
+  'age-ratings': ['AgeRatingsQuestionnaire', 'AgeRatingsSummary', 'SubmissionOverview'],
   packages: ['PackagesForm'],
   listing: ['ListingLanguageGrid', 'ListingForm'],
   options: ['OptionsForm']
@@ -233,11 +233,12 @@ async function save(page) {
 
   console.log('[BROWSER_ACTION] 🖱️ Clicking Save button...');
   await button.scrollIntoViewIfNeeded().catch(() => {});
-  await button.click({ force: true, timeout: 15_000 }).catch(async (e) => {
-    console.log(`[BROWSER_ACTION] Playwright click caught: ${e.message}, falling back to DOM click...`);
-    await button.evaluate(b => b.click()).catch(() => {});
-  });
-  await button.evaluate(b => b.click()).catch(() => {});
+  // Trigger DOM click directly to ensure Angular (click) handlers and form submit events fire reliably
+  await button.evaluate(b => {
+    b.scrollIntoView({ behavior: 'instant', block: 'center' });
+    b.click();
+  }).catch(() => {});
+  await button.click({ force: true, timeout: 5000 }).catch(() => {});
   }
 
   await waitUntil(async () => {
@@ -252,7 +253,19 @@ async function save(page) {
     if (alerts && /error|失败|错误|需要至少一张屏幕截图/i.test(alerts)) {
       throw Object.assign(new Error(`save returned an error: ${alerts}`), { retryable: false });
     }
-    const hasActiveUpload = (await page.locator('.progress-bar:visible, [role="progressbar"]:visible, .upload-progress:visible, .loading-overlay[style*="opacity: 1"]').count().catch(() => 0)) > 0;
+
+    // Accurately check for active uploads/spinners, ignoring transparent shell progressbars (opacity: 0)
+    const hasActiveUpload = await page.evaluate(() => {
+      const pbs = [...document.querySelectorAll('.upload-progress, [role="progressbar"], .progress-bar, .spinner, he-progress-ring')];
+      return pbs.some(el => {
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        const overlay = el.closest('.loading-overlay');
+        if (overlay && window.getComputedStyle(overlay).opacity === '0') return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+    }).catch(() => false);
     if (hasActiveUpload) return false;
 
     const body = await page.locator('body').innerText().catch(() => '');
@@ -310,7 +323,7 @@ async function observeAvailability(page) {
   if (!currency) {
     const curSelect = page.locator('market-group .price-config > he-select, .market-group-container .price-config > he-select, .price-config > he-select').first();
     if (await curSelect.count()) {
-      currency = (await curSelect.getAttribute('value')) || '';
+      currency = (await curSelect.getAttribute('value')) || (await curSelect.innerText().catch(() => '')).trim();
     }
   }
 
@@ -323,8 +336,11 @@ async function observeAvailability(page) {
   if (!priceTier) {
     const tierSelect = page.locator('price-tier-selection he-select').first();
     if (await tierSelect.count()) {
-      priceTier = (await tierSelect.getAttribute('value')) || '';
+      priceTier = (await tierSelect.getAttribute('value')) || (await tierSelect.innerText().catch(() => '')).trim();
     }
+  }
+  if (/免费|Free/i.test(priceTier)) {
+    priceTier = '0';
   }
 
   return {
@@ -557,40 +573,44 @@ async function applyAvailability(page, desired) {
     const s2 = document.querySelector('price-tier-selection[pricetierkey="Retail"] he-select') || document.querySelector('price-tier-selection he-select') || document.querySelectorAll('he-select')[1];
     if (!s2) return 'he-select not found';
 
-    // Step 1: Click the indicator button inside shadowRoot
-    const indicatorBtn = s2.shadowRoot?.querySelector('button.text-field__button') || s2.shadowRoot?.querySelector('button');
-    if (indicatorBtn) {
-      indicatorBtn.click();
-    } else {
-      const input = s2.shadowRoot?.querySelector('input');
-      input?.click();
+    const input = s2.shadowRoot?.querySelector('input');
+    const chevron = s2.shadowRoot?.querySelector('button.text-field__button') || s2.shadowRoot?.querySelector('button');
+
+    // Step 1: Clear any existing input/filter to unhide all options
+    if (input) {
+      input.focus();
+      input.value = '';
+      input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
     }
 
-    // Step 2: Wait for he-option elements to render
+    // Step 2: Ensure dropdown is open
+    if (!s2.__open && chevron) {
+      chevron.click();
+    }
+
+    // Step 3: Wait for options and find matching he-option
     let targetOpt = null;
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 100));
-      const options = [...s2.querySelectorAll('he-option'), ...document.querySelectorAll('price-tier-selection he-option')];
+      const options = [...s2.querySelectorAll('he-option'), ...document.querySelectorAll('price-tier-selection he-option'), ...document.querySelectorAll('he-option')];
       targetOpt = options.find(o => {
-        const txt = o.innerText.trim() || o.textContent.trim();
+        const txt = (o.innerText || o.textContent || '').trim();
         return txt === tier || (tier === '0' && (txt === '0' || txt === '免费' || txt.toLowerCase() === 'free'));
       });
-      if (targetOpt) break;
+      if (targetOpt && !targetOpt.hidden && !targetOpt.hasAttribute('hidden')) break;
     }
 
     if (targetOpt) {
-      // Step 3: Click the target he-option (e.g. 0)
+      // Step 4: Dispatch full click events on the he-option element
       targetOpt.click();
-      targetOpt.dispatchEvent(new CustomEvent('he-selected', { bubbles: true, detail: { item: targetOpt, value: tier } }));
+      targetOpt.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+      targetOpt.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, composed: true }));
+      targetOpt.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+      targetOpt.dispatchEvent(new CustomEvent('he-selected', { bubbles: true, composed: true, detail: { item: targetOpt, value: tier } }));
       
-      const input = s2.shadowRoot?.querySelector('input');
-      if (input) {
-        input.value = tier;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      document.body.click();
-      return targetOpt.innerText.trim() || targetOpt.textContent.trim();
+      await new Promise(r => setTimeout(r, 500));
+      return (targetOpt.innerText || targetOpt.textContent || '').trim();
     }
     return 'option not found';
   }, wantTier);
@@ -607,9 +627,13 @@ async function applyAvailability(page, desired) {
   await page.waitForTimeout(1500);
 
   // 5. Cold Read-back Verification on availability form if still on page
+  if (page.url().includes('/overview')) {
+    console.log('[BROWSER_ACTION] Availability successfully saved and returned to overview!');
+    return;
+  }
   const recheck = await observeAvailability(page).catch(() => null);
   if (recheck && recheck.priceTier === '') {
-    const isOverview = await page.locator('he-button[data-l10n-key="Start_Submission"], .submission-overview-container').count().catch(() => 0);
+    const isOverview = page.url().includes('/overview') || (await page.locator('he-button[data-l10n-key="Start_Submission"], .submission-overview-container').count().catch(() => 0));
     if (!isOverview) {
       throw Object.assign(new Error('Availability form saved but Price Tier remains empty in DOM!'), { code: 'PRICE_TIER_EMPTY' });
     }
@@ -722,22 +746,59 @@ async function applyProperties(page, desired, diff = []) {
   await save(page);
 }
 async function applyAgeRatings(page, desired) {
-  console.log('[BROWSER_ACTION] ⚙️ Applying Age Ratings form from scratch...');
+  console.log('[BROWSER_ACTION] ⚙️ Applying Age Ratings form...');
 
-  // Check if we are genuinely on summary/preview screen
-  const isSummary = page.url().includes('ageratings/summary') || (await page.locator('age-rating-summary, .rating-summary-table, .rating-preview, he-button[data-l10n-key="AppSubmission_AgeRating_ContinueButton"]').count()) > 0;
-  if (isSummary) {
-    console.log('[BROWSER_ACTION] On Age Ratings Summary/Preview screen. Checking terms and clicking Continue/Save...');
+  const completeSummary = async () => {
+    console.log('[BROWSER_ACTION] On Age Ratings Summary/Preview screen. Checking terms and clicking Continue...');
     const terms = page.locator('he-checkbox, input[type="checkbox"]').filter({ hasText: /IARC|条款|terms/i }).or(page.locator('he-checkbox')).first();
     if (await terms.count()) {
-      await terms.evaluate(el => el.click()).catch(() => terms.click({ force: true }));
+      const checked = await terms.isChecked().catch(async () => (await terms.getAttribute('checked')) !== null || (await terms.getAttribute('aria-checked')) === 'true');
+      if (!checked) {
+        console.log('[BROWSER_ACTION] Checking IARC terms checkbox...');
+        await terms.evaluate(el => el.click()).catch(() => terms.click({ force: true }));
+      }
     }
-    await page.waitForTimeout(500);
-    const contBtn = page.locator('he-button[data-l10n-key="AppSubmission_AgeRating_ContinueButton"], he-button').filter({ hasText: /继续|Continue|保存|Save/i }).first();
+    await page.waitForTimeout(1000);
+
+    // Step A: Click "保存" (Save) button on summary page to commit ratings
+    const saveBtn = page.locator('he-button[data-l10n-key="AppSubmission_AgeRating_SaveButton"]')
+      .or(page.locator('he-button, button').filter({ hasText: /^保存$|^Save$/i }))
+      .first();
+    if (await saveBtn.count()) {
+      const isDisabled = await saveBtn.isDisabled().catch(() => false);
+      if (!isDisabled) {
+        console.log('[BROWSER_ACTION] Clicking "保存" (Save) button on Age Ratings summary page...');
+        await saveBtn.click({ force: true }).catch(async () => saveBtn.evaluate(el => el.click()));
+        await page.waitForTimeout(2000);
+      }
+    }
+
+    // Step B: Click "继续" (Continue) button that links back to submission overview
+    const contBtn = page.locator('he-button[data-l10n-key="AppSubmission_AgeRating_ContinueButton"]')
+      .or(page.locator('he-button, button').filter({ hasText: /^继续$|^Continue$|提交分级|确认并继续/i }))
+      .or(page.locator('he-button[appearance="primary"]').filter({ hasNotText: /草稿|Draft|取消|Cancel/i }))
+      .first();
+
     if (await contBtn.count()) {
       console.log('[BROWSER_ACTION] Clicking "继续" (Continue) button on Age Ratings summary page...');
-      await contBtn.click({ force: true }).catch(async () => contBtn.evaluate(el => el.click()));
+      await contBtn.click({ force: true }).catch(async () => {
+        await page.evaluate(() => {
+          const b = document.querySelector('he-button[data-l10n-key="AppSubmission_AgeRating_ContinueButton"]');
+          const a = b?.shadowRoot?.querySelector('a') || b;
+          a?.click();
+        });
+      });
+      console.log('[BROWSER_ACTION] Waiting for Age Ratings to finalize and return to submission overview...');
+      await page.waitForURL(url => !url.toString().includes('ageratings'), { timeout: 30_000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+      return true;
     }
+    return false;
+  };
+
+  const isSummary = page.url().includes('ageratings/summary') || (await page.locator('age-rating-summary, .rating-summary-table, .rating-preview, he-button[data-l10n-key="AppSubmission_AgeRating_ContinueButton"]').count()) > 0;
+  if (isSummary) {
+    await completeSummary();
     return;
   }
 
@@ -752,6 +813,10 @@ async function applyAgeRatings(page, desired) {
   // 2. Application Type (default: 2558 - 其他所有应用类型)
   const appType = desired.ageRatings?.applicationType || '2558';
   console.log(`[BROWSER_ACTION] Selecting Application Type => ${appType} (其他所有应用类型)`);
+  const typeLabel = page.locator(`label:has(input[value="${appType}"]), label:has-text("其他所有应用类型")`).first();
+  if (await typeLabel.count()) {
+    await typeLabel.click().catch(() => {});
+  }
   const typeRadio = page.locator(`input[name="question#1109"][value="${appType}"]`).or(page.locator(`input[value="${appType}"]`)).first();
   if (await typeRadio.count()) {
     await typeRadio.evaluate(el => {
@@ -760,7 +825,7 @@ async function applyAgeRatings(page, desired) {
       el.dispatchEvent(new Event('input', { bubbles: true }));
     }).catch(() => typeRadio.click({ force: true }));
   }
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(1500);
 
   // 3. Answer specific or default (No / 否) for all followup questions
   const groups = page.locator('.followup-questions [role="radiogroup"], .followup-questions .radio-group, questionnaire [role="radiogroup"]');
@@ -786,25 +851,35 @@ async function applyAgeRatings(page, desired) {
 
   // 5. Click "预览分级" (Preview Ratings) button
   console.log('[BROWSER_ACTION] Clicking "预览分级" (Preview Ratings) button...');
-  const previewBtn = page.locator('he-button[data-l10n-key="AppSubmission_AgeRating_PreviewRatingsButton"], he-button').filter({ hasText: /预览分级|预览|Preview/i }).or(page.locator('he-button[data-l10n-key="AppSubmission_AgeRating_SaveDraftButton"], he-button:has-text("保存草稿")')).first();
+  const previewBtn = page.locator('he-button[data-l10n-key="AppSubmission_AgeRating_PreviewRatingsButton"]')
+    .or(page.locator('he-button, button').filter({ hasText: /预览分级|生成分级|Preview Ratings/i }))
+    .first();
+
   if (await previewBtn.count()) {
     await previewBtn.click({ force: true }).catch(async () => previewBtn.evaluate(el => el.click()));
-  }
-  await page.waitForTimeout(4000);
-
-  // 6. Handle summary page if it transitioned to summary / preview
-  const summaryTerms = page.locator('he-checkbox, input[type="checkbox"]').filter({ hasText: /IARC|条款|terms/i }).or(page.locator('he-checkbox')).first();
-  if (await summaryTerms.count()) {
-    console.log('[BROWSER_ACTION] Accepting IARC Terms & Conditions on preview screen...');
-    await summaryTerms.evaluate(el => el.click()).catch(() => summaryTerms.click({ force: true }));
-    await page.waitForTimeout(500);
+  } else {
+    const primaryBtn = page.locator('he-button[appearance="primary"]').filter({ hasNotText: /草稿|Draft|取消|Cancel/i }).first();
+    if (await primaryBtn.count()) {
+      await primaryBtn.click({ force: true }).catch(async () => primaryBtn.evaluate(el => el.click()));
+    }
   }
 
-  const finalContinue = page.locator('he-button[data-l10n-key="AppSubmission_AgeRating_ContinueButton"], he-button, button, input[type="submit"]').filter({ hasText: /继续|Continue|保存|Save|提交|Submit/i }).first();
-  if (await finalContinue.count()) {
-    console.log('[BROWSER_ACTION] Clicking final "继续" (Continue) button on Age Ratings page...');
-    await finalContinue.click({ force: true }).catch(async () => finalContinue.evaluate(el => el.click()));
-    await page.waitForTimeout(2000);
+  console.log('[BROWSER_ACTION] Waiting for transition to Age Ratings summary/preview screen...');
+  const transitioned = await waitUntil(async () => {
+    if (page.url().includes('ageratings/summary')) return true;
+    const summaryCount = await page.locator('age-rating-summary, .rating-summary-table, .rating-preview, he-button[data-l10n-key="AppSubmission_AgeRating_ContinueButton"]').count();
+    return summaryCount > 0;
+  }, { timeoutMs: 30_000, intervalMs: 1_000 }).catch(() => false);
+
+  if (transitioned) {
+    await completeSummary();
+  } else {
+    console.warn('[BROWSER_ACTION] Warning: Did not transition to Age Ratings summary within 30s. Checking fallback controls...');
+    const fallbackCont = page.locator('he-button[data-l10n-key="AppSubmission_AgeRating_ContinueButton"], he-button').filter({ hasText: /^继续$|^Continue$/i }).first();
+    if (await fallbackCont.count()) {
+      await fallbackCont.click({ force: true }).catch(async () => fallbackCont.evaluate(el => el.click()));
+      await page.waitForTimeout(2000);
+    }
   }
 }
 async function setFileInput(page, selector, targetPath) {

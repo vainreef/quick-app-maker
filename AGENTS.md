@@ -58,7 +58,14 @@ PageKind → Direct-Apply（完整填表）→ 保存收敛 → 记录检查点
 14. **全交互显式日志记录与禁绝控制台噪音**：所有与浏览器发生的交互（导航 goto、元素读取、输入 fill、选择 choose、保存 save、冷导航刷新 coldVerify、总览校验 overviewVerify）必须全部打印清晰明确的 `[BROWSER_ACTION]` 日志，严禁打印 `BROWSER_CONSOLE` 冗余控制台噪音；
 15. **原生真机截图与禁止申请系统桌面权限铁律**：严禁向操作系统申请屏幕截屏权限（严禁加载所谓“桌面操作技能”）；所有真机界面截图必须且仅能通过官方原生命令 `qam screenshot .\app-slug` 无头捕获；工具底层已注入符合 `window.qam` 异步 Promise 契约的 Proxy Mock 并断言 `[v-cloak]` 彻底脱落，严禁截取未激活的空黑背景；
 16. **程序包故障行与删除态自愈铁律**：程序包上传页面若出现 `已暂停 (Paused)`、`错误 (Error)` 或 `This package will be removed` 状态，必须自动识别并点击 `a[data-l10n-key="app_package_action_delete"]` 清理故障项，或点击 `a[data-l10n-key="app_package_action_revert"]` 恢复正常包状态，点亮保存按钮，严禁在故障项未清除时强行点击 disabled 保存按钮；
-17. **云端大包解包异步等待与刷新重载铁律**：对于 50MB+ 的安装包，Partner Center 在云端解包验签需要 1~2 分钟。若提示“程序包需要长时间进行处理”，必须等待就绪或通过 `page.reload()` 重新同步云端真实就绪状态。
+17. **云端大包解包异步等待与刷新重载铁律**：对于 50MB+ 的安装包，Partner Center 在云端解包验签需要 1~2 分钟。若提示“程序包需要长时间进行处理”，必须等待就绪或通过 `page.reload()` 重新同步云端真实就绪状态；
+18. **「提交进行认证」按钮异步状态翻转与 DOM 原子级检测准出铁律**：
+    - **流程定界**：该验证位于「第 4 步机器全自动填报结束」与「第 5 步交付人工终审」之间的不可逾越的机器准出总检门禁（`store verify`）；
+    - **初始态不可点认知**：在 6 大阶段刚刚保存完成初次进入或返回概览页时，微软后台正在异步进行合规校验与程序包兼容性计算，Angular 变更检测亦在运行，**此时该按钮在 DOM 中默认处于不可点态（`<he-button class="... disable-submit" disabled="">`）**；
+    - **严禁视觉截图推断**：单页应用在后台同步期间极易呈现未刷新状态，绝对禁止根据静态屏幕截图妄下结论，必须通过 CDP 原生直检 `<he-button>` 的真实 DOM 属性；
+    - **异步状态翻转轮询门禁（Button State Transition Waiter）**：`store verify` 底层（`observeOverview`）已固化最多 60 秒的异步状态翻转探测轮询（每 1.5 秒重检一次 DOM）；
+    - **主动刷新自愈（Force Sync Reload）**：若轮询超过 18 秒按钮仍未翻转，脚本自动触发 `page.reload()` 强制刷新单页应用，拉取微软后台最新就绪状态；
+    - **终极准出判定**：只有当按钮确凿解除 `disable-submit` 类与 `disabled` 属性变为完全可点态（`isSubmitEnabled: true`），且 6 大模块全为 Complete 时，`store verify` 才返回退出码 0，流程方可跨入第 5 步交付用户人工点击。若该按钮仍处于不可点态，绝对严禁声称完成。
 
 ## 运行要求与进程模型
 

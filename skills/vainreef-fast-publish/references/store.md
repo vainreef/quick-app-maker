@@ -117,8 +117,11 @@
 - **Web Components 支持**：`<he-select>` 内部直接键入回车生效，`<he-button>` 支持复合定位；
 - **大包上传支持**：50MB+ 大文件通过 CDP `DOM.setFileInputFiles` 注入；
 - **单阶段执行链**：`PageKind → Direct-Apply（完整填表）→ 保存收敛 → 记录检查点`；
-- **总检**：六个阶段处理完成后运行现有 `store verify`，不把文档中尚未执行的其他机制写成已完成事实；
-- **人工终审边界**：`store verify` 全绿标后，CLI 不会自动点击最终的“提交进行认证”按钮，留给用户在浏览器中复核并点击。
+- **总检与「提交进行认证」可点性终极验收**：六个阶段处理完成后运行现有 `store verify`。**「提交进行认证」按钮是否解除禁用并进入可点态是全流程结束的唯一硬性门槛**：
+  - **可点状态（准出）**：`<he-button class="... he-button he-focusable" appearance="primary" type="button"> 提交进行认证 </he-button>`（无 `disable-submit` 类，无 `disabled` 属性，内部 shadow DOM 按钮无禁用）；
+  - **不可点状态（拦截）**：`<he-button class="... disable-submit" disabled=""> 提交进行认证 </he-button>`；
+  - 只有当 6 个阶段全部 Complete 且该按钮为可点态（`isSubmitEnabled: true`），CLI 才会返回 0 退出；任何该按钮处于不可点状态的汇报均视为不合格；
+- **人工终审边界**：确认「提交进行认证」按钮已确凿点亮后，CLI 不会自动点击该最终按钮，留给用户在浏览器中做最后人工复核并亲自点击。
 
 
 ## 4. 六大阶段表单直接填报细节
@@ -224,5 +227,15 @@
 29. **视觉自查第一铁律与无侵入多视图截图**：初版开发完成后必须通过 `qam screenshot` 进行核心交互按钮是否可见、深浅背景文字对比度是否清晰、界面是否无残留技术调试字样的视觉自查；非首屏截图统一使用 `qam screenshot .\app-slug --eval "..."` 或 `--click "..."`，绝对严禁为截图而临时篡改业务源码；
 30. **文案单一真理源自动同步机制**：`store-submission-assets/00_*.txt` 由底层 `loadDesired` 自动嗅探解析并回填至 `desired-state.json`，确保自动填报所使用的就是用户确认的正式文案，严禁上传脚手架占位文案；
 31. **告警零容忍阻断铁律**：日志中凡出现 `failed`、`not found`、`has-error`、`REQUEST_FAILED`，即使退出码为 0，也一律视为存在潜在风险，必须主动就地核实与排查；
-32. **阶段切换工作区锁协同**：进入 `store launch` / `store apply` 发布流程前，必须先停止后台正在运行的 `qam dev` 任务，释放工作区互斥锁（`WorkspaceLock`），避免触发 `workspace is busy`。
+32. **阶段切换工作区锁协同**：进入 `store launch` / `store apply` 发布流程前，必须先停止后台正在运行的 `qam dev` 任务，释放工作区互斥锁（`WorkspaceLock`），避免触发 `workspace is busy`；
+33. **「提交进行认证」按钮异步状态翻转与 DOM 原子级检测准出铁律**：
+    - **验证位置**：该验证位于「第 4 步全自动填报结束」与「第 5 步交付人工终审」之间的不可逾越的机器准出总检门禁（`store verify`）；
+    - **初态不可点特性（Disabled by Default）**：在 6 大阶段刚刚保存收敛返回概览页时，微软后台正在进行云端合规校验、安装包兼容性计算与 Angular 变更检测，**此时该按钮在 DOM 中必然处于不可点态（`<he-button class="... disable-submit" disabled="">`）**；
+    - **严禁视觉截图推断**：单页应用在后台同步期间极易呈现未刷新状态，绝对禁止根据静态屏幕截图妄下结论，必须通过 CDP 原生直检 `<he-button>` 的真实 DOM 属性；
+    - **异步状态翻转轮询门禁（Button State Transition Waiter）**：`store verify` 底层（`observeOverview`）已固化最多 60 秒的异步状态翻转探测轮询（每 1.5 秒重检一次 DOM）；
+    - **主动刷新自愈（Force Sync Reload）**：若轮询超过 18 秒按钮仍未翻转，脚本自动触发 `page.reload()` 强制刷新单页应用，拉取微软后台最新就绪状态；
+    - **硬指标双重通过断言**：
+      - **可点状态（通过）**：`<he-button class="... he-button he-focusable" appearance="primary" type="button"> 提交进行认证 </he-button>`，无 `disable-submit` 类，无 `disabled` 属性，内部 control 按钮无禁用（`isSubmitEnabled: true`）；
+      - **不可点状态（阻断）**：`<he-button class="... disable-submit" disabled=""> 提交进行认证 </he-button>`；
+    - **绝对严禁在按钮处于不可点状态时结束流程**！若六大模块显示完成但该按钮仍为不可点状态，一律判定为存在隐藏表单校验拦截，必须自动等待 Angular 校验同步或逐个模块回查修复，直到该按钮在 DOM 中确凿翻转为完全点亮可用。
 
