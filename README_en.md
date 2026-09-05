@@ -246,4 +246,4 @@ To inspect or debug individual phases during automation:
   .\quick-app-maker\bootstrap\qam.cmd check
   .\quick-app-maker\bootstrap\qam.cmd self-test
   ```
-- **Delivery Standard**: Process listings only prove launch. Full delivery requires verifiable user input, persistence, error recovery, and clean restart. DevTools is opt-in (`$env:QAM_DEVTOOLS='1'`).
+- **Delivery Standard**: Automated verification is completed once `qam test` passes contract/syntax checks and `qam screenshot` confirms visual cleanliness; `qam dev` is then launched to present the window for the user to personally test and experience inputs, persistence, and UI behavior. DevTools is opt-in (`$env:QAM_DEVTOOLS='1'`).

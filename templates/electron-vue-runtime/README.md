@@ -4,9 +4,11 @@
 
 初版 Electron/Vue Runtime 模板已生成。开发链不使用 bundler，源码直接运行。
 
-## 验证门槛
+## 验证与试用
 
-源码正则和进程列表只算静态/启动证据。交付试用前必须记录真实窗口的添加、错误、保存、关闭重开和 UI 交互证据到 `build/run-report.md`。
+1. 编写业务代码后，通过 `qam test` 完成语法、模板与 IPC 契约自动化验收；
+2. 通过 `qam screenshot` 捕获无头真机截图进行视觉防呆；
+3. 后台启动 `qam dev` 直接展示应用窗口，由用户亲自在真实窗口中体验交互、输入与数据持久化。
 
 ## 命令
 
@@ -14,7 +16,7 @@
 
 ```powershell
 .\quick-app-maker\bootstrap\qam.cmd test .\__SLUG__                          # 自动化测试验收（秒级退出）
-.\quick-app-maker\bootstrap\qam.cmd dev .\__SLUG__                           # 启动开发热重载（长驻服务）
+.\quick-app-maker\bootstrap\qam.cmd dev .\__SLUG__                           # 启动开发热重载（长驻服务，供用户试用）
 .\quick-app-maker\bootstrap\qam.cmd package .\__SLUG__ --profile store       # 生产封装生成 Store MSIX 包
 .\quick-app-maker\bootstrap\qam.cmd store preflight --app .\__SLUG__         # 离线静态预检
 ```
@@ -24,5 +26,4 @@
 - 需求：本文件补充用户目标、核心流程和验收标准；
 - 文案：`store/listing.zh-CN.md`；
 - 目标状态：`store/desired-state.json`；
-- 图标和截图：`store/assets/`；
-- 运行记录：`build/run-report.md`。
+- 图标和截图：`store/assets/`。

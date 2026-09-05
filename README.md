@@ -240,4 +240,4 @@ Project/
   .\quick-app-maker\bootstrap\qam.cmd check
   .\quick-app-maker\bootstrap\qam.cmd self-test
   ```
-- **交付验收标准**：进程列表仅证明命令启动；正式交付前必须完成真实窗口的输入、保存、错误与重启恢复路径。开发模式默认关闭 DevTools，需排查控制台时显式设置 `$env:QAM_DEVTOOLS='1'`。
+- **交付验收标准**：机器端以 `qam test` 语法与契约测试通过、`qam screenshot` 视觉防呆合格为基准；随后后台启动 `qam dev` 直接展示应用窗口，由用户亲自在真实窗口中体验输入、保存与持久化效果。开发模式默认关闭 DevTools，需排查控制台时显式设置 `$env:QAM_DEVTOOLS='1'`。
